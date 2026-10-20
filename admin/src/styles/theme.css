@@ -1,0 +1,235 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS  (single source of truth for every colour in the admin panel)
+
+   1. Raw semantic variables live on :root (light) and .dark (dark). Components never
+      use a palette colour like gray-800 / blue-600 – they use the semantic utilities below
+      (bg-surface, text-fg, border-line, bg-primary ...), so a theme switch is just a
+      variable swap and no `dark:` variants are needed.
+   2. `@theme inline` exposes those variables to Tailwind v4 as utilities (bg-*, text-*,
+      border-*, ring-*, fill-*, stroke-* ...) – opacity modifiers work: bg-primary/10.
+   3. To re-brand the panel, change the values in section 1 only.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --canvas: oklch(0.985 0.002 250);
+  /* page background */
+  --surface: oklch(1 0 0);
+  /* cards, inputs, popovers */
+  --surface-2: oklch(0.972 0.003 250);
+  /* subtle fill: table head, hover */
+  --surface-3: oklch(0.94 0.004 250);
+  /* stronger fill: skeleton, chips */
+  --overlay: oklch(0.18 0.01 260 / 0.45);
+  /* modal backdrop */
+
+  /* text */
+  --fg: oklch(0.18 0.01 260);
+  --fg-muted: oklch(0.38 0.01 260);
+  --fg-subtle: oklch(0.52 0.01 260);
+  --fg-faint: oklch(0.66 0.008 260);
+
+  /* lines */
+  --line: oklch(0.925 0.004 250);
+  --line-strong: oklch(0.865 0.006 250);
+  --ring: oklch(0.55 0.02 260);
+
+  /* brand */
+  --primary: oklch(0.2 0.01 260);
+  /* navy  (brand #000068 family) */
+  --primary-hover: oklch(0.3 0.01 260);
+  --primary-soft: oklch(0.962 0.003 250);
+  --primary-fg: oklch(0.99 0 0);
+  --accent: oklch(0.62 0.15 160);
+  /* red   (brand #fd0202 family) */
+  --accent-hover: oklch(0.56 0.15 160);
+  --accent-soft: oklch(0.96 0.04 160);
+  --accent-fg: oklch(0.99 0 0);
+
+  /* status */
+  --success: oklch(0.6 0.15 155);
+  --success-soft: oklch(0.96 0.045 155);
+  --warning: oklch(0.72 0.16 65);
+  --warning-soft: oklch(0.97 0.05 85);
+  --danger: oklch(0.58 0.21 22);
+  --danger-hover: oklch(0.49 0.22 25);
+  --danger-soft: oklch(0.965 0.03 22);
+  --info: oklch(0.6 0.17 250);
+  --info-soft: oklch(0.96 0.03 250);
+
+  /* constants (do not change with the theme) */
+  --ink: oklch(0.2 0.03 265);
+  /* always dark  */
+  --paper: oklch(1 0 0);
+  /* always white */
+
+  /* sidebar (dark navy in both themes) */
+  --sidebar: oklch(0.985 0.002 250);
+  --sidebar-2: oklch(0.972 0.003 250);
+  --sidebar-fg: oklch(0.2 0.01 260);
+  --sidebar-muted: oklch(0.52 0.01 260);
+  --sidebar-line: oklch(0.925 0.004 250);
+  --sidebar-hover: oklch(0.2 0.01 260 / 0.05);
+  --sidebar-active: oklch(0.2 0.01 260);
+
+  /* premium / gold (Ora AI) */
+  --gold-100: oklch(0.96 0.07 95);
+  --gold-200: oklch(0.91 0.12 92);
+  --gold-300: oklch(0.86 0.15 88);
+  --gold-500: oklch(0.7 0.13 78);
+  --gold-700: oklch(0.5 0.1 75);
+  --gold-900: oklch(0.3 0.07 70);
+  --gold-ink: oklch(0.25 0.05 70);
+
+  /* charts – one hue per series, same lightness */
+  --chart-1: oklch(0.6 0.17 250);
+  --chart-2: oklch(0.64 0.15 160);
+  --chart-3: oklch(0.76 0.16 70);
+  --chart-4: oklch(0.6 0.2 300);
+  --chart-5: oklch(0.65 0.22 5);
+  --chart-6: oklch(0.7 0.12 210);
+  --chart-grid: var(--line);
+
+  /* shape + depth */
+  --radius-control: 0.5rem;
+  --radius-card: 0.5rem;
+  --shadow-card: 0 1px 2px oklch(0.2 0.01 260 / 0.04), 0 4px 16px -6px oklch(0.2 0.01 260 / 0.06);
+  --shadow-pop: 0 10px 20px -50px oklch(0.2 0.01 260 / 0.28), 0 6px 16px -8px oklch(0.2 0.01 260 / 0.12);
+
+  /* layout */
+  --sidebar-width: 16.5rem;
+  --sidebar-width-collapsed: 4.75rem;
+  --topbar-height: 3.75rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: oklch(0.155 0.006 260);
+  --surface: oklch(0.205 0.008 260);
+  --surface-2: oklch(0.235 0.009 260);
+  --surface-3: oklch(0.29 0.01 260);
+  --overlay: oklch(0.08 0.02 265 / 0.7);
+
+  --fg: oklch(0.97 0.003 260);
+  --fg-muted: oklch(0.82 0.006 260);
+  --fg-subtle: oklch(0.69 0.008 260);
+  --fg-faint: oklch(0.55 0.01 260);
+
+  --line: oklch(0.285 0.01 260);
+  --line-strong: oklch(0.37 0.012 260);
+  --ring: oklch(0.75 0.02 260);
+
+  --primary: oklch(0.96 0.004 260);
+  --primary-hover: oklch(0.88 0.005 260);
+  --primary-soft: oklch(0.27 0.01 260);
+  --primary-fg: oklch(0.18 0.01 260);
+  --accent: oklch(0.72 0.15 160);
+  --accent-hover: oklch(0.78 0.14 160);
+  --accent-soft: oklch(0.29 0.05 160);
+  --accent-fg: oklch(0.99 0 0);
+
+  --success: oklch(0.7 0.15 152);
+  --success-soft: oklch(0.28 0.06 152);
+  --warning: oklch(0.78 0.15 80);
+  --warning-soft: oklch(0.3 0.065 80);
+  --danger: oklch(0.66 0.21 25);
+  --danger-hover: oklch(0.72 0.2 25);
+  --danger-soft: oklch(0.29 0.075 25);
+  --info: oklch(0.72 0.12 235);
+  --info-soft: oklch(0.28 0.05 235);
+
+  --sidebar: oklch(0.175 0.007 260);
+  --sidebar-2: oklch(0.155 0.006 260);
+  --sidebar-active: oklch(0.96 0.004 260);
+  --sidebar-fg: oklch(0.95 0.004 260);
+  --sidebar-muted: oklch(0.68 0.008 260);
+  --sidebar-line: oklch(0.27 0.01 260);
+  --sidebar-hover: oklch(1 0 0 / 0.07);
+
+  --chart-1: oklch(0.7 0.15 250);
+  --chart-2: oklch(0.74 0.15 160);
+  --chart-3: oklch(0.82 0.14 75);
+  --chart-4: oklch(0.72 0.17 300);
+  --chart-5: oklch(0.74 0.18 5);
+  --chart-6: oklch(0.76 0.11 210);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-pop: 0 14px 36px -8px oklch(0 0 0 / 0.6), 0 4px 10px -4px oklch(0 0 0 / 0.4);
+}
+
+/* Tailwind v4: CSS-first configuration. `inline` = utilities reference the variables above directly,
+   so they follow .dark without any extra generated CSS. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-overlay: var(--overlay);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-faint: var(--fg-faint);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ring: var(--ring);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-2: var(--sidebar-2);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-line: var(--sidebar-line);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+
+  --color-gold-100: var(--gold-100);
+  --color-gold-200: var(--gold-200);
+  --color-gold-300: var(--gold-300);
+  --color-gold-500: var(--gold-500);
+  --color-gold-700: var(--gold-700);
+  --color-gold-900: var(--gold-900);
+  --color-gold-ink: var(--gold-ink);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --font-sans: "Inter", "Anek Devanagari", ui-sans-serif, system-ui, sans-serif;
+  --font-hindi: "Anek Devanagari", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --breakpoint-xs: 30rem;
+}

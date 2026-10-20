@@ -1,0 +1,46 @@
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    max-width: 200px;
+    /* Max width constraint */
+    background-color: var(--ink);
+    color: var(--paper);
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 10px;
+    /* Added padding for better spacing */
+    position: absolute;
+    z-index: 1;
+    top: 125%;
+    /* Adjust this value to position the tooltip below */
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    word-wrap: break-word;
+    /* Handle long words */
+    white-space: nowrap;
+    /* Prevent text wrapping */
+}
+
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    /* Position the arrow at the top of the tooltip */
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: transparent transparent red transparent;
+}

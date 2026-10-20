@@ -1,0 +1,9 @@
+/* Tailwind v4 – CSS-first. No tailwind.config.js: tokens live in styles/theme.css. */
+@import "tailwindcss";
+@import "./styles/theme.css";
+@import "./styles/base.css";
+@import "./styles/utilities.css";
+@import "./styles/editor.css";
+
+/* `dark:` only needed in rare cases – prefer semantic tokens which switch themselves. */
+@custom-variant dark (&:where(.dark, .dark *));

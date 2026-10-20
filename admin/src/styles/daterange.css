@@ -1,0 +1,28 @@
+/* react-date-range, re-skinned with the panel's design tokens (works in light + dark) */
+.drf .rdrCalendarWrapper, .drf .rdrDateDisplayWrapper { background: transparent; color: var(--fg); font-family: inherit; }
+.drf .rdrCalendarWrapper { width: 100%; font-size: 13px; }
+.drf .rdrMonth { width: 100%; padding: 0 0.25rem 0.5rem; }
+.drf .rdrMonths.rdrMonthsHorizontal .rdrMonth { width: 100%; }
+.drf .rdrMonthAndYearWrapper { padding-top: 0; height: 44px; }
+.drf .rdrMonthAndYearPickers select { color: var(--fg); background-color: transparent; border-radius: 8px; padding: 6px 22px 6px 8px; }
+.drf .rdrMonthAndYearPickers select:hover { background-color: var(--surface-2); }
+.drf .rdrMonthAndYearPickers select option { background: var(--surface); color: var(--fg); }
+.drf .rdrNextPrevButton { background: var(--surface-2); border-radius: 10px; }
+.drf .rdrNextPrevButton:hover { background: var(--surface-3); }
+.drf .rdrPprevButton i { border-color: transparent var(--fg-muted) transparent transparent; }
+.drf .rdrNextButton i { border-color: transparent transparent transparent var(--fg-muted); }
+.drf .rdrWeekDay { color: var(--fg-subtle); font-weight: 600; }
+.drf .rdrDayNumber span { color: var(--fg); }
+.drf .rdrDayPassive .rdrDayNumber span { color: var(--fg-faint); }
+.drf .rdrDayDisabled { background: var(--surface-2); }
+.drf .rdrDayToday .rdrDayNumber span:after { background: var(--accent); }
+.drf .rdrDayStartOfMonth .rdrInRange, .drf .rdrDayStartOfWeek .rdrInRange { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.drf .rdrDayEndOfMonth .rdrInRange, .drf .rdrDayEndOfWeek .rdrInRange { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+.drf .rdrDayInPreview, .drf .rdrDayStartPreview, .drf .rdrDayEndPreview { border-color: var(--primary); }
+.drf .rdrDateInput { background: var(--surface-2); border-radius: 10px; border: 1px solid var(--line); }
+.drf .rdrDateInput input { color: var(--fg); }
+.drf .rdrDateDisplayItem { background: var(--surface-2); border-radius: 10px; box-shadow: none; border: 1px solid var(--line); }
+.drf .rdrDateDisplayItemActive { border-color: var(--primary); }
+.drf .rdrDateDisplayItem input { color: var(--fg); }
+.drf .rdrDefinedRangesWrapper { display: none; }
+@media (max-width: 480px) { .drf .rdrDateDisplayWrapper { display: none; } }

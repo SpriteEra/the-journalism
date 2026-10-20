@@ -1,0 +1,81 @@
+/* Custom utilities (Tailwind v4 `@utility`) – they accept variants: hover:, md:, focus-visible: ... */
+
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@utility focus-ring {
+  &:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+}
+
+@utility surface-card {
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+@utility required-mark {
+  &::after { content: " *"; color: var(--danger); }
+}
+
+@utility hindi-font { font-family: var(--font-hindi); }
+
+@utility safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+/* ── Legacy class names used by pages that have not been migrated to <Button>/<Input> yet.
+      They are defined from tokens, so they follow the theme; new code should use the components. ── */
+@utility btn-blue {
+  @apply inline-flex items-center justify-center gap-2 rounded-control border border-primary bg-primary px-3 py-1 text-base font-medium text-primary-fg transition hover:bg-primary-hover disabled:opacity-60;
+}
+@utility btn-blue-lg { @apply btn-blue px-4 py-2 text-lg; }
+@utility btn-blue-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-control border border-primary bg-surface px-4 py-1 text-base font-medium text-primary transition hover:bg-primary-soft disabled:opacity-60;
+}
+@utility btn-blue-outline-lg { @apply btn-blue-outline px-4 py-2 text-lg; }
+@utility btn-red {
+  @apply inline-flex items-center justify-center gap-2 rounded-control border border-primary bg-primary px-3 py-1 text-base font-medium text-primary-fg transition hover:bg-primary-hover disabled:opacity-60;
+}
+@utility btn-red-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-control border border-line-strong bg-surface px-4 py-1 text-base font-medium text-fg transition hover:bg-surface-2 disabled:opacity-60;
+}
+@utility btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-control border border-line-strong bg-surface px-4 py-1 text-base font-medium text-fg transition hover:bg-surface-2 disabled:opacity-60;
+}
+@utility btn-outline-lg { @apply btn-outline px-4 py-2 text-lg; }
+@utility input-box {
+  @apply w-full rounded-control border border-line-strong bg-surface p-2 text-fg placeholder:text-fg-faint focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/25 sm:p-3;
+}
+@utility label { @apply text-sm font-medium text-fg-muted sm:text-base; }
+@utility card { @apply surface-card p-4; }
+@utility required { &::after { content: " *"; color: var(--danger); } }
+@utility required-text { &::after { content: " *"; color: var(--danger); } }
+@utility custom-shadow { box-shadow: var(--shadow-card); }
+@utility hide-scrollbar { @apply scrollbar-none; }
+@utility text35 { font-size: 35px; }
+@utility text25 { font-size: 1.5rem; }
+@utility text22 { font-size: 22px; }
+@utility text20 { font-size: 1.25rem; }
+@utility text18 { font-size: 1.125rem; }
+@utility text16 { font-size: 16px; }
+@utility text15 { font-size: 15px; }
+
+/* animations used by the UI kit */
+@keyframes ui-fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ui-pop-in { from { opacity: 0; transform: translateY(6px) scale(.98) } to { opacity: 1; transform: none } }
+@keyframes ui-slide-in-right { from { transform: translateX(100%) } to { transform: none } }
+@keyframes ui-slide-in-left { from { transform: translateX(-100%) } to { transform: none } }
+@keyframes ui-shimmer { 100% { transform: translateX(100%) } }
+@utility animate-fade-in { animation: ui-fade-in .15s ease-out; }
+@utility animate-pop-in { animation: ui-pop-in .16s ease-out; }
+@utility animate-slide-in-right { animation: ui-slide-in-right .22s cubic-bezier(.2,.8,.2,1); }
+@utility animate-slide-in-left { animation: ui-slide-in-left .22s cubic-bezier(.2,.8,.2,1); }
+
+/* Ora AI button: a soft light sweeping across the pill, and a slow glow on the sparkle */
+@keyframes ora-sweep { 0% { transform: translateX(-120%) skewX(-18deg) } 60%, 100% { transform: translateX(260%) skewX(-18deg) } }
+@keyframes ora-twinkle { 0%, 100% { opacity: 1; transform: scale(1) } 50% { opacity: .65; transform: scale(.88) } }
+@utility ora-sweep { animation: ora-sweep 3.4s ease-in-out infinite; }
+@utility ora-twinkle { animation: ora-twinkle 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ora-sweep, .ora-twinkle { animation: none !important; } }

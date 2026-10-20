@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirmation: Ads Successfully Added to thejournalism.news</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ffffff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      color: #333;
+      border-radius: 8px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      color: #4f5ef1;
+    }
+
+    .content {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .content p {
+      font-size: 16px;
+      color: #555;
+    }
+
+    .otp {
+      font-size: 24px;
+      font-weight: 600;
+      color: #4f5ef1;
+      margin: 20px 0;
+    }
+
+    .footer {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .footer a {
+      color: #4f5ef1;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Advertisement Added Successfully</h1>
+    </div>
+    <div class="content">
+      <p>Dear Client,</p>
+      <p>
+        We are pleased to confirm that your ads have been successfully added
+        to our website until <%= data.expireDate %>. Thank you for choosing
+          our platform for your advertising needs!
+      </p>
+      <div class="otp">
+        <%= data.otp %>
+      </div>
+      <p>
+        If you have any questions or need further modifications, please let us
+        know. We're here to assist you.
+      </p>
+    </div>
+    <div class="footer">
+      <p>
+        If you have any questions, feel free to
+        <a href="mailto:contact.japnadnewstimes@gmail.com">contact our support team</a>.
+      </p>
+      <p>
+        &copy; <%= new Date().getFullYear() %> The Journalism. All rights
+          reserved.
+      </p>
+    </div>
+  </div>
+</body>
+
+</html>
