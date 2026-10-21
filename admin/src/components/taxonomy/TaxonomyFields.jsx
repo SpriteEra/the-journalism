@@ -26,7 +26,9 @@ export const appendTaxonomy = (fd, tax, tags = []) => {
  *   removing a category removes its sub-categories, removing a state removes its districts.
  */
 export function TaxonomyFields({ value, onChange, categoryRequired = false, errors = {} }) {
-  const cats = useCategories(); const states = useStates(); const districts = useDistricts();
+  const cats = useCategories();
+  const states = useStates();
+  const districts = useDistricts();
   const v = { ...emptyTaxonomy, ...value };
 
   const tops = useMemo(() => (cats.data || []).filter((c) => !c.parent && c.isActive !== false), [cats.data]);

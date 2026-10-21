@@ -12,6 +12,7 @@ const get = (url, params) => httpClient.get(url, { params: cleanParams(params) }
 
 export const useApiMutation = (fn, { invalidate = [], success, onSuccess } = {}) => {
   const qc = useQueryClient();
+  console.log('hello')
   return useMutation({
     mutationFn: fn,
     onSuccess: (data, vars) => {
@@ -37,7 +38,7 @@ export const useTags = (params) => useQuery({ queryKey: ["tags", params], queryF
 export const useTagSuggest = (q) => useQuery({ queryKey: ["tag-suggest", q], queryFn: () => get("/tags/suggest", { q, limit: 8 }), select: (d) => d.tags, staleTime: 20_000, placeholderData: (p) => p });
 
 // taxonomy
-export const useCategories = () => useQuery({ queryKey: ["categories"], queryFn: () => get("/categories"), select: (d) => d.categories, staleTime: REFERENCE_STALE });
+export const useCategories = () => useQuery({ queryKey: ["categories"], queryFn: () => get("/categories"), select: (d) => d.categories });
 export const useStates = () => useQuery({ queryKey: ["states"], queryFn: () => get("/states"), select: (d) => d.states, staleTime: REFERENCE_STALE });
 export const useDistricts = (state) => useQuery({ queryKey: ["districts", state || "all"], queryFn: () => get("/districts", { state }), select: (d) => d.districts, staleTime: REFERENCE_STALE });
 
