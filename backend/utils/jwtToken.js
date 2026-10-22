@@ -11,7 +11,8 @@ export const sendToken = async (user, statusCode, res) => {
 
         const options = {
             httpOnly: true,
-            secure: false,
+            secure: true,        // required with sameSite 'none'
+            sameSite: 'none',
         }
 
         const accessOptions = {
