@@ -1,1 +1,0 @@
-import{j as l,$ as m}from"./index-bQu02j-g.js";const x=({isOpen:o,onClose:s,children:p,heading:t="PopUp",classes:a="",size:e="lg"})=>l.jsx(m,{open:o,onClose:s,title:t,size:e,className:a,children:p});export{x as P};

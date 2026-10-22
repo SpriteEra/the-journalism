@@ -74,11 +74,11 @@ export default function CreateVideo() {
               <Field label="Title" hint="Optional — taken from YouTube when empty"><Input value={f.title} onChange={set("title")} className="hindi-font" /></Field>
               <Field label="Description" hint="Optional — taken from YouTube when empty"><Textarea rows={4} value={f.description} onChange={set("description")} className="hindi-font" /></Field>
               <Field label="Tags" required hint="Hindi or English · Enter to add"><ChipInput value={tags} onChange={setTags} max={10} suggestions={[]} placeholder="e.g. modi, मोदी" /></Field>
-              <div className="grid gap-4 sm:grid-cols-2">
+              {/* <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="State"><Select value={f.state} onChange={set("state")} options={[{ value: "", label: "Select state" }, ...Object.keys(stateDistricts).map((s) => ({ value: s, label: findHindi(s) }))]} /></Field>
                 <Field label="District"><Select value={f.district} onChange={set("district")} disabled={!f.state} options={[{ value: "", label: "Select district" }, ...(stateDistricts[f.state] || []).map((d) => ({ value: d.english, label: d.hindi }))]} /></Field>
-              </div>
-              <Field label="Location" required hint="Village / town"><Input value={f.location} onChange={set("location")} className="hindi-font" /></Field>
+              </div> */}
+              {/* <Field label="Location" required hint="Village / town"><Input value={f.location} onChange={set("location")} className="hindi-font" /></Field> */}
             </div>
           </Card>
         </div>

@@ -20,7 +20,7 @@ export function MultiSelect({ options = [], value = [], onChange, placeholder = 
     <div ref={root} className="relative" onBlur={(e) => { if (!root.current?.contains(e.relatedTarget)) setOpen(false); }}>
       <div className={cn(controlBase, "flex min-h-10 flex-wrap items-center gap-1.5 px-2 py-1.5", disabled && "pointer-events-none opacity-60")} onClick={() => setOpen(true)}>
         {selected.map((s) => (
-          <span key={s.value} className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary">
+          <span key={s.value} className="inline-flex items-center gap-1 rounded-md bg-surface px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium text-primary">
             {s.label}
             <button type="button" aria-label={`Remove ${s.label}`} onClick={(e) => { e.stopPropagation(); onChange(value.filter((v) => v !== s.value)); }} className="rounded hover:bg-primary/15"><X className="size-3" /></button>
           </span>

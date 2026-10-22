@@ -45,6 +45,9 @@ tagSchema.pre('validate', function () {
 tagSchema.index({ titleKey: 1 }, { unique: true, partialFilterExpression: { isDeleted: false } });
 tagSchema.index({ aliases: 1 });
 tagSchema.index({ isDeleted: 1, isActive: 1, isFeatured: -1, title: 1 });
-tagSchema.index({ title: 'text', aliases: 'text' });
+tagSchema.index(
+    { title: 'text', aliases: 'text' },
+    { language_override: 'searchLanguage', default_language: 'none' }
+);
 
 export default mongoose.model('Tag', tagSchema);

@@ -19,7 +19,7 @@ const Textarea = forwardRef(function Textarea({ className, invalid, rows = 4, ma
         {...props}
       />
       {(showCount || maxLength) && typeof value === "string" ? (
-        <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] text-fg-faint">{value.length}{maxLength ? `/${maxLength}` : ""}</span>
+        <span className="pointer-events-none absolute -bottom-3 sm:bottom-2  right-1 sm:right-3 text-[11px] text-fg-faint">{value.length}{maxLength ? `/${maxLength}` : ""}</span>
       ) : null}
     </div>
   );

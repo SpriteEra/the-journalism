@@ -113,8 +113,8 @@ export function Drawer({ open, onClose, title, description, side = "right", widt
       >
         <div className="relative flex items-start justify-between gap-4 border-b border-line bg-linear-to-r from-primary-soft/60 to-transparent px-5 py-4">
           <div className="min-w-0">
-            {title && <h2 id={titleId} className="text-lg font-semibold text-fg">{title}</h2>}
-            {description && <p className="mt-0.5 text-sm text-fg-subtle">{description}</p>}
+            {title && <h2 id={titleId} className="max-sm:text-xl text-lg font-semibold text-fg">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs max-sm:leading-snug sm:text-sm text-fg-subtle">{description}</p>}
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle transition-colors hover:bg-surface-3 hover:text-fg focus-ring">
             <X className="size-4.5" />

@@ -74,7 +74,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
     const narrow = collapsed && !isDrawer;
     return (
       <div className="flex h-full flex-col bg-sidebar text-sidebar-fg border-r border-black/5">
-        <div className={cn("flex h-(--topbar-height) shrink-0 items-center gap-3 border-b border-sidebar-line px-4", narrow && "justify-center px-0")}>
+        <div className={cn("flex h-(--topbar-height) shrink-0 items-center gap-3 border-b border-sidebar-line px-2 sm:px-4", narrow && "justify-center px-0")}>
           <img src={narrow ? "/favicon-large.png" : "/logo.png"} alt="The Journalism" className={cn("object-contain", narrow ? "size-8" : "h-12 max-w-48 mx-auto bg-paper/95 px-2 py-1")} />
           {isDrawer && (
             <button onClick={onCloseMobile} aria-label="Close menu" className="ml-auto grid size-9 place-items-center rounded-lg text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-fg">

@@ -52,7 +52,7 @@ export function SearchInput({ value, onChange, placeholder = "Search…", classN
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         placeholder={placeholder}
-        className={cn(controlBase, "h-10 pl-9 pr-9 text-sm [&::-webkit-search-cancel-button]:hidden")}
+        className={cn(controlBase, "py-1.5 sm:py-2 pl-9 pr-9 text-sm [&::-webkit-search-cancel-button]:hidden")}
         {...props}
       />
       {value ? (

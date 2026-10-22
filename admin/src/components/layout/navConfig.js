@@ -16,7 +16,7 @@ export const NAV = [
       { label: "Review queue", to: "/dashboard/review-news", icon: ShieldCheck, perm: ["news.approve"] },
       { label: "Drafts", to: "/dashboard/draft-news", icon: Save, perm: ["news.view.own", "news.view.all"] },
       { label: "Scheduled", to: "/dashboard/schedule-news", icon: CalendarClock, perm: ["news.schedule"] },
-      { label: "Breaking news", to: "/dashboard/breaking-news", icon: Rss, perm: ["breaking.manage"] },
+      // { label: "Breaking news", to: "/dashboard/breaking-news", icon: Rss, perm: ["breaking.manage"] },
     ],
   },
   {
@@ -24,10 +24,10 @@ export const NAV = [
     items: [
       { label: "Shorts & videos", to: "/dashboard/short-videos", icon: PlaySquare, perm: ["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage"] },
       { label: "YouTube news", to: "/dashboard/videos", icon: Video, perm: ["yt.manage"] },
-      { label: "Photo gallery", to: "/dashboard/photo-gallery", icon: Images, perm: ["gallery.create", "gallery.manage.own", "gallery.manage.any"] },
-      { label: "Events", to: "/dashboard/events", icon: CalendarCheck, perm: ["event.create", "event.manage.own", "event.manage.any"] },
-      { label: "Event categories", to: "/dashboard/admin-events", icon: CalendarCog, perm: ["event.category.manage"] },
-      { label: "Panchang", to: "/dashboard/panchang", icon: CalendarDays, perm: ["panchang.manage"] },
+      // { label: "Photo gallery", to: "/dashboard/photo-gallery", icon: Images, perm: ["gallery.create", "gallery.manage.own", "gallery.manage.any"] },
+      // { label: "Events", to: "/dashboard/events", icon: CalendarCheck, perm: ["event.create", "event.manage.own", "event.manage.any"] },
+      // { label: "Event categories", to: "/dashboard/admin-events", icon: CalendarCog, perm: ["event.category.manage"] },
+      // { label: "Panchang", to: "/dashboard/panchang", icon: CalendarDays, perm: ["panchang.manage"] },
     ],
   },
   {
@@ -40,8 +40,8 @@ export const NAV = [
         children: [
           { label: "Banner ads", to: "/dashboard/ads/banner-ads" },
           { label: "Side ads", to: "/dashboard/ads/side-ads" },
-          { label: "In-news ads", to: "/dashboard/ads/ads-innews" },
-          { label: "Title ads", to: "/dashboard/ads/title-ads" },
+          // { label: "In-news ads", to: "/dashboard/ads/ads-innews" },
+          // { label: "Title ads", to: "/dashboard/ads/title-ads" },
         ],
       },
       { label: "Ora AI", to: "/dashboard/ora-ai", icon: Sparkles, perm: ["tools.ai"] },

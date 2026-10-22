@@ -1,10 +1,11 @@
 import { normalizeBlog } from "./taxonomy/TaxonomyFields.jsx";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import EditorJS from "@editorjs/editorjs";
 import imageCompression from "browser-image-compression";
-
-import { ArrowRight, RotateCcw, Upload } from "lucide-react";
+// @ts-ignore
+import Undo from "editorjs-undo";
+import { ArrowRight, RotateCcw, Undo2, Redo2, Upload } from "lucide-react";
 import { tools } from "../utils/EditorTools.jsx";
 import { EditorContext } from "../pages/news/CreateNews.jsx";
 import { truncate } from "../utils/utils.js";
@@ -49,6 +50,7 @@ const BlogEditor = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreview, setVideoPreview] = useState(null);
   const [showVideo, setShowVideo] = useState(false);
+  const undoRef = useRef(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const handleVideoChange = async (e) => {
@@ -200,19 +202,41 @@ const BlogEditor = () => {
     }
 
     if (!textEditor.isReady) {
-      setTextEditor(
-        new EditorJS({
-          holderId: "textEditor",
-          data: savedBlog
-            ? savedBlog.content
-            : Array.isArray(content)
-            ? content[0]
-            : content,
-          tools: tools,
-          placeholder: "Let's write an awesome news",
-          onChange: () => setHasChanges(true),
-        })
-      );
+      const initialData = savedBlog
+        ? savedBlog.content
+        : Array.isArray(content)
+          ? content[0]
+          : content;
+
+      const editor = new EditorJS({
+        holderId: "textEditor",
+        data: initialData,
+        tools: tools,
+        placeholder: "Let's write an awesome news",
+        onChange: () => setHasChanges(true),
+        onReady: () => {
+          const undo = new Undo({
+            editor,
+            config: {
+              debounceTimer: 200,
+              shortcuts: { undo: "CMD+Z", redo: "CMD+Y" }, // change shortcuts here
+            },
+          });
+          if (initialData?.blocks) undo.initialize(initialData);
+          undoRef.current = undo;
+
+          // extra shortcut: Ctrl+Shift+Z also redoes
+          const holder = document.getElementById("textEditor");
+          holder?.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z") {
+              e.preventDefault();
+              undo.redo();
+            }
+          });
+        },
+      });
+
+      setTextEditor(editor);
     }
   }, []);
 
@@ -241,6 +265,70 @@ const BlogEditor = () => {
 
     return () => clearInterval(intervalId);
   }, [textEditor, blog, news_id, setBlog, hasChanges, page]);
+
+  useEffect(() => {
+    const holder = document.getElementById("textEditor");
+    if (!holder || !textEditor?.isReady) return;
+
+    const onPaste = (e) => {
+      const text = e.clipboardData?.getData("text/plain") || "";
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.replace(/^\s*(?:[-*•]|\[[ xX]?\])\s*/, "").trim()) // strip "- ", "* ", "[ ] "
+        .filter(Boolean);
+
+      if (lines.length < 2) return; // single line: let Editor.js paste normally
+
+      const index = textEditor.blocks.getCurrentBlockIndex();
+      const current = textEditor.blocks.getBlockByIndex(index);
+      if (current?.name !== "checklist") return;
+
+      // must be called synchronously, before any await
+      e.preventDefault();
+      e.stopPropagation();
+
+      current.save().then((saved) => {
+        const existing = (saved?.data?.items || []).filter((i) => i.text?.trim());
+        const added = lines.map((t) => ({ text: t, checked: false }));
+        textEditor.blocks.insert(
+          "checklist",
+          { items: [...existing, ...added] },
+          undefined,
+          index,
+          true, // focus
+          true  // replace the current block
+        );
+        setHasChanges(true);
+      });
+    };
+
+    // capture phase so it runs before Editor.js's own paste handler
+    holder.addEventListener("paste", onPaste, true);
+    return () => holder.removeEventListener("paste", onPaste, true);
+  }, [textEditor]);
+
+  useEffect(() => {
+    const holder = document.getElementById("textEditor");
+    if (!holder) return;
+
+    const onKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        // only take over when focus is inside the editor
+        if (!holder.contains(document.activeElement)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const range = document.createRange();
+        range.selectNodeContents(holder);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    };
+
+    // capture phase so it runs before Editor.js's own handler
+    holder.addEventListener("keydown", onKeyDown, true);
+    return () => holder.removeEventListener("keydown", onKeyDown, true);
+  }, []);
 
   const handleChangeBanner = async (e) => {
     const file = e.target.files[0];
@@ -320,9 +408,8 @@ const BlogEditor = () => {
             setBlog(updatedBlog);
             const queryParams = new URLSearchParams(window.location.search);
             queryParams.set("page", "publish");
-            const newUrl = `${
-              window.location.pathname
-            }?${queryParams.toString()}`;
+            const newUrl = `${window.location.pathname
+              }?${queryParams.toString()}`;
             window.history.replaceState(null, "", newUrl);
             setEditorState("publish");
             localStorage.setItem("blog", JSON.stringify(updatedBlog));
@@ -406,12 +493,12 @@ const BlogEditor = () => {
   };
 
   return (
-    <div className="mx-auto p-0 sm:p-3 bg-surface rounded-md">
-      <nav className="flex sm:px-3 mb-2 sm:mb-4 sticky -top-2 md:-top-6 z-10 bg-surface w-full p-2 justify-between">
+    <div className="mx-auto p-0 sm:p-3 sm:bg-surface rounded-md">
+      <nav className="flex sm:px-3 mb-1 sm:mb-4 sticky top-15 md:top-15 shadow z-10  w-full p-2 justify-end md:justify-between bg-surface">
         <p className="max-md:hidden text-fg line-clamp-1 text-xl sm:md:text-xl lg:text-2xl font-medium leading-7 sm:line-clamp-2 ">
           {title?.length ? truncate(title, 60) : "New News"}
         </p>
-        <div className="flex gap-1 sm:gap-3 items-center max-sm:justify-between max-sm:w-full">
+        <div className="flex gap-1 sm:gap-3 items-center ">
           {/* Video Toggle Button */}
           {user?.role === "admin" && (
             <div className="flex items-center sm:gap-2 ">
@@ -420,23 +507,22 @@ const BlogEditor = () => {
               </span>
               <button
                 onClick={handleToggleVideo}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                  isVideo
-                    ? "bg-primary hover:bg-primary-hover"
-                    : "bg-surface-3 hover:bg-line-strong"
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isVideo
+                  ? "bg-primary hover:bg-primary-hover"
+                  : "bg-surface-3 hover:bg-line-strong"
+                  }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform duration-200 ${
-                    isVideo ? "translate-x-6" : "translate-x-1"
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform duration-200 ${isVideo ? "translate-x-6" : "translate-x-1"
+                    }`}
                 />
               </button>
             </div>
           )}
+
           <div className="h-6 w-px bg-surface-3"></div>
           <button
-            className="btn-blue bg-gradient-to-r max-sm:text-sm from-success to-success border-success flex items-center sm:gap-1 h-full"
+            className="btn-blue max-sm:rounded bg-gradient-to-r max-sm:text-sm from-success to-success border-success flex items-center sm:gap-1 h-full"
             onClick={handlePublishEvent}
           >
             <ArrowRight size={20} className="max-sm:hidden" />
@@ -444,7 +530,7 @@ const BlogEditor = () => {
           </button>
           {mode !== "edit" && (
             <button
-              className="btn-blue-outline bg-surface hover:bg-surface-2 text-fg-muted border border-line-strong flex gap-1 items-center max-sm:text-sm"
+              className="btn-blue-outline max-sm:rounded bg-surface hover:bg-surface-2 text-fg-muted border border-line-strong flex gap-1 items-center max-sm:text-sm"
               onClick={handleSaveDraft}
             >
               <span className="flex items-center space-x-2 max-sm:hidden">
@@ -466,7 +552,7 @@ const BlogEditor = () => {
             </button>
           )}
           <button
-            className="btn-red flex items-center gap-1 h-full max-sm:text-sm"
+            className="btn-red max-sm:rounded flex items-center gap-1 h-full max-sm:text-sm"
             onClick={handleResetEditor}
           >
             <RotateCcw size={20} className="max-sm:hidden" />
@@ -475,10 +561,12 @@ const BlogEditor = () => {
         </div>
       </nav>
       <section>
-        <div className="mx-auto max-w-[800px] w-full p-1 sm:p-3">
-          <div className="bg-surface rounded-xl sm:rounded-2xl shadow-xl sm:shadow-xl border border-line/50 p-1 sm:p-3 mb-8 backdrop-blur-sm">
+        <div className="mx-auto max-w-[800px] w-full sm:p-3">
+
+          {/* feature images  */}
+          <div className="bg-surface rounded-lg sm:rounded-2xl shadow-sm sm:shadow-xl border border-line/50 p-1 sm:p-3 mb-3 sm:mb-8 backdrop-blur-sm">
             <div className="relative group">
-              <div className="aspect-video bg-gradient-to-br from-surface-2 to-surface-2 rounded-xl overflow-hidden border-2 border-dashed border-line-strong hover:border-primary transition-all duration-300">
+              <div className="aspect-video bg-gradient-to-br from-surface-2 to-surface-2 rounded-lg sm:rounded-xl overflow-hidden border-2 border-dashed border-line-strong hover:border-primary transition-all duration-300">
                 <label
                   htmlFor="uploadBanner"
                   className="cursor-pointer block h-full"
@@ -530,21 +618,21 @@ const BlogEditor = () => {
             </div>
           </div>
 
-          <div className="bg-surface rounded-xl sm:rounded-2xl shadow-xl sm:shadow-xl border border-line/50 p-1 sm:p-3 mb-8">
+          <div className="bg-surface rounded-lg sm:rounded-2xl shadow-sm sm:shadow-xl border border-line/50 p-1.5 sm:p-3 mb-2 sm:mb-8">
             <textarea
               defaultValue={title}
               placeholder="News Title"
-              className="text-xl sm:text-2xl font-medium w-full h-20 bg-transparent border-none outline-none resize-none text-fg placeholder-fg-faint leading-tight"
+              className="text-xl sm:text-2xl font-semibold w-full h-20 bg-transparent border-none outline-none resize-none text-fg placeholder-fg-faint leading-tight"
               onKeyDown={handleTitleKeyDown}
               onChange={handleTitleChange}
             />
           </div>
-          <hr className="w-full opacity-10 my-5" />
+          <hr className="w-full opacity-10 my-2 sm:my-5 max-sm:hidden" />
 
           {/* Video Input Section - Only show when toggle is enabled */}
           {isVideo && (
-            <div className="w-full mb-6">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="w-full mb-2 sm:mb-6 mt-5">
+              <div className="flex items-center gap-2 mb-2 sm:mb-3">
                 <svg
                   className="w-5 h-5 text-primary"
                   fill="currentColor"
@@ -605,7 +693,7 @@ const BlogEditor = () => {
                     />
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2 sm:space-y-4">
                     <div className="relative rounded-xl overflow-hidden shadow-lg border">
                       <video
                         controls
@@ -638,8 +726,8 @@ const BlogEditor = () => {
                     </div>
 
                     <div className="flex items-center justify-between bg-success-soft border border-success/30 rounded-lg p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-success-soft rounded-full flex items-center justify-center">
+                      <div className="flex items-center gap-1 sm:gap-3">
+                        <div className="size-6 sm:size-8 bg-success-soft rounded-full flex items-center justify-center">
                           <svg
                             className="w-4 h-4 text-success"
                             fill="currentColor"
@@ -686,31 +774,54 @@ const BlogEditor = () => {
           )}
 
           {/* <div id="textEditor" className="font-anekdevanagari"></div> */}
-          <div className="bg-surface rounded-xl sm:rounded-2xl shadow-xl sm:shadow-xl border border-line/50 p-1 sm:p-3">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary rounded-xl flex items-center justify-center shadow-lg">
-                <svg
-                  className="w-5 h-5 text-paper"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+          <div className="bg-surface rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl border border-line/50 p-1 sm:p-3 max-sm:mt-4">
+            <div className="flex items-center justify-between space-x-3 mb-2 sm:mb-6">
+              <div className="flex items-center gap-2 md:gap-3 max-sm:px-1">
+                <div className="size-8 sm:size-10 bg-gradient-to-br from-primary to-primary rounded-md sm:rounded-xl flex items-center justify-center shadow-lg">
+                  <svg
+                    className="size-4 sm:size-5 text-paper"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2.5 2.5 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-fg">
+                    Article Content
+                  </h3>
+                  <p className="text-[10px] sm:text-sm text-fg-subtle max-sm:-mt-1">
+                    Write your news with our rich text editor
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  title="Undo"
+                  onClick={() => undoRef.current?.undo()}
+                  className="p-1.5 rounded text-fg-muted hover:bg-surface-2"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2.5 2.5 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
+                  <Undo2 size={18} />
+                </button>
+                <button
+                  type="button"
+                  title="Redo"
+                  onClick={() => undoRef.current?.redo()}
+                  className="p-1.5 rounded text-fg-muted hover:bg-surface-2"
+                >
+                  <Redo2 size={18} />
+                </button>
               </div>
-              <div>
-                <h3 className="text-lg sm:text-xl font-bold text-fg">
-                  Article Content
-                </h3>
-                <p className="text-sm text-fg-subtle">
-                  Write your news with our rich text editor
-                </p>
-              </div>
+
             </div>
 
             <div

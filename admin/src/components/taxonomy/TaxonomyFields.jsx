@@ -4,6 +4,8 @@ import { useCategories, useDistricts, useStates, useTagSuggest } from "../../hoo
 import { useState } from "react";
 import usePermission from "../../hooks/usePermission";
 import { ChipInput, Field, MultiSelect } from "../ui";
+import { Plus } from "lucide-react";
+import TagFormModal from "../../pages/tags/TagFormModal";
 
 export const emptyTaxonomy = { category: [], subCategory: [], state: [], district: [] };
 
@@ -43,7 +45,13 @@ export function TaxonomyFields({ value, onChange, categoryRequired = false, erro
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Field label="Categories" required={categoryRequired} error={errors.category} hint="Category or state — at least one" info="The sections of the website the story appears in (Politics, Sports …). One of them can be the primary section used in the story link.">
-        <MultiSelect options={tops.map((c) => ({ value: c._id, label: c.name }))} value={v.category} onChange={setCategory} placeholder="Choose categories" max={10} />
+        <MultiSelect
+          options={tops.map((c) => ({ value: c._id, label: c.name }))}
+          value={v.category}
+          onChange={setCategory}
+          placeholder="Choose categories"
+          max={10}
+        />
       </Field>
       <Field label="Sub-categories" hint={v.category.length ? "Optional" : "Choose a category first"}>
         <MultiSelect options={subOptions.map((c) => ({ value: c._id, label: c.name }))} value={v.subCategory} onChange={(subCategory) => onChange({ ...v, subCategory })} disabled={!v.category.length} placeholder="Choose sub-categories" emptyText="This category has no sub-categories" max={30} />
@@ -51,22 +59,52 @@ export function TaxonomyFields({ value, onChange, categoryRequired = false, erro
       <Field label="States" hint="Category or state — at least one" info="Use for local news. A story can also use a state as the first part of its link.">
         <MultiSelect options={stateOptions.map((s) => ({ value: s._id, label: s.displayName || s.state }))} value={v.state} onChange={setState} placeholder="Choose states" max={10} />
       </Field>
-      <Field label="Districts" hint={v.state.length ? "From the chosen states" : "Optional – choose a state to narrow the list"}>
+      {/* <Field label="Districts" hint={v.state.length ? "From the chosen states" : "Optional – choose a state to narrow the list"}>
         <MultiSelect options={districtOptions.map((d) => ({ value: d._id, label: d.displayName || d.district }))} value={v.district} onChange={(district) => onChange({ ...v, district })} placeholder="Choose districts" max={50} />
-      </Field>
+      </Field> */}
     </div>
   );
 }
 
 /** Tag chips with live suggestions. Users with tag.create may type a new tag, others can only pick existing ones. */
-export function TagPicker({ value, onChange, max = 20, label = "Topic", required, error }) {
+export function TagPicker({ value = [], onChange, max = 20, label = "Topic", required, error }) {
   const [q, setQ] = useState("");
+  const [creating, setCreating] = useState(false);
   const { can } = usePermission();
+  const canCreate = can("tag.create");
   const { data = [] } = useTagSuggest(q);
+
+  // the API's response shape may differ, so this accepts { tag }, { data } or the tag itself
+  const handleCreated = (res) => {
+    const t = res?.tag || res?.data || res;
+    if (!t?.title) return;
+    if (value.length >= max) return;
+    if (value.some((v) => (typeof v === "string" ? v : v.title) === t.title)) return;
+    // keep the same shape the form already uses: titles (normalizeBlog) or { id, title }
+    const asTitle = !value.length || typeof value[0] === "string";
+    onChange([...value, asTitle ? t.title : { id: t._id || t.id, title: t.title }]);
+  };
+
   return (
-    <Field label={label} required={required} error={error} hint={can("tag.create") ? "The main subject of the story. Press Enter to add — a new topic is created automatically." : "Pick the subject from the list. You can't create new topics."}>
-      <ChipInput value={value} onChange={onChange} suggestions={data} onQuery={setQ} canCreate={can("tag.create")} max={max} placeholder="Search or add a topic" />
-    </Field>
+    <>
+      <Field
+        label={label}
+        required={required}
+        error={error}
+        labelExtra={canCreate && (
+          <button type="button" onClick={() => setCreating(true)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+            <Plus className="size-3.5" />New topic
+          </button>
+        )}
+        hint={canCreate ? "Pick from the list, or use New topic to create one." : "Pick the subject from the list. You can't create new topics."}
+      >
+        <ChipInput value={value} onChange={onChange} suggestions={data} onQuery={setQ} canCreate={false} max={max} placeholder="Search a topic" />
+      </Field>
+
+      {creating && (
+        <TagFormModal tag={null} initialTitle={q} onClose={() => setCreating(false)} onSaved={handleCreated} />
+      )}
+    </>
   );
 }
 

@@ -56,7 +56,7 @@ const buildForm = (b, { newsId, draft = false, ...opts } = {}) => {
   fd.append("is_literature", Boolean(b.is_literature));
   fd.append("ref_reporter", b.ref_reporter || "");
   fd.append("content", JSON.stringify(b.content));
-  fd.append("tags", JSON.stringify(b.tags || []));                      // Topic(s) — references to the Tag collection
+  fd.append("tags", JSON.stringify(b.tags || []));                      // Topic(s) - references to the Tag collection
   fd.append("keywords", JSON.stringify(normalizeKeywords(b.keywords))); // SEO keywords, Hindi + English strings
   fd.append("aiGeneratedTags", JSON.stringify(b.aiGeneratedTags || []));
   ["category", "subCategory", "state", "district"].forEach((k) => fd.append(k, JSON.stringify(b[k] || [])));
@@ -253,22 +253,33 @@ const PublishForm = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl pb-28 lg:pb-8">
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Button variant="outline" size="sm" leftIcon={ArrowLeft} onClick={goBackToEditor}>{t("Back")}</Button>
+    <div className="mx-auto w-full max-w-7xl pb-20  lg:pb-8">
+      <div className="mb-3 sm:mb-5 flex flex-wrap items-center gap-2 sm:gap-3">
+        <ArrowLeft className="text-black size-4.5 md:size-5 lg:size-6" onClick={goBackToEditor} />
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">{t("Story details")}</h1>
-          <p className="text-sm text-fg-subtle">Topic, keywords, URL section and publishing options.</p>
+          <h1 className="text-base font-semibold tracking-tight text-fg sm:text-xl">{t("Story details")}</h1>
+          <p className="text-xs text-fg-subtle">Topic, keywords, URL section and publishing options.</p>
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-5">
+      <div className="grid gap-3 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] ">
+        <div className="space-y-3 sm:space-y-5 w-full flex flex-col">
           <Card padded={false}>
             <CardHeader icon={Info} title="Summary" description="What readers see in lists and on social cards" info="The short text under the headline in lists, on the home page and when the story is shared." />
-            <div className="space-y-4 p-4 sm:p-5">
-              <Field label="Short description" required hint={`${(description || "").length}/${CHAR_LIMIT}`} info="Two or three lines that sum the story up. Shown under the headline and used as the search description when you leave the SEO description empty.">
-                <Textarea rows={4} maxLength={CHAR_LIMIT} value={description || ""} className="hindi-font" placeholder="Two or three lines that sum the story up" onChange={(e) => update({ description: e.target.value.replace(/\n/g, " ") })} />
+            <div className="space-y-4 p-2.5 sm:p-5">
+              <Field label="Short description" required
+                // hint={`${(description || "").length}/${CHAR_LIMIT}`}
+                info="Two or three lines that sum the story up. Shown under the headline and used as the search description when you leave the SEO description empty."
+              >
+                <Textarea
+                  rows={4}
+                  maxLength={CHAR_LIMIT}
+                  value={description || ""}
+                  className="hindi-font" placeholder="Two or three lines that sum the story up"
+                  onChange={(e) => update({
+                    description: e.target.value.replace(/\n/g, " ")
+                  })}
+                />
               </Field>
               <Field label={t("Reporter credit")} hint="Optional" info="The reporter / agency name printed as the byline, for example “Ravi Kumar” or “PTI”. Leave empty to show the author's own name.">
                 <Input value={ref_reporter || ""} onChange={(e) => update({ ref_reporter: e.target.value })} placeholder="Name shown as the byline" className="hindi-font" />
@@ -277,22 +288,33 @@ const PublishForm = () => {
           </Card>
 
           <Card padded={false}>
-            <CardHeader title={`${t("Topic")} & ${t("Keywords")}`} description="Topic = the subject page of the story. Keywords = what people type into search." info="Topic groups the story on a topic page (like “Elections”). Keywords are the words people search for — they help the story show up in search, in Hindi or English." />
-            <div className="space-y-5 p-4 sm:p-5">
-              <TagPicker required label={t("Topic")} max={TOPIC_LIMIT} value={(tags || []).map((x) => ({ title: x }))} onChange={(list) => update({ tags: list.map((x) => x.title) })} />
+            <CardHeader
+              title={`${t("Topic")} & ${t("Tags")}`}
+              description="Topic = the subject page of the story. Keywords = what people type into search." info="Topic groups the story on a topic page (like “Elections”). Keywords are the words people search for - they help the story show up in search, in Hindi or English."
+            />
+            <div className="space-y-5 p-2.5 sm:p-5">
+              <TagPicker
+                required
+                label={t("Topic")}
+                max={TOPIC_LIMIT}
+                value={(tags || []).map((x) => ({ title: x }))}
+                onChange={(list) => update({ tags: list.map((x) => x.title) })}
+              />
               <KeywordsField value={kw} onChange={(v) => update({ keywords: v })} onSuggest={can("tools.ai") ? onSuggest : undefined} suggesting={aiLoading} />
             </div>
           </Card>
 
           <Card padded={false}>
             <CardHeader icon={MapPin} title="Category, place & URL" description="Where the story appears and how its link looks" info="Choose where the story belongs. The link of the story starts with ONE of these (the primary section), for example yoursite.com/politics/news/story-name." />
-            <div className="space-y-5 p-4 sm:p-5">
+            <div className="space-y-5 p-2.5 sm:p-5">
               <TaxonomyFields value={{ category, subCategory, state, district }} onChange={(x) => update(x)} categoryRequired={false} />
 
-              <div className="rounded-2xl border border-line bg-surface-2/50 p-4">
-                <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-fg"><Link2 className="size-4 text-fg-subtle" />Story link<InfoTip>The first part of the link is the primary section. It is required: pick a category or a state above. If you choose several, mark the one the link should use — readers and Google will see this link.</InfoTip></p>
+              <div className="rounded-lg sm:rounded-2xl border border-line bg-surface-2/50 p-2 sm:p-4">
+                <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-fg"><Link2 className="size-4 text-fg-subtle" />Story link
+                  <InfoTip>The first part of the link is the primary section. It is required: pick a category or a state above. If you choose several, mark the one the link should use - readers and Google will see this link.</InfoTip>
+                </p>
                 {routeOptions.length === 0 ? (
-                  <p className="rounded-xl bg-warning-soft p-3 text-sm text-fg-muted">Choose a category or a state — the story link needs one of them.</p>
+                  <p className="rounded-xl bg-warning-soft p-3 text-sm text-fg-muted">Choose a category or a state - the story link needs one of them.</p>
                 ) : (
                   <>
                     {routeOptions.length > 1 && (
@@ -316,10 +338,10 @@ const PublishForm = () => {
                 )}
               </div>
 
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface-2/50 p-3">
+              {/* <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface-2/50 p-3">
                 <Switch checked={Boolean(is_literature)} onChange={(v) => update({ is_literature: v })} />
                 <span className="text-sm"><b className="text-fg">Literature</b><span className="block text-fg-subtle">Shown in the literature section instead of the news feed.</span></span>
-              </label>
+              </label> */}
               {!is_literature && <Field label="Location" hint="Village / town as written on the story" info="The exact place the news happened, for example “chandauli”. Used for local search and the place line of the story."><Input value={location || ""} onChange={(e) => update({ location: e.target.value })} placeholder="e.g. chandauli" /></Field>}
             </div>
           </Card>
@@ -334,7 +356,7 @@ const PublishForm = () => {
               {isVideo && <Badge tone="neutral" className="absolute left-3 top-3 bg-ink/80 text-paper"><Video className="size-3" />Video</Badge>}
             </div>
             <div className="space-y-1 p-4">
-              <h2 className="hindi-font line-clamp-2 text-lg font-semibold leading-snug text-fg">{title || "—"}</h2>
+              <h2 className="hindi-font line-clamp-2 text-lg font-semibold  text-fg pt-1">{title || "—"}</h2>
               <p className="hindi-font line-clamp-3 text-sm text-fg-subtle">{description}</p>
             </div>
           </Card>
@@ -351,8 +373,16 @@ const PublishForm = () => {
             </label>
           </Card>
 
-          <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-[auto_1fr_1fr] gap-2 border-t border-line bg-surface/95 p-3 backdrop-blur lg:static lg:z-auto lg:grid-cols-1 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-            {type !== "schedule_news" && <Button size="lg" leftIcon={Send} loading={busy} onClick={submit} className="order-3 lg:order-1 lg:w-full">{t(verb)}</Button>}
+          <div className="fixed inset-x-0 -bottom-5 z-30 flex justify-between flex-wrap lg:grid lg:grid-cols-2 gap-2 border-t border-line bg-surface/95 p-3 backdrop-blur lg:static lg:z-auto lg:grid-cols-1 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            {type !== "schedule_news" &&
+              <Button
+                size="lg"
+                leftIcon={Send}
+                loading={busy}
+                onClick={submit}
+                className="order-3 lg:order-1 lg:w-full max-sm:max-w-fit max-sm:px-5">{t(verb)}
+              </Button>
+            }
             {canDraft && <Button size="lg" variant="outline" leftIcon={FileClock} disabled={busy} onClick={saveDraft} className="order-2 lg:w-full">Save as draft</Button>}
             {((mode !== "edit" && type !== "guest-news") || (mode === "edit" && type === "schedule_news")) && (
               <Button size="lg" variant="outline" leftIcon={CalendarClock} onClick={() => setScheduleOpen(true)} className="hidden lg:inline-flex lg:order-3 lg:w-full">{mode === "edit" ? "Update schedule" : t("Schedule")}</Button>

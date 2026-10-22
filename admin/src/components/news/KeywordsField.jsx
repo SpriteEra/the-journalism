@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { cn } from "../../lib/cn";
 import { controlBase } from "../ui/Input";
 
-export const KEYWORD_MAX = 30;
+export const KEYWORD_MAX = 10;
 const DEVANAGARI = /[\u0900-\u097F]/;
 export const scriptOf = (s) => (DEVANAGARI.test(s) ? "hi" : "en");
 export const emptyKeywords = () => ({ hi: [], en: [] });
@@ -47,14 +47,21 @@ export default function KeywordsField({ value, onChange, onSuggest, suggesting, 
   const remove = ({ k, lang }) => onChange({ ...v, [lang]: v[lang].filter((x) => x !== k) });
 
   return (
-    <div className={cn("space-y-3 rounded-2xl border bg-surface-2/50 p-4", error ? "border-danger/50" : "border-line")}>
+    <div className={cn("space-y-3 rounded-xl sm:rounded-2xl border bg-surface-2/50 p-2 sm:p-4", error ? "border-danger/50" : "border-line")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-sm font-semibold text-fg"><Languages className="size-4 text-fg-subtle" />{t("Keywords")}<span className="font-normal text-fg-subtle">· Hindi or English</span></p>
+        <p className="inline-flex items-center gap-2 text-sm font-semibold text-fg">
+          <Languages className="size-4 text-fg-subtle" />
+          {t("Tags")}
+        </p>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-fg-subtle">{list.length}/{KEYWORD_MAX * 2}</span>
           {onSuggest && (
-            <button type="button" onClick={onSuggest} disabled={suggesting}
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90 disabled:opacity-60">
+            <button
+              type="button"
+              onClick={onSuggest}
+              disabled={suggesting}
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            >
               <Sparkles className="size-3.5 text-gold-300" />{suggesting ? "…" : "AI suggest"}
             </button>
           )}
@@ -62,11 +69,20 @@ export default function KeywordsField({ value, onChange, onSuggest, suggesting, 
       </div>
       <div className={cn(controlBase, "flex min-h-12 flex-wrap items-center gap-1.5 px-2.5 py-2")}>
         {list.map((item) => (
-          <span key={item.lang + item.k} lang={item.lang} className="hindi-font inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-fg">
-            <span className={cn("size-1.5 rounded-full", item.lang === "hi" ? "bg-accent" : "bg-info")} aria-hidden />
+          <div key={item.lang + item.k} lang={item.lang} className="hindi-font inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 sm:px-3 py-1 sm:py-1.5 pb-0.5 sm:pb-1 text-xs sm:text-sm font-medium text-fg">
+            <span
+              className={cn("size-1.5 rounded-full pt-1.5!", item.lang === "hi" ? "bg-accent" : "bg-info")}
+              aria-hidden
+            />
             {item.k}
-            <button type="button" aria-label={`Remove ${item.k}`} onClick={() => remove(item)} className="rounded-full text-fg-subtle hover:text-danger"><X className="size-3" /></button>
-          </span>
+            <button
+              type="button"
+              aria-label={`Remove ${item.k}`}
+              onClick={() => remove(item)}
+              className="rounded-full text-fg-subtle hover:text-danger">
+              <X className="size-3" />
+            </button>
+          </div>
         ))}
         <input
           value={q} placeholder={list.length ? "Add another…" : "Type a keyword in Hindi or English and press Enter"}
@@ -76,14 +92,14 @@ export default function KeywordsField({ value, onChange, onSuggest, suggesting, 
             if (e.key === "Backspace" && !q && list.length) remove(list[list.length - 1]);
           }}
           onBlur={commit}
-          className="hindi-font min-w-40 flex-1 border-0 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-fg-faint"
+          className="hindi-font min-w-40 flex-1 border-0 bg-transparent px-1 py-0.5 sm:py-1.5! text-sm outline-none placeholder:text-fg-faint"
           style={{ background: "transparent" }}
         />
       </div>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-fg-faint">
-        <span>Press <kbd className="rounded border border-line bg-surface px-1">Enter</kbd> after each keyword</span>
-        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-accent" />Hindi</span>
-        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-info" />English</span>
+        <span>Press <kbd className="rounded py-0.5 border border-line bg-surface px-1">Enter</kbd> after each tags</span>
+        {/* <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-accent" />Hindi</span>
+        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-info" />English</span> */}
       </p>
       {error && <p className="text-sm text-danger">{error}</p>}
     </div>

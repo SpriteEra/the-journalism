@@ -40,11 +40,11 @@ export default function ForgotPassword() {
         {resolved === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
       </IconButton>
 
-      <div className="relative mt-12 w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl shadow-blue-900/10 sm:mt-0 sm:p-10">
-        <img className="mb-8 h-10 w-fit object-contain" src="/logo.png" alt="The Journalism" />
+      <div className="relative mt-12 w-full max-w-md rounded-xl md:rounded-3xl border border-line bg-surface p-6 shadow-2xl shadow-blue-900/10 sm:mt-0 sm:p-10">
+        <img className="mb-8 h-8 md:h-10 w-fit object-contain" src="/logo.png" alt="The Journalism" />
 
-        <h1 className="text-3xl font-bold tracking-tight text-fg">Forgot password?</h1>
-        <p className="mt-2 text-sm text-fg-subtle sm:text-base">Enter your email and we'll help you get back in.</p>
+        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-fg">Forgot password?</h1>
+        <p className="text-sm md:text-base sm:mt-2 text-fg-subtle mt-1">Enter your email and we'll help you get back in.</p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <Field label="Email" required>

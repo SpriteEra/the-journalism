@@ -11,10 +11,15 @@ export const sendToken = async (user, statusCode, res) => {
 
         const options = {
             httpOnly: true,
-            secure: true,        // required with sameSite 'none'
-            sameSite: 'none',
+            secure: false,
         }
 
+
+        // const options = {
+        //     httpOnly: true,
+        //     secure: true,        // required with sameSite 'none'
+        //     sameSite: 'none',
+        // }
         const accessOptions = {
             ...options,
             maxAge: process.env.ACCESS_COOKIE_EXPIRES * 60 * 1000

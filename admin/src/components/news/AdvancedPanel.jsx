@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Clock, Crown, Link2, Search, Star } from "lucide-react";
+import { ChevronDown, Clock, Crown, Link2, Plus, Search, Star, X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { fmtDate } from "../../lib/api";
 import { toIstInput } from "../../lib/time";
@@ -12,14 +12,14 @@ const inHours = (h) => toIstInput(new Date(Date.now() + h * 3600000));
 
 function Section({ icon: Icon, title, description, open, onToggle, badge, children }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface">
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg-muted"><Icon className="size-4.5" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-fg">{title}</span><span className="block truncate text-xs text-fg-subtle">{description}</span></span>
+    <div className="rounded-lg sm:rounded-2xl border border-line bg-surface w-full flex flex-col">
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 px-2 sm:px-4 py-2 sm:py-3.5 text-left">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md sm:rounded-xl bg-surface-2 text-fg-muted"><Icon className="size-4.5" /></span>
+        <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-fg">{title}</span><span className="block truncate whitespace-normal text-[11px] max-sm:leading-snug sm:text-xs text-fg-subtle">{description}</span></span>
         {badge}
         <ChevronDown className={cn("size-4 shrink-0 text-fg-subtle transition-transform", open && "rotate-180")} />
       </button>
-      {open && <div className="space-y-4 border-t border-line p-4">{children}</div>}
+      {open && <div className="space-y-4 border-t border-line p-2.5 sm:p-4">{children}</div>}
     </div>
   );
 }
@@ -27,10 +27,66 @@ function Section({ icon: Icon, title, description, open, onToggle, badge, childr
 /** Google-style result, so the editor sees what the SEO title / description will look like in search. */
 function SerpPreview({ title, description, url }) {
   return (
-    <div className="rounded-xl border border-line bg-surface-2/50 p-3.5">
+    <div className="rounded-sm sm:rounded-xl border border-line bg-surface-2/50 p-2 sm:p-3.5">
       <p className="truncate text-xs text-fg-subtle">{url}</p>
       <p className="hindi-font mt-0.5 line-clamp-1 text-lg leading-snug text-info">{title || "Page title appears here"}</p>
       <p className="hindi-font mt-0.5 line-clamp-2 text-sm text-fg-muted">{description || "The description shown under the title in search results."}</p>
+    </div>
+  );
+}
+
+
+function KeywordInput({ value, onChange, id, max = 10 }) {
+  const [draft, setDraft] = useState("");
+  const list = (value || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const save = (arr) => onChange(arr.join(", "));
+
+  const add = () => {
+    const k = draft.replace(/,/g, " ").replace(/\s+/g, " ").trim();
+    setDraft("");
+    if (!k || list.length >= max) return;
+    if (list.some((x) => x.toLowerCase() === k.toLowerCase())) return; // no duplicates
+    save([...list, k]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          value={draft}
+          className="hindi-font"
+          placeholder={list.length >= max ? `Maximum ${max} keywords` : "Type a keyword, press Enter"}
+          disabled={list.length >= max}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // isComposing: don't add half-typed Hindi text while the keyboard is still composing
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); add(); }
+            if (e.key === "Backspace" && !draft && list.length) save(list.slice(0, -1));
+          }}
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!draft.trim() || list.length >= max}
+          aria-label="Add keyword"
+          className="grid size-10 shrink-0 place-items-center rounded-lg border border-line bg-surface-2 text-fg-muted hover:text-fg disabled:opacity-40"
+        >
+          <Plus className="size-4" />
+        </button>
+      </div>
+      {list.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {list.map((k) => (
+            <span key={k} className="hindi-font inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 py-1 pl-3 pr-1.5 text-xs font-medium text-fg-muted">
+              {k}
+              <button type="button" aria-label={`Remove ${k}`} onClick={() => save(list.filter((x) => x !== k))} className="grid size-4 place-items-center rounded-full hover:bg-surface-3 hover:text-fg">
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -50,7 +106,7 @@ export default function AdvancedPanel({ blog, update, title, description, canFea
   const mTitle = seo.metaTitle ?? ""; const mDesc = seo.metaDescription ?? "";
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full flex-col max-w-full ">
       <Section icon={Search} title="SEO" description="Search title, description and focus keyword" open={open.seo} onToggle={() => toggle("seo")}
         badge={mTitle || mDesc ? <Badge tone="success" size="sm">Custom</Badge> : <Badge size="sm" tone="neutral">Auto</Badge>}>
         <Field label="SEO title" hint={`${mTitle.length}/120 · leave empty to use the story title`} info="The blue headline Google shows for this story. Make it clear and under about 60 characters.">
@@ -59,8 +115,12 @@ export default function AdvancedPanel({ blog, update, title, description, canFea
         <Field label="SEO description" hint={`${mDesc.length}/320 · leave empty to use the short description`} info="The grey text under the headline in search results. Aim for 120–160 characters.">
           <Textarea rows={3} value={mDesc} maxLength={320} className="hindi-font" placeholder={description || "Short description"} onChange={(e) => setSeo({ metaDescription: e.target.value.replace(/\n/g, " ") })} />
         </Field>
-        <Field label="Focus keyword" hint="The one phrase this story should rank for" info="The main phrase people would search to find this story. Try to have it in the title and the first lines.">
-          <Input value={seo.focusKeyword || ""} className="hindi-font" onChange={(e) => setSeo({ focusKeyword: e.target.value })} />
+        <Field
+          label="Focus keywords"
+          hint="Press Enter or + to add each keyword · the first one is the main keyword"
+          info="The phrases people would search to find this story. Add the main one first, and try to use it in the title and the first lines."
+        >
+          <KeywordInput value={seo.focusKeyword} onChange={(v) => setSeo({ focusKeyword: v })} />
         </Field>
         <SerpPreview title={mTitle || title} description={mDesc || description} url="yoursite.com › news › …" />
       </Section>

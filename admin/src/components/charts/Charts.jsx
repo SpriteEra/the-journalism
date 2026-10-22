@@ -139,7 +139,7 @@ export function Gauge({ value = 0, label, color = SERIES[2], height = 180 }) {
         </RadialBarChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-        <div><p className="text-3xl font-semibold text-fg">{Math.round(v)}%</p>{label && <p className="text-xs text-fg-subtle">{label}</p>}</div>
+        <div><p className="text-xl sm:text-3xl font-semibold text-fg">{Math.round(v)}%</p>{label && <p className="text-[10px] sm:text-xs text-fg-subtle">{label}</p>}</div>
       </div>
     </div>
   );

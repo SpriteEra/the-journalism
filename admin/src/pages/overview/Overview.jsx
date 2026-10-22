@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { BarChart3, CalendarClock, Clapperboard, Eye, FileText, Hourglass, Images, MapPin, PlaySquare, Plus, Radio, Sparkles, Users, Video } from "lucide-react";
+import { BarChart3, CalendarClock, Clapperboard, Eye, FileText, Hourglass, Images, MapPin, MoreVertical, PlaySquare, Plus, Radio, Sparkles, Users, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import usePermission from "../../hooks/usePermission";
 import { useAnalyticsDashboard } from "../../hooks/admin";
@@ -23,18 +24,101 @@ function Block({ title, description, loading, children, className, actions, heig
   );
 }
 
-function QuickActions({ can }) {
+function QuickActions({ can, inline = false }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
   const actions = [
     can("news.create") && { to: "/dashboard/news/create", label: t("Write news"), icon: Plus, primary: true },
     can("news.approve") && { to: "/dashboard/review-news", label: t("Review queue"), icon: Hourglass },
     can(["video.create"]) && { to: "/dashboard/short-videos", label: t("Shorts & videos"), icon: PlaySquare },
   ].filter(Boolean);
-  return actions.length ? (
-    <div className="flex flex-wrap gap-2">
-      {actions.map((a) => <Link key={a.to} to={a.to} className={buttonStyles({ variant: a.primary ? "primary" : "outline" })}><a.icon className="size-4" />{a.label}</Link>)}
-    </div>
-  ) : null;
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    }
+    setOpen((o) => !o);
+  };
+
+  // close on outside tap, Escape, scroll, resize
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e) => {
+      if (menuRef.current?.contains(e.target) || btnRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
+    const close = () => setOpen(false);
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
+  if (!actions.length) return null;
+
+  return (
+    <>
+      {/* sm and up (or inline): normal buttons */}
+      <div className={`${inline ? "flex" : "hidden sm:flex"} flex-wrap gap-2`}>
+        {actions.map((a) => (
+          <Link key={a.to} to={a.to} className={buttonStyles({ variant: a.primary ? "primary" : "outline" })}>
+            <a.icon className="size-4" />{a.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* below sm: three-dot menu */}
+      {!inline && (
+        <div className="sm:hidden">
+          <button
+            ref={btnRef}
+            type="button"
+            onClick={toggle}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label={t("Quick actions")}
+            className={`${buttonStyles({ variant: "outline" })} !px-2.5`}
+          >
+            <MoreVertical className="size-4" />
+          </button>
+
+          {open && createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              style={{ top: pos.top, right: pos.right }}
+              className="fixed z-[100] min-w-52 max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-surface p-1.5 shadow-card"
+            >
+              {actions.map((a) => (
+                <Link
+                  key={a.to}
+                  to={a.to}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-surface-2 ${a.primary ? "text-primary" : "text-fg"}`}
+                >
+                  <a.icon className="size-4" />{a.label}
+                </Link>
+              ))}
+            </div>,
+            document.body
+          )}
+        </div>
+      )}
+    </>
+  );
 }
 
 export default function Overview() {
@@ -66,16 +150,16 @@ export default function Overview() {
   return (
     <div className="space-y-4">
       {/* hero (Nexora style: light card, soft mint / sky glow, headline numbers) */}
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-line bg-surface p-5 shadow-card sm:p-8">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-[1.75rem] border border-line bg-surface p-4 shadow-card sm:p-8">
         <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 size-[26rem] rounded-full bg-linear-to-br from-accent/25 via-info/15 to-transparent blur-3xl" />
         <span aria-hidden className="pointer-events-none absolute -bottom-32 left-1/3 size-[24rem] rounded-full bg-info/10 blur-3xl" />
-        <div className="relative flex flex-col gap-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex flex-col gap-3 sm:gap-6">
+          <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><Sparkles className="size-3.5" />Insights · last {days} days</span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><span className="size-1.5 rounded-full bg-success" />Live</span>
             </div>
-            <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-col items-end gap-2 sm:gap-3">
               <QuickActions can={can} />
               <p className="hidden text-sm text-fg-subtle sm:block">{fmtDate(new Date())}</p>
             </div>
@@ -83,7 +167,7 @@ export default function Overview() {
           <div className="max-w-2xl">
             <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{t(greetingKey())}, {user?.fullName || user?.username}</h1>
             {canSee && !isLoading
-              ? <p className="mt-3 text-base leading-relaxed text-fg-subtle sm:text-lg">Here is how the newsroom is doing - reads are {Number(o?.news.change.viewsPercent) >= 0 ? "up" : "down"} <b className="text-fg">{Math.abs(o?.news.change.viewsPercent || 0)}%</b> on the previous period, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</p>
+              ? <p className="mt-3 text-sm sm:text-base leading-relaxed text-fg-subtle sm:text-lg">Here is how the newsroom is doing - reads are {Number(o?.news.change.viewsPercent) >= 0 ? "up" : "down"} <b className="text-fg">{Math.abs(o?.news.change.viewsPercent || 0)}%</b> on the previous period, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</p>
               : <p className="mt-3 text-base text-fg-subtle sm:text-lg">Pick a section from the menu to get started.</p>}
           </div>
           {canSee && (

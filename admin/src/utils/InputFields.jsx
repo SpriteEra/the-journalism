@@ -6,7 +6,7 @@ import Input from "../components/ui/Input";
  * it now renders the new <Field> + <Input> components. New code should use those directly.
  */
 const InputFields = ({ required = false, LabelTitle, inputVal, handleInputValue, placeholder, type = "text", name, readOnly = false, icon, min }) => (
-  <Field label={LabelTitle} required={required} className="mb-5">
+  <Field label={LabelTitle} required={required} className="mb-2 sm:mb-5">
     <Input required={required} type={type} readOnly={readOnly} name={name} value={inputVal ?? ""} onChange={handleInputValue} placeholder={placeholder} icon={icon} {...(min ? { min } : {})} />
   </Field>
 );

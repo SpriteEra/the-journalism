@@ -99,18 +99,37 @@ export default function NewsList({ title, description, draft = false, needApprov
       <PageHeader title={title} description={description} actions={writeBtn} />
 
       <Card padded={false} className="mb-2 overflow-visible rounded-lg">
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-2.5">
-          <form className="min-w-0 flex-1" onSubmit={(e) => { e.preventDefault(); apply({ ...applied, search }); }}>
-            <SearchInput value={search} onChange={(v) => { setSearch(v); if (!v && applied.search) apply({ ...applied, search: "" }); }} placeholder={t("Search title, place, category or keyword (Enter)")} />
+        <div className="flex gap-1.5 p-1 items-center sm:p-2.5">
+          <form
+            className="min-w-0 flex-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              apply({ ...applied, search });
+            }}>
+            <SearchInput
+              value={search}
+              onChange={(v) => {
+                setSearch(v);
+                if (!v && applied.search)
+                  apply({ ...applied, search: "" });
+              }}
+              placeholder={t("Search title, place, category or keyword (Enter)")}
+            />
           </form>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" leftIcon={SlidersHorizontal} onClick={() => { setSelected(applied); setFilterOpen(true); }} className="flex-1 sm:flex-none">
-              {t("Filters")}{active - (applied.search ? 1 : 0) > 0 && <span className="ml-1 grid size-5 place-items-center rounded-full bg-fg text-[11px] font-semibold text-canvas">{active - (applied.search ? 1 : 0)}</span>}
+          <div className="flex items-center gap-1 sm:gap-2">
+
+            <Button
+              variant="outline"
+              leftIcon={SlidersHorizontal}
+              onClick={() => { setSelected(applied); setFilterOpen(true); }} className="px-2 flex-1 sm:flex-none"
+            >
+              {t("Filters")}{active - (applied.search ? 1 : 0) > 0 && <span className="ml-1 grid size-4 sm:size-5 place-items-center rounded-full bg-fg text-[11px] font-semibold text-canvas">{active - (applied.search ? 1 : 0)}</span>}
             </Button>
-            <div className="hidden items-center rounded-control border border-line-strong p-0.5 sm:flex" role="group" aria-label="Layout">
+
+            <div className="hidden sm:flex items-center rounded-control border border-line-strong p-0.5" role="group" aria-label="Layout">
               {[["grid", LayoutGrid, t("Grid")], ["list", Rows3, t("List")]].map(([id, Icon, label]) => (
                 <button key={id} type="button" aria-pressed={layout === id} aria-label={label} title={label} onClick={() => setLayout(id)}
-                  className={cn("grid size-9 place-items-center rounded-lg transition-colors", layout === id ? "bg-primary text-primary-fg" : "text-fg-subtle hover:bg-surface-2")}><Icon className="size-4" /></button>
+                  className={cn("grid size-7 sm:size-9 place-items-center rounded-md sm:rounded-lg transition-colors", layout === id ? "bg-primary text-primary-fg" : "text-fg-subtle hover:bg-surface-2")}><Icon className="size-3.5 sm:size-4" /></button>
               ))}
             </div>
           </div>
@@ -173,13 +192,29 @@ export default function NewsList({ title, description, draft = false, needApprov
           </div>
         ) : !data?.news?.length ? (
           <Card className="flex min-h-[max(20rem,calc(100dvh-26rem))] items-center">
-            <EmptyState icon={Newspaper} title={t(emptyText)} description={active ? t("Try clearing the filters.") : undefined} action={!active ? writeBtn || null : <Button variant="outline" onClick={() => { setSearch(""); apply(EMPTY); }}>{t("Clear all")}</Button>} />
+            <EmptyState
+              icon={Newspaper}
+              title={t(emptyText)}
+              description={active ? t("Try clearing the filters.") : undefined} action={!active ? writeBtn || null : <Button variant="outline" onClick={() => { setSearch(""); apply(EMPTY); }}>{t("Clear all")}</Button>}
+            />
           </Card>
         ) : (
           <div className={cn("grid gap-4 transition-opacity h-full flex-1", layout === "grid" ? "sm:grid-cols-2 2xl:grid-cols-3" : "grid-cols-1", isFetching && "opacity-70")}>
             {data.news.map((n) => (
-              <NewsCard key={n.news_id} item={n} layout={layout} draft={draft} needApproval={needApproval} canEdit={canEdit} canDelete={canDelete(n)}
-                onEdit={() => navigate(`${editBase}/${n.news_id}${editQuery}`)} onPreview={() => openPreview(n)} onHistory={() => setStack(n.update_stack)} onDelete={() => askDelete(n)} />
+              <NewsCard
+                key={n.news_id}
+                item={n}
+                layout={layout}
+                draft={draft}
+                needApproval={needApproval}
+                canEdit={canEdit}
+                canDelete={canDelete(n)}
+                onEdit={() =>
+                  navigate(`${editBase}/${n.news_id}${editQuery}`)}
+                onPreview={() => openPreview(n)}
+                onHistory={() => setStack(n.update_stack)}
+                onDelete={() => askDelete(n)}
+              />
             ))}
           </div>
         )}

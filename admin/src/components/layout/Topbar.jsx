@@ -35,11 +35,11 @@ export default function Topbar({ onOpenMenu }) {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-(--topbar-height) items-center gap-2 border-b border-line bg-surface/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-surface/70 sm:gap-3 sm:px-5">
+    <header className="sticky top-0 z-20 flex h-(--topbar-height) items-center gap-2 border-b border-line bg-surface/85 px-2 backdrop-blur supports-[backdrop-filter]:bg-surface/70 sm:gap-3 sm:px-5">
       <IconButton label="Open menu" className="lg:hidden" onClick={onOpenMenu}><MenuIcon className="size-5" /></IconButton>
       <div className="min-w-0 flex-1"><Breadcrumbs /></div>
 
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex items-center gap-0.5 sm:gap-2">
         {can("tools.ai") && <OraAIButton />}
         <IconButton label={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"} onClick={() => setTheme(resolved === "dark" ? "light" : "dark")} className="hidden sm:inline-flex">
           {resolved === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}

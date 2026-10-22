@@ -8,45 +8,9 @@ import {
   Badge, Button, Card, ChipInput, ConfirmDialog, DataTable, EmptyState, ErrorState, Field, IconButton, Input, Modal, PageHeader, Pagination,
   SearchInput, Select, StatusBadge, Switch, Tabs, Textarea,
 } from "../../components/ui";
+import TagFormModal from "./TagFormModal";
 
 const blank = { title: "", aliases: [], description: "", language: "hi", isActive: true, isFeatured: false, seo: { metaTitle: "", metaDescription: "" } };
-
-function TagForm({ tag, onClose }) {
-  const editing = Boolean(tag?._id);
-  const [form, setForm] = useState(() => (editing ? { ...blank, ...tag, aliases: tag.aliases || [], seo: { ...blank.seo, ...(tag.seo || {}) } } : blank));
-  const [slug, setSlug] = useState(tag?.slug || "");
-  const set = (p) => setForm((f) => ({ ...f, ...p }));
-  const save = useApiMutation(() => {
-    const body = { title: form.title, aliases: form.aliases, description: form.description, language: form.language, isActive: form.isActive, isFeatured: form.isFeatured, seo: { metaTitle: form.seo.metaTitle, metaDescription: form.seo.metaDescription } };
-    return (editing ? httpClient.put(`/tags/${tag._id}`, { ...body, slug }) : httpClient.post("/tags", body)).then((r) => r.data);
-  }, { invalidate: ["tags", "tag-suggest"], onSuccess: onClose });
-
-  return (
-    <Modal open onClose={onClose} size="lg" title={editing ? "Edit topic" : "New topic"}
-      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" form="tag-form" loading={save.isPending}>{editing ? "Save changes" : "Create tag"}</Button></>}>
-      <form id="tag-form" onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
-        <Field label="Title" required hint="2–80 characters. Hindi or English."><Input value={form.title} onChange={(e) => set({ title: e.target.value })} maxLength={80} autoFocus data-autofocus /></Field>
-        {editing && <Field label="URL slug" hint={`/tag/${slug}`}><Input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())} /></Field>}
-        <Field label="Aliases" hint="Other spellings that should find this topic (max 15)."><ChipInput value={form.aliases} onChange={(a) => set({ aliases: a.map((x) => (typeof x === "string" ? x : x.title)) })} placeholder="bjp, भाजपा …" max={15} /></Field>
-        <Field label="Description"><Textarea rows={3} value={form.description} onChange={(e) => set({ description: e.target.value })} maxLength={500} /></Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Language"><Select value={form.language} onChange={(e) => set({ language: e.target.value })} options={[{ value: "hi", label: "Hindi" }, { value: "en", label: "English" }, { value: "other", label: "Other" }]} /></Field>
-          <div className="space-y-3 pt-6">
-            <Switch checked={form.isActive} onChange={(v) => set({ isActive: v })} label="Active" description="Inactive topics can't be added to new news" />
-            <Switch checked={form.isFeatured} onChange={(v) => set({ isFeatured: v })} label="Featured" description="Shown first in popular topics" />
-          </div>
-        </div>
-        <details className="rounded-xl border border-line p-4">
-          <summary className="cursor-pointer text-sm font-medium text-fg">SEO (optional)</summary>
-          <div className="mt-4 space-y-4">
-            <Field label="Meta title"><Input value={form.seo.metaTitle || ""} onChange={(e) => set({ seo: { ...form.seo, metaTitle: e.target.value } })} maxLength={70} /></Field>
-            <Field label="Meta description"><Textarea rows={2} value={form.seo.metaDescription || ""} onChange={(e) => set({ seo: { ...form.seo, metaDescription: e.target.value } })} maxLength={160} /></Field>
-          </div>
-        </details>
-      </form>
-    </Modal>
-  );
-}
 
 function MergeDialog({ tag, onClose }) {
   const [q, setQ] = useState("");
@@ -85,18 +49,22 @@ export default function Tags() {
   const patch = (p) => setParams((s) => ({ ...s, page: 1, ...p }));
 
   const columns = [
-    { key: "title", header: "Topic", primary: true, cell: (t) => (
-      <div className="min-w-0"><p className="flex items-center gap-1.5 font-medium text-fg">#{t.title}{t.isFeatured && <Star className="size-3.5 fill-warning text-warning" aria-label="Featured" />}</p><p className="truncate text-xs text-fg-subtle">/{t.slug}</p></div>) },
+    {
+      key: "title", header: "Topic", primary: true, cell: (t) => (
+        <div className="min-w-0"><p className="flex items-center gap-1.5 font-medium text-fg">#{t.title}{t.isFeatured && <Star className="size-3.5 fill-warning text-warning" aria-label="Featured" />}</p><p className="truncate text-xs text-fg-subtle">/{t.slug}</p></div>)
+    },
     { key: "aliases", header: "Aliases", hideOnMobile: true, cell: (t) => (t.aliases?.length ? <span className="line-clamp-1 max-w-48 text-xs">{t.aliases.join(", ")}</span> : "—") },
     { key: "news", header: "News", cell: (t) => <span className="tabular-nums">{t.publishedCount}<span className="text-fg-faint"> / {t.newsCount}</span></span> },
     { key: "status", header: "Status", cell: (t) => <StatusBadge status={t.isActive ? "active" : "inactive"} /> },
     { key: "createdAt", header: "Created", cell: (t) => <span className="text-xs">{fmtDate(t.createdAt)}</span> },
-    { key: "actions", header: "", align: "right", cell: (t) => (
-      <div className="flex justify-end gap-1">
-        {can("tag.update") && <IconButton size="icon-sm" label="Edit topic" onClick={() => setEditing(t)}><Pencil className="size-4" /></IconButton>}
-        {can("tag.merge") && <IconButton size="icon-sm" label="Merge into another topic" onClick={() => setMerging(t)}><GitMerge className="size-4" /></IconButton>}
-        {can("tag.delete") && <IconButton size="icon-sm" label="Delete topic" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setDeleting(t)}><Trash2 className="size-4" /></IconButton>}
-      </div>) },
+    {
+      key: "actions", header: "", align: "right", cell: (t) => (
+        <div className="flex justify-end gap-1">
+          {can("tag.update") && <IconButton size="icon-sm" label="Edit topic" onClick={() => setEditing(t)}><Pencil className="size-4" /></IconButton>}
+          {can("tag.merge") && <IconButton size="icon-sm" label="Merge into another topic" onClick={() => setMerging(t)}><GitMerge className="size-4" /></IconButton>}
+          {can("tag.delete") && <IconButton size="icon-sm" label="Delete topic" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setDeleting(t)}><Trash2 className="size-4" /></IconButton>}
+        </div>)
+    },
   ];
 
   return (
@@ -122,7 +90,7 @@ export default function Tags() {
           </>
         )}
       </Card>
-      {editing && <TagForm tag={editing._id ? editing : null} onClose={() => setEditing(null)} />}
+      {editing && <TagFormModal tag={editing._id ? editing : null} onClose={() => setEditing(null)} />}
       {merging && <MergeDialog tag={merging} onClose={() => setMerging(null)} />}
       {deleting && (
         <ConfirmDialog open onClose={() => setDeleting(null)} tone="danger" title={`Delete “${deleting.title}”?`} loading={del.isPending}

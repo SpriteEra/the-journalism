@@ -1,0 +1,1 @@
+import{j as e,ag as i}from"./index-DLXw8dX5.js";const c=({isPending:s,isError:n,error:t,children:a})=>s?e.jsx("div",{className:"items-center justify-center py-4 flex flex-1 h-full",children:e.jsx(i,{})}):n?e.jsx("div",{className:"text-danger text-center py-4",children:(t==null?void 0:t.message)||"Something went wrong."}):e.jsx(e.Fragment,{children:a});export{c as A};

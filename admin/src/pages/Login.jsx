@@ -103,17 +103,17 @@ export default function Login() {
       <div className="pointer-events-none absolute -right-24 -top-24 size-[30rem] rounded-full bg-blue-200/50 blur-3xl dark:bg-blue-500/10" aria-hidden />
       <div className="pointer-events-none absolute -bottom-32 -left-24 size-[28rem] rounded-full bg-sky-200/40 blur-3xl dark:bg-sky-500/10" aria-hidden />
 
-      <IconButton label="Toggle theme" onClick={toggleTheme} className="absolute right-4 top-4 z-10">
+      <IconButton label="Toggle theme" onClick={toggleTheme} className="absolute right-2 md:right-4 top-2 md:top-4 z-10">
         {resolved === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
       </IconButton>
 
-      <div className="relative grid w-full max-w-6xl overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl shadow-blue-900/10 lg:min-h-[640px] lg:grid-cols-2">
+      <div className="relative grid w-full max-w-6xl overflow-hidden rounded-xl md:rounded-3xl border border-line bg-surface shadow-2xl shadow-blue-900/10 lg:min-h-[640px] lg:grid-cols-2">
         {/* left: brand */}
         <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-blue-50 via-white to-sky-50 p-12 lg:flex dark:from-blue-950/40 dark:via-surface dark:to-surface">
           <div className="absolute left-1/3 top-10 size-72 rounded-full bg-blue-200/40 blur-3xl dark:bg-blue-500/10" aria-hidden />
           <div className="relative">
             <img className="h-10 w-fit object-contain " src="/logo.png" />
-            <h2 className="mt-10 text-[55px] font-bold leading-[1.02] tracking-tight text-fg">
+            <h2 className="mt-10 text-2xl md:text-3xl lg:text-[55px] font-bold leading-[1.02] tracking-tight text-fg">
               Newsroom
               <span className="block text-blue-600 dark:text-blue-400">made simple.</span>
             </h2>
@@ -127,11 +127,11 @@ export default function Login() {
 
         {/* right: form */}
         <main className="flex flex-col justify-center p-6 sm:p-12 lg:p-16">
-          <Brand className="mb-10 lg:hidden" />
-          <h1 className="text-4xl font-bold tracking-tight text-fg">Welcome back</h1>
-          <p className="mt-2 text-fg-subtle">Sign in to your newsroom account</p>
+          <Brand className="mb-6 sm:mb-10 lg:hidden" />
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-fg">Welcome back</h1>
+          <p className="text-sm md:text-base sm:mt-2 text-fg-subtle">Sign in to your newsroom account</p>
 
-          <form onSubmit={submit} className="mt-9 space-y-5">
+          <form onSubmit={submit} className="mt-5 md:mt-9 space-y-5">
             <Field label="Email or username" required>
               <Input icon={Mail} autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required autoFocus />
             </Field>

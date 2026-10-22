@@ -61,11 +61,11 @@ export default function ResetPassword() {
         {resolved === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
       </IconButton>
 
-      <div className="relative mt-12 w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl shadow-blue-900/10 sm:mt-0 sm:p-10">
+      <div className="relative mt-12 w-full max-w-md rounded-xl md:rounded-3xl border border-line bg-surface p-6 shadow-2xl shadow-blue-900/10 sm:mt-0 sm:p-10">
         <img className="mb-8 h-8 w-fit object-contain mx-auto" src="/logo.png" alt="The Journalism" />
 
-        <h1 className="text-3xl font-bold tracking-tight text-fg">Set a new password</h1>
-        <p className="mt-2 text-sm text-fg-subtle sm:text-base leading-tight">Choose a new password for your newsroom account.</p>
+        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-fg">Set a new password</h1>
+        <p className="text-sm md:text-base sm:mt-2 text-fg-subtle mt-1">Choose a new password for your newsroom account.</p>
 
         {linkError ? (
           <div className="mt-8 space-y-5">
