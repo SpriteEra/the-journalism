@@ -114,7 +114,7 @@ export const getRelatedYtNews = tryCatch(async (req, res, next) => {
 // admin and reporter routes
 
 export const createYtNews = tryCatch(async (req, res, next) => {
-    let { title, description, tags, location, state, district, videoLinkId, draft } = req.body;
+    let { title, description, tags, videoLinkId, draft } = req.body;
     const url = req.body.url || videoLinkId;
 
     // YouTube news = long, LANDSCAPE videos added by link. The id is read from any YouTube URL and the details (title, thumbnail,
@@ -144,9 +144,7 @@ export const createYtNews = tryCatch(async (req, res, next) => {
         if (!tags || tags.length === 0) {
             return next(new ErrorHandler(400, 'You must provide a tags for the news'))
         }
-        if (!location || location.trim() === '') {
-            return next(new ErrorHandler(400, 'You must provide a location for the news'))
-        }
+
     }
 
     let newUrlTitle = ""
@@ -166,7 +164,7 @@ export const createYtNews = tryCatch(async (req, res, next) => {
     news_id += '-' + getCurrentDate() + '-' + generateNanoId();
 
     let news = new YtNews({
-        title, description, tags, location, state, district, videoLinkId, draft: Boolean(draft), news_id, author: req.user._id,
+        title, description, tags, videoLinkId, draft: Boolean(draft), news_id, author: req.user._id,
         ...(meta ? { thumbnail: meta.thumbnail || '', duration: meta.duration || 0, channelId: meta.channelId || '', channelTitle: meta.channelTitle || '', publishedAt: meta.publishedAt || undefined } : {}),
     })
 

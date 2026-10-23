@@ -74,16 +74,24 @@ const videoPageSeo = (v) => {
 export const getShortVideos = tryCatch(async (req, res) => {
     const { page, limit, skip } = paging(req);
     const q = { ...PUBLIC };
-    if (KINDS.includes(req.query.kind)) q.kind = req.query.kind;
-    if (req.query.source === 'upload') q.sourceType = 'upload';
-    else if (req.query.source === 'youtube') q.sourceType = { $in: ['youtube_auto', 'youtube_manual'] };
+    if (KINDS.includes(req.query.kind))
+        q.kind = req.query.kind;
+    if (req.query.source === 'upload')
+        q.sourceType = 'upload';
+    else if (req.query.source === 'youtube')
+        q.sourceType = { $in: ['youtube_auto', 'youtube_manual'] };
+
     const { filter, empty } = await buildTaxonomyFilter({
         category: qList(req.query, 'category'), subCategory: qList(req.query, 'subCategory'),
         state: qList(req.query, 'state'), district: qList(req.query, 'district'), tag: qList(req.query, 'tag'),
     });
+
     if (empty) return res.status(200).json({ success: true, videos: [], hasMore: false, page, limit });
+
     const rows = await ShortVideo.find({ ...q, ...filter }).sort({ publishedAt: -1, _id: -1 }).skip(skip).limit(limit + 1).select(LIST).populate(TAGS_POPULATE).lean();
+
     setPublicCache(res, 60);
+
     res.status(200).json({ success: true, videos: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
 });
 

@@ -91,100 +91,106 @@ const isValidVideo = (file) => {
 };
 
 app.post('/api/v1/upload-stream', apiCors, async (req, res) => {
-    console.log('Upload request received');
+    try {
+
+        console.log('Upload request received');
 
 
-    // Ensure directories exist
+        // Ensure directories exist
 
-    const form = formidable({
-        uploadDir: videoUploadDir, // Save original videos here
-        keepExtensions: true,
-        maxFileSize: 500 * 1024 * 1024, // 500MB
-        multiples: false,
-        filter: ({ name, originalFilename, mimetype }) => {
-            return name === 'file' && isValidVideo({ originalFilename, mimetype });
-        }
-    });
-
-    const [fields, files] = await new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-            if (err) reject(err);
-            else resolve([fields, files]);
+        const form = formidable({
+            uploadDir: videoUploadDir, // Save original videos here
+            keepExtensions: true,
+            maxFileSize: 500 * 1024 * 1024, // 500MB
+            multiples: false,
+            filter: ({ name, originalFilename, mimetype }) => {
+                return name === 'file' && isValidVideo({ originalFilename, mimetype });
+            }
         });
-    });
 
-    console.log('Form parsed successfully');
+        const [fields, files] = await new Promise((resolve, reject) => {
+            form.parse(req, (err, fields, files) => {
+                if (err) reject(err);
+                else resolve([fields, files]);
+            });
+        });
 
-    const file = files.file?.[0];
-    if (!file) {
-        throw new Error('No valid video file uploaded. Supported formats: MP4, MOV, AVI, MKV');
+        console.log('Form parsed successfully');
+
+        const file = files.file?.[0];
+        if (!file) {
+            throw new Error('No valid video file uploaded. Supported formats: MP4, MOV, AVI, MKV');
+        }
+
+
+        const inputPath = file.filepath;
+        const originalFilename = file.originalFilename;
+        const uniqueName = uuidv4();
+        const fileExt = path.extname(originalFilename);
+
+        const outputFilename = `${uniqueName}${fileExt}`;
+        const outputPath = path.join(videoDir, outputFilename);
+        const tempOutputPath = path.join(tempDir, outputFilename);
+
+        // if (!await exists(inputPath)) {
+        //     throw new Error('Uploaded file not found');
+        // }
+
+        // console.log(`Starting compression for ${originalFilename}`);
+
+        await new Promise((resolve, reject) => {
+            ffmpeg(inputPath)
+                .videoCodec('libx264')
+                .audioCodec('aac')
+                .outputOptions([
+                    '-crf 20',
+                    '-preset veryfast',
+                    '-movflags +faststart',
+                    '-profile:v high',
+                    '-pix_fmt yuv420p',
+                    '-vf scale=960:-2',
+                    '-b:v 1000k',
+                    '-b:a 128k',
+                    '-ac 2'
+                ])
+                .on('start', (commandLine) => {
+                    // console.log('FFmpeg command:', commandLine);
+                })
+                .on('progress', (progress) => {
+                    // console.log(`Processing: ${Math.round(progress.percent)}% done`);
+                })
+                .on('end', () => {
+                    // Move from temp to final location
+                    copyAndDelete(tempOutputPath, outputPath)
+                        .then(() => {
+                            console.log('Compression finished successfully');
+                            resolve();
+                        })
+                        .catch(reject);
+                })
+                .on('error', reject)
+                .save(tempOutputPath);
+        });
+
+        // Move original file to delete queue for later cleanup
+        const deleteQueuePath = path.join(deleteQueueDir, path.basename(inputPath));
+        await fs.promises.rename(inputPath, deleteQueuePath);
+
+        const stats = await fs.promises.stat(outputPath);
+        const baseUrl = process.env.IMG_URL || 'http://localhost:8000';
+        res.json({
+            success: true,
+            url: `${baseUrl}/videos/${outputFilename}`,
+            message: 'Upload and compression successful',
+            originalFile: originalFilename,
+            compressedFile: outputFilename,
+            size: stats.size,
+            downloadUrl: `/videos/${outputFilename}`
+        });
+    } catch (error) {
+        console.error('upload-stream failed:', err);
+        return res.status(500).json({ success: false, message: err.message });
     }
-
-
-    const inputPath = file.filepath;
-    const originalFilename = file.originalFilename;
-    const uniqueName = uuidv4();
-    const fileExt = path.extname(originalFilename);
-
-    const outputFilename = `${uniqueName}${fileExt}`;
-    const outputPath = path.join(videoDir, outputFilename);
-    const tempOutputPath = path.join(tempDir, outputFilename);
-
-    // if (!await exists(inputPath)) {
-    //     throw new Error('Uploaded file not found');
-    // }
-
-    // console.log(`Starting compression for ${originalFilename}`);
-
-    await new Promise((resolve, reject) => {
-        ffmpeg(inputPath)
-            .videoCodec('libx264')
-            .audioCodec('aac')
-            .outputOptions([
-                '-crf 20',
-                '-preset veryfast',
-                '-movflags +faststart',
-                '-profile:v high',
-                '-pix_fmt yuv420p',
-                '-vf scale=960:-2',
-                '-b:v 1000k',
-                '-b:a 128k',
-                '-ac 2'
-            ])
-            .on('start', (commandLine) => {
-                // console.log('FFmpeg command:', commandLine);
-            })
-            .on('progress', (progress) => {
-                // console.log(`Processing: ${Math.round(progress.percent)}% done`);
-            })
-            .on('end', () => {
-                // Move from temp to final location
-                copyAndDelete(tempOutputPath, outputPath)
-                    .then(() => {
-                        console.log('Compression finished successfully');
-                        resolve();
-                    })
-                    .catch(reject);
-            })
-            .on('error', reject)
-            .save(tempOutputPath);
-    });
-
-    // Move original file to delete queue for later cleanup
-    const deleteQueuePath = path.join(deleteQueueDir, path.basename(inputPath));
-    await fs.promises.rename(inputPath, deleteQueuePath);
-
-    const stats = await fs.promises.stat(outputPath);
-    const baseUrl = process.env.IMG_URL || 'http://localhost:8000';
-    res.json({
-        success: true,
-        url: `${baseUrl}/videos/${outputFilename}`,
-        message: 'Upload and compression successful',
-        originalFile: originalFilename,
-        compressedFile: outputFilename,
-        size: stats.size,
-        downloadUrl: `/videos/${outputFilename}`
-    });
 
 });
 
