@@ -18,6 +18,7 @@ const BP = {
   sm: { table: "hidden sm:block", list: "sm:hidden" },
 };
 
+
 export default function DataTable({ columns, rows = [], loading, rowKey = "_id", skeletonRows = 6, empty, onRowClick, className, dense, contained = false, mobileCard, breakpoint = "md" }) {
   const bp = BP[breakpoint] || BP.md;
   const cell = (c, row, i) => (c.cell ? c.cell(row, i) : row[c.key] ?? "—");
