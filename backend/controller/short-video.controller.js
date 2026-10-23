@@ -141,7 +141,7 @@ export const uploadShortVideo = tryCatch(async (req, res) => {
         const kind = 'short';
 
         const uploaded = filePath ? await uploadVideoFromPath(filePath, file.name, file.mimetype) : { success: false };
-        const videoUrl = uploaded?.downloadUrl || uploaded?.url || (typeof uploaded === 'string' ? uploaded : '');
+        const videoUrl = uploaded?.url || uploaded?.downloadUrl || (typeof uploaded === 'string' ? uploaded : '');
         if (!videoUrl && !uploaded?.hlsUrl) throw new ErrorHandler(502, `Video upload failed: ${uploaded?.message || 'no url returned'}`);
 
         let thumbnail = '';

@@ -121,7 +121,7 @@ export const uploadVideoFromPath = async (filePath, originalName, mimeType = 'vi
         const form = new FormData();
         form.append('file', fs.createReadStream(filePath), { filename: originalName, contentType: mimeType });
         const length = await new Promise((resolve, reject) => form.getLength((e, l) => (e ? reject(e) : resolve(l))));
-        const response = await axios.post(`${process.env.IMG_URL}/upload-video`, form, {
+        const response = await axios.post(`${process.env.IMG_URL}/api/v1/upload-stream`, form, {
             headers: { ...form.getHeaders(), 'Content-Length': length },
             maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 15 * 60 * 1000,
         });
