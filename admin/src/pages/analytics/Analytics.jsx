@@ -49,15 +49,24 @@ function AdminAnalytics() {
 
   return (
     <>
-      <PageHeader title="Analytics" description="Performance of stories, topics and your team. Figures are cached on the server for a couple of minutes."
-        actions={<RangePicker value={range} onChange={setRange} />} />
-      {cache && <p className="-mt-3 mb-4 text-xs text-fg-faint">Data {cache.status === "HIT" ? "served from cache" : cache.status === "STALE" ? "refreshing in the background" : "freshly calculated"}{cache.ageSeconds ? ` · ${cache.ageSeconds}s old` : ""}{isFetching && !isLoading ? " · updating…" : ""}</p>}
-      <Tabs value={tab} onChange={setTab} className="mb-5" items={[{ value: "overview", label: "Overview", icon: BarChart3 }, { value: "content", label: "Content", icon: Layers }, { value: "team", label: "Team", icon: Users }, { value: "timing", label: "Timing", icon: Clock }]} />
+      {/* actions: full picker from sm up, one small menu button on phones (handled inside RangePicker) */}
+      <PageHeader
+        title="Analytics"
+        description="Performance of stories, topics and your team. Figures are cached on the server for a couple of minutes."
+        actions={<RangePicker compact value={range} onChange={setRange} />}
+      />
+      {cache && <p className="mb-3 text-[11px] text-fg-faint sm:-mt-3 sm:mb-4 sm:text-xs">Data {cache.status === "HIT" ? "from cache" : cache.status === "STALE" ? "refreshing…" : "fresh"}{cache.ageSeconds ? ` · ${cache.ageSeconds}s old` : ""}{isFetching && !isLoading ? " · updating…" : ""}</p>}
+
+      {/* tabs scroll sideways on phones instead of squeezing */}
+      <div className="-mx-1 mb-4 overflow-x-auto px-1 sm:mb-5">
+        <Tabs value={tab} onChange={setTab} items={[{ value: "overview", label: "Overview", icon: BarChart3 }, { value: "content", label: "Content", icon: Layers }, { value: "team", label: "Team", icon: Users }, { value: "timing", label: "Timing", icon: Clock }]} />
+      </div>
+
       {error ? <ErrorState error={error} onRetry={refetch} /> : (
         <div className="space-y-5">
           {tab === "overview" && (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
                 <StatCard label="Stories published" value={o?.news.published ?? 0} icon={FileText} change={o?.news.change.publishedPercent} loading={isLoading} hint="vs previous period" />
                 <StatCard label="Reads" value={o?.news.views ?? 0} icon={Eye} tone="accent" change={o?.news.change.viewsPercent} loading={isLoading} />
                 <StatCard label="Avg reads / story" value={o?.news.avgViews ?? 0} icon={BarChart3} tone="info" loading={isLoading} />
@@ -146,10 +155,10 @@ function MyPerformance() {
   const { data: r, isLoading, error, refetch } = useReporterPerformance("me", range);
   return (
     <>
-      <PageHeader title="My performance" description="How your stories are doing." actions={<RangePicker value={range} onChange={setRange} />} />
+      <PageHeader title="My performance" description="How your stories are doing." actions={<RangePicker compact value={range} onChange={setRange} />} />
       {error ? <ErrorState error={error} onRetry={refetch} /> : (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Stories published" value={r?.summary.published ?? 0} icon={FileText} change={r?.comparison.publishedChangePercent} loading={isLoading} />
             <StatCard label="Total reads" value={r?.summary.totalViews ?? 0} icon={Eye} tone="accent" change={r?.comparison.viewsChangePercent} loading={isLoading} />
             <StatCard label="Avg reads / story" value={r?.summary.avgViewsPerArticle ?? 0} icon={BarChart3} tone="info" loading={isLoading} />

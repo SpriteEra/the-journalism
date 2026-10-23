@@ -13,6 +13,7 @@ import {
 import httpClient from "./api/httpClient";
 import Loader from "./components/Loader";
 import TrendsDashboard from "./components/keywords/AIDashboard";
+import ShortVideoFormPage from "./pages/shortVideos/ShortVideoForm";
 
 const AdminLayout = lazy(() => import("./components/layout/AdminLayout"));
 const Login = lazy(() => import("./pages/Login"));
@@ -73,7 +74,7 @@ const App = () => {
   const [currentToast, setCurrentToast] = useState(null);
   const [appInitialized, setAppInitialized] = useState(false);
   const { newNotifications } = useSocket();
-
+  const VIDEO_PERMS = ["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage"];
   // ✅ Load user data on app initialization
   useEffect(() => {
     const loadUserData = async () => {
@@ -175,7 +176,11 @@ const App = () => {
             <Route path="breaking-news" element={<ProtectedRoute component={BreakingNews} permission="breaking.manage" />} />
 
             {/* media */}
-            <Route path="short-videos" element={<ProtectedRoute component={ShortVideos} permission={["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage"]} />} />
+
+            <Route path="short-videos" element={<ProtectedRoute component={ShortVideos} permission={VIDEO_PERMS} />} />
+            <Route path="short-videos/new" element={<ProtectedRoute component={ShortVideoFormPage} permission={["video.create"]} />} />
+            <Route path="short-videos/:slug/edit" element={<ProtectedRoute component={ShortVideoFormPage} permission={["video.manage.own", "video.manage.any", "video.shorts.manage"]} />} />
+
             <Route path="videos" element={<ProtectedRoute component={Videos} permission="yt.manage" />} />
             <Route path="videos/create" element={<ProtectedRoute component={CreateVideo} permission="yt.manage" />} />
             <Route path="videos/edit/:news_id" element={<ProtectedRoute component={UpdateVideo} permission="yt.manage" />} />

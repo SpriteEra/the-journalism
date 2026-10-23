@@ -47,9 +47,9 @@
   --accent-hover: oklch(0.56 0.15 160);
   --accent-soft: oklch(0.96 0.04 160);
   --accent-fg: oklch(0.99 0 0);
-
-  /* status */
-  --success: oklch(0.6 0.15 155);
+  --cat-accent: #4f46e5
+    /* status */
+    --success: oklch(0.6 0.15 155);
   --success-soft: oklch(0.96 0.045 155);
   --warning: oklch(0.72 0.16 65);
   --warning-soft: oklch(0.97 0.05 85);

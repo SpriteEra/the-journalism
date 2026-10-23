@@ -13,32 +13,53 @@ export const pageWindow = (page, pages, around = 1) => {
   return out;
 };
 
-/** <Pagination page total limit onPage onLimit limits=[10,20,50] /> – total = number of records */
+/**
+ * <Pagination page total limit onPage onLimit limits=[10,20,50] /> – total = number of records
+ * Phone: one slim row – "1–20 of 120" on the left, ‹ 3 / 6 › on the right.
+ * sm and up: full page list and the rows-per-page select.
+ */
 export default function Pagination({ page = 1, total = 0, limit = 10, onPage, onLimit, limits = [10, 20, 50], className }) {
   const pages = Math.max(1, Math.ceil(total / limit));
   const from = total ? (page - 1) * limit + 1 : 0;
   const to = Math.min(page * limit, total);
   const btn = "grid size-8 place-items-center rounded-lg text-sm transition-colors focus-ring disabled:pointer-events-none disabled:opacity-40";
+  const arrow = cn(btn, "text-fg-muted hover:bg-surface-2");
+
   return (
-    <nav aria-label="Pagination" className={cn("flex flex-col items-center justify-between gap-3 px-4 py-3 sm:flex-row", className)}>
-      <p className="text-sm text-fg-subtle">
-        {total ? <>Showing <b className="font-medium text-fg">{from}–{to}</b> of <b className="font-medium text-fg">{total}</b></> : "No results"}
+    <nav aria-label="Pagination" className={cn("flex items-center justify-between gap-3 px-3 py-2 sm:px-4 sm:py-3", className)}>
+      {/* summary */}
+      <p className="min-w-0 truncate text-xs text-fg-subtle sm:text-sm">
+        {total ? (
+          <>
+            <span className="sm:hidden"><b className="font-medium text-fg">{from}–{to}</b> of {total}</span>
+            <span className="hidden sm:inline">Showing <b className="font-medium text-fg">{from}–{to}</b> of <b className="font-medium text-fg">{total}</b></span>
+          </>
+        ) : "No results"}
       </p>
-      <div className="flex items-center gap-3">
+
+      {/* phone: prev  3 / 6  next */}
+      <div className="flex shrink-0 items-center gap-0.5 sm:hidden">
+        <button className={cn(arrow, "border border-line")} onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-4" /></button>
+        <span className="min-w-14 text-center text-xs tabular-nums text-fg-subtle" aria-live="polite"><b className="font-semibold text-fg">{page}</b> / {pages}</span>
+        <button className={cn(arrow, "border border-line")} onClick={() => onPage(page + 1)} disabled={page >= pages} aria-label="Next page"><ChevronRight className="size-4" /></button>
+      </div>
+
+      {/* sm and up: full controls */}
+      <div className="hidden shrink-0 items-center gap-3 sm:flex">
         {onLimit && (
-          <div className="hidden w-36 shrink-0 sm:block">
-            <div><Select size="sm" aria-label="Rows per page" value={limit} onChange={(e) => onLimit(Number(e.target.value))} options={limits.map((l) => ({ value: l, label: `${l} / page` }))} /></div>
+          <div className="w-36 shrink-0">
+            <Select size="sm" aria-label="Rows per page" value={limit} onChange={(e) => onLimit(Number(e.target.value))} options={limits.map((l) => ({ value: l, label: `${l} / page` }))} />
           </div>
         )}
         <div className="flex items-center gap-1">
-          <button className={cn(btn, "text-fg-muted hover:bg-surface-2")} onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-4" /></button>
+          <button className={arrow} onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page"><ChevronLeft className="size-4" /></button>
           {pageWindow(page, pages).map((n, i) =>
             n === "…" ? <span key={`e${i}`} className="px-1 text-fg-faint">…</span> : (
               <button key={n} onClick={() => onPage(n)} aria-current={n === page ? "page" : undefined}
                 className={cn(btn, "min-w-8 px-2", n === page ? "bg-primary text-primary-fg" : "text-fg-muted hover:bg-surface-2")}>{n}</button>
             )
           )}
-          <button className={cn(btn, "text-fg-muted hover:bg-surface-2")} onClick={() => onPage(page + 1)} disabled={page >= pages} aria-label="Next page"><ChevronRight className="size-4" /></button>
+          <button className={arrow} onClick={() => onPage(page + 1)} disabled={page >= pages} aria-label="Next page"><ChevronRight className="size-4" /></button>
         </div>
       </div>
     </nav>

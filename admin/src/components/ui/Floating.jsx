@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
  * Opens below the anchor (above when there is no room), keeps itself inside the viewport and follows scroll / resize.
  *   <Floating anchorRef={ref} open align="start|end" matchWidth>…</Floating>
  */
-export default function Floating({ anchorRef, open, children, align = "start", matchWidth, className, panelRef, gap = 8, ...props }) {
+export default function Floating({ anchorRef, open, children, align = "start", matchWidth, className, panelRef, gap = 8, maxWidth = "calc(100vw - 16px)", ...props }) {
   const [pos, setPos] = useState(null);
   // fallback ref so the panel can always be measured, even when the caller passes no panelRef
   const ownRef = useRef(null);
@@ -51,10 +51,10 @@ export default function Floating({ anchorRef, open, children, align = "start", m
       style={{
         position: "fixed",
         zIndex: 90,
-        maxWidth: "calc(100vw - 16px)", // never wider than the screen
+        maxWidth,                                   // was a hard-coded "calc(100vw - 16px)"
         left: pos?.left ?? -9999,
         top: pos?.top ?? -9999,
-        width: pos?.width,
+        width: pos?.width ?? "max-content",
         maxHeight: pos?.maxHeight,
         overflowY: "auto",
         visibility: pos ? "visible" : "hidden",

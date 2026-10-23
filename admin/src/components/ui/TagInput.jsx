@@ -97,7 +97,7 @@ export function ChipInput({ value = [], onChange, suggestions = [], onQuery, pla
             <li key={s.id || s.title}><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => add(s)} className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-fg-muted hover:bg-surface-2 hover:text-fg">#{s.title}</button></li>
           ))}
           {q.trim() && !exact && canCreate && (
-            <li><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => add(q)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary hover:bg-primary-soft"><Plus className="size-4" />Create tag “{q.trim()}”</button></li>
+            <li><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => add(q)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary hover:bg-primary-soft"><Plus className="size-4" />Use tag “{q.trim()}”</button></li>
           )}
         </ul>
       </Floating>

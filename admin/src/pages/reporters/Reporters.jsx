@@ -1,7 +1,7 @@
 import { addDays, istDay, istEndOfDay } from "../../lib/time";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Ban, Check, IdCard, KeyRound, ListChecks, Lock, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, Unlock, UserPlus, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Ban, IdCard, KeyRound, ListChecks, MoreHorizontal, Pencil, ShieldCheck, Trash2, Unlock, UserPlus, Users } from "lucide-react";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation, usePermissionCatalog, useRoles, useUserDetail, useUsers } from "../../hooks/admin";
@@ -11,6 +11,7 @@ import {
   PageHeader, Pagination, SearchInput, Select, Skeleton, StatusBadge, Switch,
 } from "../../components/ui";
 import PasswordResetReporter from "./PasswordResetReporter";
+import RowMenu from "../../components/common/RowMenu";
 
 const roleOptions = (roles = []) => roles.filter((r) => r.isActive).map((r) => ({ value: r.name, label: r.displayName || r.name }));
 
@@ -23,7 +24,7 @@ function UserForm({ user, roles, onClose }) {
   const save = useApiMutation(() => (editing
     ? httpClient.put("/update-reporter", { userId: user._id, email: f.email, fullName: f.fullName, ...(can("user.assign.role") ? { role: f.role } : {}) }).then((r) => r.data)
     : httpClient.post("/add-reporter", { username: f.username, email: f.email, fullName: f.fullName, password: f.password, ...(can("user.assign.role") ? { role: f.role } : {}) }).then((r) => r.data)),
-  { invalidate: ["users"], onSuccess: onClose });
+    { invalidate: ["users"], onSuccess: onClose });
   return (
     <Modal open onClose={onClose} title={editing ? `Edit ${user.username}` : "Add team member"}
       footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" form="user-form" loading={save.isPending}>{editing ? "Save changes" : "Create account"}</Button></>}>
@@ -102,8 +103,8 @@ function PermissionOverrides({ user, roles, onClose }) {
                   const locked = user.role === "admin" || !can("user.permissions") || (!isSuper && !mine.has(i.key) && s !== "deny");
                   return (
                     <li key={i.key} className="flex flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0"><p className="text-sm text-fg">{i.label}</p><p className="font-mono text-[11px] text-fg-faint">{i.key}</p></div>
-                      <div className="flex items-center gap-3">
+                      <div className="min-w-0"><p className="text-sm text-fg">{i.label}</p><p className="break-all font-mono text-[11px] text-fg-faint">{i.key}</p></div>
+                      <div className="flex items-center justify-between gap-3 sm:justify-end">
                         <Badge tone={effective ? "success" : "neutral"} size="sm">{effective ? "Allowed" : "Not allowed"}</Badge>
                         <div className="w-36"><Select size="sm" aria-label={`Override ${i.key}`} disabled={locked} value={s} onChange={(e) => setState(i.key, e.target.value)}
                           options={[{ value: "role", label: base ? "From role ✓" : "From role ✗" }, { value: "grant", label: "Always allow" }, { value: "deny", label: "Always deny" }]} /></div>
@@ -123,6 +124,7 @@ function PermissionOverrides({ user, roles, onClose }) {
 /* ───────────── page ───────────── */
 export default function Reporters() {
   const { can, user: me } = usePermission();
+  const navigate = useNavigate();
   const [params, setParams] = useState({ page: 1, limit: 10, search: "", role: "all", status: "all" });
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState(null);       // { type, user }
@@ -136,37 +138,76 @@ export default function Reporters() {
   const del = useApiMutation(() => httpClient.delete("/admin/delete-user", { data: { data: dialog.user._id } }).then((r) => r.data), { invalidate: ["users"], onSuccess: close });
 
   const columns = [
-    { key: "user", header: "Member", primary: true, cell: (u) => (
-      <div className="flex min-w-0 items-center gap-3"><Avatar name={u.fullName || u.username} src={u.profile} /><div className="min-w-0"><Link to={`/dashboard/reporters/${u._id}`} className="block truncate font-medium text-fg hover:text-primary">{u.fullName || u.username}</Link><p className="truncate text-xs text-fg-subtle">@{u.username} · {u.email}</p></div></div>) },
+    {
+      key: "user", header: "Member", primary: true, cell: (u) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={u.fullName || u.username} src={u.profile} className="shrink-0" />
+          <div className="min-w-0">
+            <Link to={`/dashboard/reporters/${u._id}`} className="block truncate font-medium text-fg hover:text-primary">{u.fullName || u.username}</Link>
+            <p className="truncate text-xs text-fg-subtle">@{u.username}</p>
+            <p className="truncate text-xs text-fg-subtle">{u.email}</p>
+          </div>
+        </div>
+      ),
+    },
     { key: "role", header: "Role", cell: (u) => <Badge tone={u.role === "admin" ? "accent" : "primary"} className="capitalize">{u.role}</Badge> },
     { key: "publishing", header: "Publishing", cell: (u) => (u.role === "admin" ? <span className="text-xs text-fg-subtle">Always</span> : can("user.trust") && u._id !== me?.id ? <Switch checked={u.trusted} onChange={() => trust.mutate(u)} label={undefined} className="w-fit" /> : <Badge tone={u.trusted ? "success" : "neutral"} size="sm">{u.trusted ? "Auto-publish" : "Needs review"}</Badge>) },
     { key: "status", header: "Status", cell: (u) => (u.is_blocked ? <div><StatusBadge status="blocked" />{u.blockedUntil && <p className="mt-0.5 text-[11px] text-fg-subtle">until {fmtDate(u.blockedUntil)}</p>}</div> : <StatusBadge status="active" />) },
     { key: "joined", header: "Joined", hideOnMobile: true, cell: (u) => <span className="text-xs">{fmtDate(u.createdAt)}</span> },
-    { key: "actions", header: "", align: "right", cell: (u) => {
-      const self = u._id === me?.id;
-      return (
-        <Menu trigger={<IconButton label="Actions" size="icon-sm"><MoreHorizontal className="size-4.5" /></IconButton>} width="w-56">
-          <MenuItem as={Link} to={`/dashboard/reporters/${u._id}`} icon={IdCard}>View profile</MenuItem>
-          {can("user.update") && <MenuItem as={Link} to={`/dashboard/reporters/${u._id}/edit`} icon={Pencil}>Edit profile</MenuItem>}
-          {can("user.permissions") && !self && u.role !== "admin" && <MenuItem icon={ListChecks} onClick={() => setDialog({ type: "perms", user: u })}>Permissions</MenuItem>}
-          {can("user.password.reset") && <MenuItem icon={KeyRound} onClick={() => setDialog({ type: "password", user: u })}>Reset password</MenuItem>}
-          {can("user.block") && !self && (u.is_blocked ? <MenuItem icon={Unlock} onClick={() => unblock.mutate(u)}>Unblock</MenuItem> : <MenuItem icon={Ban} onClick={() => setDialog({ type: "block", user: u })}>Block…</MenuItem>)}
-          {can("user.delete") && !self && <><MenuSeparator /><MenuItem icon={Trash2} tone="danger" onClick={() => setDialog({ type: "delete", user: u })}>Delete</MenuItem></>}
-        </Menu>
-      );
-    } },
+    {
+      key: "actions", header: "", align: "right", cell: (u) => {
+        const self = u._id === me?.id;
+        return (
+          <Menu trigger={<IconButton label="Actions" size="icon-sm"><MoreHorizontal className="size-4.5" /></IconButton>} width="w-56">
+            <MenuItem as={Link} to={`/dashboard/reporters/${u._id}`} icon={IdCard}>View profile</MenuItem>
+            {can("user.update") && <MenuItem as={Link} to={`/dashboard/reporters/${u._id}/edit`} icon={Pencil}>Edit profile</MenuItem>}
+            {can("user.permissions") && !self && u.role !== "admin" && <MenuItem icon={ListChecks} onClick={() => setDialog({ type: "perms", user: u })}>Permissions</MenuItem>}
+            {can("user.password.reset") && <MenuItem icon={KeyRound} onClick={() => setDialog({ type: "password", user: u })}>Reset password</MenuItem>}
+            {can("user.block") && !self && (u.is_blocked ? <MenuItem icon={Unlock} onClick={() => unblock.mutate(u)}>Unblock</MenuItem> : <MenuItem icon={Ban} onClick={() => setDialog({ type: "block", user: u })}>Block…</MenuItem>)}
+            {can("user.delete") && !self && <><MenuSeparator /><MenuItem icon={Trash2} tone="danger" onClick={() => setDialog({ type: "delete", user: u })}>Delete</MenuItem></>}
+          </Menu>
+        );
+      },
+    },
   ];
 
   return (
     <>
-      <PageHeader title="Reporters" description="Everyone who can sign in to the panel. Roles decide what they can do; permissions can be fine-tuned per person."
-        actions={<>{can("role.view") && <Button as={Link} to="/dashboard/roles" variant="outline" leftIcon={ShieldCheck}>Roles</Button>}{can("user.create") && <Button as={Link} to="/dashboard/reporters/new" leftIcon={UserPlus}>Add member</Button>}</>} />
+      <PageHeader
+        title="Reporters"
+        description="Everyone who can sign in to the panel. Roles decide what they can do; permissions can be fine-tuned per person."
+        actions={
+          <>
+            {/* md and up: normal buttons */}
+            <div className="hidden items-center gap-2 md:flex">
+              {can("role.view") && <Button as={Link} to="/dashboard/roles" variant="outline" leftIcon={ShieldCheck}>Roles</Button>}
+              {can("user.create") && <Button as={Link} to="/dashboard/reporters/new" leftIcon={UserPlus}>Add member</Button>}
+            </div>
+
+            {/* below md: one button that opens the same actions */}
+            <div className="md:hidden">
+              <RowMenu
+                variant="filled"
+                icon={UserPlus}
+                label="Actions"
+                items={[
+                  { label: "Add member", icon: UserPlus, hidden: !can("user.create"), onClick: () => navigate("/dashboard/reporters/new") },
+                  { label: "Roles", icon: ShieldCheck, hidden: !can("role.view"), onClick: () => navigate("/dashboard/roles") },
+                ]}
+              />
+            </div>
+          </>
+        }
+      />
+
       <Card padded={false}>
-        <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center lg:justify-between">
-          <form className="w-full lg:max-w-sm" onSubmit={(e) => { e.preventDefault(); patch({ search }); }}><SearchInput value={search} onChange={(v) => { setSearch(v); if (!v) patch({ search: "" }); }} placeholder="Search name, username or email (Enter)" /></form>
-          <div className="flex flex-wrap gap-3">
-            <div className="w-44"><Select size="sm" aria-label="Role" value={params.role} onChange={(e) => patch({ role: e.target.value })} options={[{ value: "all", label: "All roles" }, ...roleOptions(roles)]} /></div>
-            <div className="w-40"><Select size="sm" aria-label="Status" value={params.status} onChange={(e) => patch({ status: e.target.value })} options={[{ value: "all", label: "Any status" }, { value: "active", label: "Active" }, { value: "blocked", label: `Blocked${data?.blockedTotal ? ` (${data.blockedTotal})` : ""}` }]} /></div>
+        <div className="flex flex-col gap-3 border-b border-line p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+          <form className="w-full lg:max-w-sm" onSubmit={(e) => { e.preventDefault(); patch({ search }); }}>
+            <SearchInput value={search} onChange={(v) => { setSearch(v); if (!v) patch({ search: "" }); }} placeholder="Search name, username or email (Enter)" />
+          </form>
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+            <div className="sm:w-44"><Select size="sm" aria-label="Role" value={params.role} onChange={(e) => patch({ role: e.target.value })} options={[{ value: "all", label: "All roles" }, ...roleOptions(roles)]} /></div>
+            <div className="sm:w-40"><Select size="sm" aria-label="Status" value={params.status} onChange={(e) => patch({ status: e.target.value })} options={[{ value: "all", label: "Any status" }, { value: "active", label: "Active" }, { value: "blocked", label: `Blocked${data?.blockedTotal ? ` (${data.blockedTotal})` : ""}` }]} /></div>
           </div>
         </div>
         {error ? <ErrorState error={error} onRetry={refetch} /> : (

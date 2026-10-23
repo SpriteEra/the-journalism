@@ -15,16 +15,16 @@ export default function Tabs({ items, value, onChange, className, variant = "und
             aria-selected={active}
             onClick={() => onChange(t.value)}
             className={cn(
-              "inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors focus-ring",
+              "inline-flex shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm font-medium transition-colors focus-ring",
               variant === "underline"
-                ? cn("-mb-px border-b-2 px-3 py-2.5", active ? "border-primary text-primary" : "border-transparent text-fg-subtle hover:text-fg")
-                : cn("rounded-lg px-3 py-1.5", active ? "bg-surface text-fg shadow-card" : "text-fg-subtle hover:text-fg")
+                ? cn("-mb-px border-b-2 px-2 sm:px-3 py-2 sm:py-2.5", active ? "border-primary text-primary" : "border-transparent text-fg-subtle hover:text-fg")
+                : cn("rounded-lg px-2 sm:px-3 py-1.5", active ? "bg-surface text-fg shadow-card" : "text-fg-subtle hover:text-fg")
             )}
           >
-            {Icon && <Icon className="size-4" aria-hidden />}
+            {Icon && <Icon className="size-3.5 sm:size-4" aria-hidden />}
             {t.label}
             {t.count !== undefined && (
-              <span className={cn("rounded-full px-1.5 text-[11px]", active ? "bg-primary-soft text-primary" : "bg-surface-3 text-fg-subtle")}>{t.count}</span>
+              <span className={cn("rounded-full px-1 sm:px-1.5 text-[10px] sm:text-[11px]", active ? "bg-primary-soft text-primary" : "bg-surface-3 text-fg-subtle")}>{t.count}</span>
             )}
           </button>
         );

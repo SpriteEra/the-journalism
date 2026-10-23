@@ -187,7 +187,7 @@ app.post('/api/v1/upload-stream', apiCors, async (req, res) => {
             size: stats.size,
             downloadUrl: `/videos/${outputFilename}`
         });
-    } catch (error) {
+    } catch (err) {
         console.error('upload-stream failed:', err);
         return res.status(500).json({ success: false, message: err.message });
     }

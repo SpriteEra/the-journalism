@@ -5,13 +5,19 @@ import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import httpClient from "../api/httpClient";
 import { useFetchVideos } from "../hooks/ytnews";
-import { formatDate } from "../utils/utils";
-import SocialShare from "../components/SocialShare";
+import { fmtISTDateTime } from "../lib/time";
 import VideoFilter from "../components/VideoFilter";
 import UpdateStackPanel from "../components/UpdateStack";
-import { Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, IconButton, PageHeader, Pagination, SearchInput } from "../components/ui";
+import RowActions from "../components/common/RowActions";
+import RowMenu from "../components/common/RowMenu";
+import VideoCard, { VideoThumb } from "../components/video/Videocard";
+import { Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, PageHeader, Pagination, SearchInput, StatusBadge } from "../components/ui";
 
 const EMPTY_FILTERS = { district: [], state: [], location: "", createdAt: "", search: "" };
+
+const thumbOf = (item) => `https://img.youtube.com/vi/${item.videoLinkId}/mqdefault.jpg`;
+const dateOf = (item) => fmtISTDateTime(item.publishedAt || item.createdAt);
+const videoStatus = (item) => (item.draft ? "draft" : item.isPublished === false ? "pending" : "published");
 
 const Videos = () => {
   const navigate = useNavigate();
@@ -82,6 +88,45 @@ const Videos = () => {
     }
   };
 
+  // one definition, used by the table row AND the collapsible card
+  const rowActions = (item) => (
+    <RowActions
+      row={item}
+      share={{
+        url: (r) => `${import.meta.env.VITE_CLIENT_URL}/video/${r.slug || r.news_id}`,
+        title: (r) => r.title,
+      }}
+      actions={[
+        {
+          label: "History",
+          icon: History,
+          onClick: (r) => {
+            setId(r.update_stack);
+            setIsShowUpdatedStack(true);
+          },
+        },
+        {
+          label: "Edit",
+          icon: Pencil,
+          onClick: (r) => navigate(`/dashboard/videos/edit/${r.news_id}`),
+        },
+        {
+          label: "Delete",
+          icon: Trash2,
+          danger: true,
+          onClick: (r) => {
+            setId(r.news_id);
+            setIsModalOpen(true);
+          },
+        },
+      ]}
+    />
+  );
+
+  const typeBadge = () => <Badge tone="primary">Video</Badge>;
+  const sourceBadge = () => <Badge tone="info" size="sm">YouTube · link</Badge>;
+
+  // sm and up: the table, unchanged
   const columns = [
     {
       key: "title",
@@ -89,88 +134,77 @@ const Videos = () => {
       primary: true,
       cell: (item) => (
         <div className="flex min-w-0 items-center gap-3">
-          <div className="relative h-14 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-3">
-            <img
-              src={`https://img.youtube.com/vi/${item.videoLinkId}/mqdefault.jpg`}
-              alt=""
-              loading="lazy"
-              className="size-full object-cover"
-            />
-          </div>
+          <VideoThumb src={thumbOf(item)} />
           <div className="min-w-0">
-            <p className="hindi-font line-clamp-2 font-medium text-fg">{item.title}</p>
-            <p className="truncate text-xs text-fg-subtle">@{item.author?.username || "—"}</p>
+            <p className="hindi-font line-clamp-2 max-w-xs font-medium text-fg lg:text-base">{item.title}</p>
+            <span className="text-xs">{dateOf(item)}</span>
           </div>
         </div>
       ),
     },
-    {
-      key: "reads",
-      header: "Reads",
-      cell: (item) => <span className="tabular-nums">{item.activity?.total_reads ?? 0}</span>,
-    },
-    {
-      key: "date",
-      header: "Created",
-      cell: (item) => <span className="text-xs">{formatDate(item.createdAt)}</span>,
-    },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      cell: (item) => (
-        <div className="flex items-center justify-end gap-1">
-          {item.update_stack && (
-            <IconButton
-              size="icon-sm"
-              label="History"
-              onClick={() => {
-                setId(item.update_stack);
-                setIsShowUpdatedStack(true);
-              }}
-            >
-              <History className="size-4" />
-            </IconButton>
-          )}
-          <SocialShare item={item} baseurl={`${import.meta.env.VITE_CLIENT_URL}/video/`} />
-          <IconButton
-            size="icon-sm"
-            label="Edit"
-            onClick={() => navigate(`/dashboard/videos/edit/${item.news_id}`)}
-          >
-            <Pencil className="size-4" />
-          </IconButton>
-          <IconButton
-            size="icon-sm"
-            label="Delete"
-            className="text-danger hover:bg-danger-soft hover:text-danger"
-            onClick={() => {
-              setId(item.news_id);
-              setIsModalOpen(true);
-            }}
-          >
-            <Trash2 className="size-4" />
-          </IconButton>
-        </div>
-      ),
-    },
+    { key: "kind", header: "Type", cell: typeBadge },
+    { key: "source", header: "Source", cell: sourceBadge },
+    { key: "status", header: "Status", cell: (item) => <StatusBadge status={videoStatus(item)} /> },
+    { key: "by", header: "By", cell: (item) => item.author?.username || <span className="text-fg-faint">auto</span> },
+    { key: "reads", header: "Reads", cell: (item) => <span className="tabular-nums">{item.activity?.total_reads ?? 0}</span> },
+    { key: "actions", header: "Actions", align: "right", cell: rowActions },
   ];
 
+  // below sm: collapsible card
+  const mobileCard = (item) => (
+    <VideoCard
+      thumbnail={thumbOf(item)}
+      title={item.title}
+      titleClassName="hindi-font"
+      date={dateOf(item)}
+      views={item.activity?.total_reads ?? 0}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {typeBadge()}
+        {sourceBadge()}
+        <StatusBadge status={videoStatus(item)} />
+      </div>
+      <p className="text-sm text-fg-muted">By {item.author?.username || "auto"}</p>
+      {rowActions(item)}
+    </VideoCard>
+  );
+
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <PageHeader
         title="YouTube news"
         description="Long landscape videos added from YouTube."
         actions={
-          <Button leftIcon={Plus} onClick={() => navigate("/dashboard/videos/create")}>
-            Add video
-          </Button>
+          <>
+            {/* md and up: normal buttons */}
+            <div className="hidden items-center gap-2 md:flex">
+              <Button leftIcon={Youtube} variant="outline" onClick={() => navigate("/dashboard/short-videos")}>
+                Short Videos
+              </Button>
+              <Button leftIcon={Plus} onClick={() => navigate("/dashboard/videos/create")}>
+                Add video
+              </Button>
+            </div>
+
+            {/* below md: one button that opens the same actions */}
+            <div className="md:hidden">
+              <RowMenu
+                variant="filled"
+                icon={Plus}
+                items={[
+                  { label: "Short Videos", icon: Youtube, onClick: () => navigate("/dashboard/short-videos") },
+                  { label: "Add video", icon: Plus, onClick: () => navigate("/dashboard/videos/create") },
+                ]}
+              />
+            </div>
+          </>
         }
       />
 
-      <Card padded={false}>
-        <div className="flex flex-col gap-3 border-b border-line p-4 xl:flex-row xl:items-center xl:justify-between">
-          <form className="w-full xl:max-w-sm" onSubmit={handleSubmitSearch}>
+      <Card padded={false} className="flex min-h-0 flex-1 flex-col overflow-hidden max-sm:border-none max-sm:bg-transparent max-sm:p-0">
+        {/* toolbar: stays fixed. Phone = one row (search + Filter / Reset icons) */}
+        <div className="flex shrink-0 items-center gap-2 border-line sm:gap-3 sm:border-b sm:p-4 xl:justify-between">
+          <form className="min-w-0 flex-1 xl:max-w-sm" onSubmit={handleSubmitSearch}>
             <SearchInput
               value={search}
               onChange={(v) => {
@@ -183,15 +217,15 @@ const Videos = () => {
               placeholder="Search title (Enter)"
             />
           </form>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-fg-subtle">
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="mr-2 hidden text-sm text-fg-subtle sm:inline">
               Total: <b className="text-fg">{data?.total ?? 0}</b>
             </span>
-            <Button variant="outline" leftIcon={TextSearch} onClick={openFilter}>
-              Filter
+            <Button variant="outline" leftIcon={TextSearch} onClick={openFilter} aria-label="Filter">
+              <span className="max-sm:hidden">Filter</span>
             </Button>
-            <Button variant="outline" leftIcon={RotateCcw} onClick={handleResetFilter}>
-              Reset
+            <Button variant="outline" leftIcon={RotateCcw} onClick={handleResetFilter} aria-label="Reset filters">
+              <span className="max-sm:hidden">Reset</span>
             </Button>
           </div>
         </div>
@@ -200,10 +234,14 @@ const Videos = () => {
           <ErrorState error={error} onRetry={refetch} />
         ) : (
           <>
+            {/* DataTable (contained) is the only part that scrolls */}
             <DataTable
+              contained
+              breakpoint="sm"
               columns={columns}
               rows={data?.news}
               loading={isPending}
+              mobileCard={mobileCard}
               empty={
                 <EmptyState
                   icon={Youtube}
@@ -212,6 +250,7 @@ const Videos = () => {
                 />
               }
             />
+            {/* pagination: stays fixed at the bottom */}
             <Pagination
               page={page}
               total={data?.total || 0}
@@ -221,7 +260,7 @@ const Videos = () => {
                 setLimit(l);
                 setPage(1);
               }}
-              className="border-t border-line"
+              className="shrink-0 border-t border-line bg-surface"
             />
           </>
         )}
@@ -252,7 +291,7 @@ const Videos = () => {
         onClose={() => setIsShowUpdatedStack(false)}
         stack_id={id}
       />
-    </>
+    </div>
   );
 };
 

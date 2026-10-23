@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Award, BarChart3, Eye, FileText, Flame, Trophy, Users } from "lucide-react";
+import { Award, BarChart3, ChevronsDown, Eye, FileText, Flame, Trophy, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAnalyticsDashboard, useReportersLeaderboard } from "../../hooks/admin";
 import { fmtDate } from "../../lib/api";
@@ -13,6 +13,65 @@ import { Avatar, Badge, Card, CardHeader, DataTable, EmptyState, ErrorState, Pag
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
 const SORTS = [["views", "Most reads"], ["published", "Most stories"], ["avgViews", "Best average"], ["activeDays", "Most active days"]];
 const MEDAL = ["bg-gold-300 text-gold-ink", "bg-surface-3 text-fg", "bg-warning-soft text-warning"];
+
+const label = (r) => r.reporter.fullName || r.reporter.username || "—";
+
+/** Collapsible leaderboard row for phones (below sm). Collapsed: rank, avatar, name, reads. Open: all numbers + profile link. */
+function ReporterCard({ r }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+
+  return (
+    <div className="overflow-hidden rounded-md border border-line bg-surface">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={id}
+        className="group flex w-full items-center gap-3 p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      >
+        <span className={cn("grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold", MEDAL[r.rank - 1] || "bg-surface-2 text-fg-muted")}>{r.rank}</span>
+        <Avatar name={label(r)} src={r.reporter.profile} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-fg">{label(r)}</p>
+          <span className="mt-0.5 flex items-center gap-1 text-[10px] italic text-red-500 transition-colors group-hover:text-fg">
+            {open ? "Hide details" : "View details"}
+            <ChevronsDown className={`size-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden />
+          </span>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-fg"><Eye className="size-3.5 text-fg-subtle" aria-hidden />{num(r.views)}</p>
+          <p className="text-[11px] text-fg-subtle">{num(r.published)} stories</p>
+        </div>
+      </button>
+
+      <div id={id} className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+        <div className="overflow-hidden" inert={open ? undefined : ""}>
+          <div className="space-y-3 border-t border-line p-3">
+            <dl className="grid grid-cols-3 gap-2">
+              {[
+                { l: "Stories", v: num(r.published) },
+                { l: "Reads", v: num(r.views) },
+                { l: "Avg reads", v: num(r.avgViews) },
+              ].map((s) => (
+                <div key={s.l} className="rounded-md bg-surface-2 px-2.5 py-2">
+                  <dt className="text-[11px] text-fg-subtle">{s.l}</dt>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-fg">{s.v}</dd>
+                </div>
+              ))}
+            </dl>
+            <dl className="space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3"><dt className="text-xs text-fg-subtle">Role</dt><dd className="capitalize text-fg">{r.reporter.role}</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-xs text-fg-subtle">Active days</dt><dd className="text-fg">{r.activeDays}</dd></div>
+              <div className="flex items-center justify-between gap-3"><dt className="text-xs text-fg-subtle">Last active</dt><dd className="text-fg">{r.lastPublishedAt ? fmtDate(r.lastPublishedAt) : "—"}</dd></div>
+            </dl>
+            <Link to={`/dashboard/reporters/${r.reporter._id}`} className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-line bg-surface text-sm font-medium text-fg-muted transition-colors active:bg-surface-2">View profile</Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Team performance: who published how much, how it was read, and what is trending this week. */
 export default function TeamPerformance() {
@@ -30,26 +89,30 @@ export default function TeamPerformance() {
   const trending = week.data?.data?.topArticles || [];
   const trendTags = (week.data?.data?.tags || []).slice(0, 8);
 
-  const label = (r) => r.reporter.fullName || r.reporter.username || "—";
   const columns = [
     { key: "rank", header: "#", cell: (r) => <span className={cn("grid size-7 place-items-center rounded-full text-xs font-semibold", MEDAL[r.rank - 1] || "bg-surface-2 text-fg-muted")}>{r.rank}</span> },
-    { key: "who", header: t("Reporters"), primary: true, cell: (r) => (
-      <Link to={`/dashboard/reporters/${r.reporter._id}`} className="flex items-center gap-3 hover:opacity-80"><Avatar name={label(r)} src={r.reporter.profile} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-medium text-fg">{label(r)}</p><p className="text-[11px] capitalize text-fg-subtle">{r.reporter.role}</p></div></Link>) },
+    {
+      key: "who", header: t("Reporters"), primary: true, cell: (r) => (
+        <Link to={`/dashboard/reporters/${r.reporter._id}`} className="flex items-center gap-3 hover:opacity-80"><Avatar name={label(r)} src={r.reporter.profile} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-medium text-fg">{label(r)}</p><p className="text-[11px] capitalize text-fg-subtle">{r.reporter.role}</p></div></Link>)
+    },
     { key: "published", header: t("Stories"), align: "right", cell: (r) => <b className="text-fg">{num(r.published)}</b> },
     { key: "views", header: t("reads"), align: "right", cell: (r) => num(r.views) },
-    { key: "avg", header: "Avg", align: "right", hideOnMobile: true, cell: (r) => num(r.avgViews) },
-    { key: "days", header: "Active days", align: "right", hideOnMobile: true, cell: (r) => r.activeDays },
-    { key: "last", header: t("Last active"), hideOnMobile: true, cell: (r) => <span className="text-xs text-fg-subtle">{r.lastPublishedAt ? fmtDate(r.lastPublishedAt) : "—"}</span> },
+    { key: "avg", header: "Avg", align: "right", cell: (r) => num(r.avgViews) },
+    { key: "days", header: "Active days", align: "right", cell: (r) => r.activeDays },
+    { key: "last", header: t("Last active"), cell: (r) => <span className="text-xs text-fg-subtle">{r.lastPublishedAt ? fmtDate(r.lastPublishedAt) : "—"}</span> },
   ];
+
+  const sortTabs = <Tabs variant="pill" value={sort} onChange={setSort} items={SORTS.map(([value, l]) => ({ value, label: l }))} />;
 
   if (board.error) return <ErrorState error={board.error} onRetry={board.refetch} />;
 
   return (
     <>
-      <PageHeader title="Team performance" description="Stories published, reads and activity of every reporter — and what readers liked this week." actions={<RangePicker value={range} onChange={setRange} />} />
+      {/* compact = small calendar menu on phones, full picker from sm up */}
+      <PageHeader title="Team performance" description="Stories published, reads and activity of every reporter — and what readers liked this week." actions={<RangePicker compact value={range} onChange={setRange} />} />
 
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Team stories" value={totals.published} icon={FileText} tone="success" loading={board.isLoading} />
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatCard label="Team stories" value={totals.published} icon={FileText} tone="black" loading={board.isLoading} />
         <StatCard label="Team reads" value={totals.views} icon={Eye} tone="info" loading={board.isLoading} />
         <StatCard label="Avg reads / story" value={totals.avg} icon={BarChart3} tone="violet" loading={board.isLoading} />
         <StatCard label={t("Active reporters")} value={totals.active} icon={Users} tone="warning" loading={board.isLoading} hint={`of ${rows.length} on the team`} />
@@ -67,8 +130,18 @@ export default function TeamPerformance() {
       </div>
 
       <Card padded={false} className="mb-5">
-        <CardHeader icon={Trophy} title="Leaderboard" actions={<Tabs variant="pill" value={sort} onChange={setSort} items={SORTS.map(([value, l]) => ({ value, label: l }))} />} />
-        <DataTable columns={columns} rows={rows} loading={board.isLoading} rowKey={(r) => r.reporter._id} empty={<EmptyState icon={Users} title="No reporters in this range" />} />
+        {/* sort tabs sit in the header from sm up; on phones they get their own scrollable row */}
+        <CardHeader icon={Trophy} title="Leaderboard" actions={<div className="hidden sm:block">{sortTabs}</div>} />
+        <div className="overflow-x-auto border-b border-line px-3 py-2 sm:hidden">{sortTabs}</div>
+        <DataTable
+          breakpoint="sm"
+          columns={columns}
+          rows={rows}
+          loading={board.isLoading}
+          rowKey={(r) => r.reporter._id}
+          mobileCard={(r) => <ReporterCard r={r} />}
+          empty={<EmptyState icon={Users} title="No reporters in this range" />}
+        />
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -78,10 +151,10 @@ export default function TeamPerformance() {
             <ol className="divide-y divide-line">
               {trending.slice(0, 8).map((a, i) => (
                 <li key={a.news_id}>
-                  <Link to={`/dashboard/news/${a.news_id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-surface-2/60 sm:px-5">
-                    <span className={cn("grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold", MEDAL[i] || "bg-surface-2 text-fg-muted")}>{i + 1}</span>
-                    <img src={`${a.banner}?q=60&w=160`} alt="" loading="lazy" onError={handleImageError} className="h-12 w-20 shrink-0 rounded-lg bg-surface-3 object-cover" />
-                    <span className="min-w-0 flex-1"><span className="hindi-font line-clamp-2 text-sm font-medium text-fg">{a.title}</span><span className="text-xs text-fg-subtle">{a.category?.[0]?.name} · {a.author?.username} · {fmtDate(a.post_time)}</span></span>
+                  <Link to={`/dashboard/news/${a.news_id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-surface-2/60 sm:gap-4 sm:px-5">
+                    <span className={cn("grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold sm:size-8 sm:text-sm", MEDAL[i] || "bg-surface-2 text-fg-muted")}>{i + 1}</span>
+                    <img src={`${a.banner}?q=60&w=160`} alt="" loading="lazy" onError={handleImageError} className="h-12 w-16 shrink-0 rounded-lg bg-surface-3 object-cover sm:w-20" />
+                    <span className="min-w-0 flex-1"><span className="hindi-font line-clamp-2 text-sm font-medium text-fg">{a.title}</span><span className="line-clamp-1 text-xs text-fg-subtle">{a.category?.[0]?.name} · {a.author?.username} · {fmtDate(a.post_time)}</span></span>
                     <Badge tone="primary" size="sm"><Eye className="size-3" />{num(a.activity?.total_reads)}</Badge>
                   </Link>
                 </li>

@@ -59,7 +59,8 @@ export default function InfoTip({ children, label = "What is this?", className, 
         gap={6}
         id={id}
         role="tooltip"
-        className="max-w-[18rem] animate-pop-in rounded-xl border border-line bg-ink px-3 py-2 text-xs leading-relaxed text-paper shadow-pop"
+        maxWidth="min(18rem, calc(100vw - 16px))"
+        className="animate-pop-in rounded-xl border border-line bg-ink px-3 py-2 text-xs leading-relaxed text-paper shadow-pop"
       >
         {children}
       </Floating>
