@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Bell,
   X,
@@ -19,7 +19,6 @@ import { useSelector } from "react-redux";
 import NotificationItem from "./NotificationItem";
 import httpClient from "../../api/httpClient";
 import useSocket from "../../hooks/useSocket";
-import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 const NotificationCenter = () => {
@@ -38,7 +37,7 @@ const NotificationCenter = () => {
   const { newNotifications, isConnected, clearNewNotifications } = useSocket();
 
   const navigate = useNavigate();
-  const panelRef = useRef(null);
+  const rootRef = useRef(null);
 
   // Calculate unread count from notifications
   const calculateUnreadCount = useCallback(() => {
@@ -284,18 +283,16 @@ const NotificationCenter = () => {
     }
   };
 
-  // Close panel when clicking outside
+  // Close when clicking outside the bell + panel
   useEffect(() => {
     function handleClickOutside(event) {
-      if (panelRef.current && !panelRef.current.contains(event.target)) {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     }
 
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
@@ -304,156 +301,167 @@ const NotificationCenter = () => {
   }, [isOpen]);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       {/* Notification Bell */}
       <button
         onClick={handleToggleOpen}
-        className="relative p-2 text-fg-muted hover:text-fg focus:outline-none rounded-lg transition-colors"
+        aria-label="Notifications"
+        aria-expanded={isOpen}
+        className="relative rounded-lg p-2 text-fg-muted transition-colors hover:text-fg focus:outline-none"
       >
-        <Bell className="w-6 h-6" />
+        <Bell className="size-6" />
 
-        {/* Unread Count Badge */}
+        {/* Unread dot */}
         {unreadCount > 0 && (
-          <div className="absolute top-1 right-2 w-3 h-3 rounded-full bg-success" />
+          <span className="absolute right-1 sm:-right-0.5 top-1 sm:-top-0.5 grid size-3 sm:size-4 place-items-center rounded-full bg-danger pt-px text-[8px] sm:text-[10px] font-bold leading-none text-white ring-2 ring-surface">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
         )}
       </button>
 
       {/* Notification Panel */}
       {isOpen && (
-        <div
-          ref={panelRef}
-          className="absolute -right-20 sm:right-0 mt-2 w-96 bg-surface rounded-lg shadow-xl border border-line z-50 max-h-[80vh] overflow-hidden"
-        >
-          {/* Header */}
-          <div className="p-4 border-b border-line bg-surface-2">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-fg">
-                Notifications
-              </h3>
-              <div className="flex items-center space-x-2">
-                <span
-                  className={`flex items-center text-xs px-2 py-1 rounded-full ${
-                    isConnected
+        <>
+          {/* phones only: dim backdrop, just under the panel */}
+          <div
+            className="fixed inset-0 z-[100] bg-black/40 sm:hidden"
+            onClick={() => setIsOpen(false)}
+            aria-hidden
+          />
+
+          <div
+            className="fixed inset-x-2 top-16 z-[101] flex max-h-[calc(100dvh-5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:max-h-[80vh] sm:w-96 sm:rounded-lg"
+          >
+            {/* Header */}
+            <div className="shrink-0 border-b border-line bg-surface-2 p-3 sm:p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-fg sm:text-lg">
+                  Notifications
+                </h3>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`flex items-center rounded-full px-2 py-1 text-xs ${isConnected
                       ? "bg-success-soft text-success"
                       : "bg-danger-soft text-danger"
-                  }`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full mr-1 ${
-                      isConnected ? "bg-success" : "bg-danger"
-                    }`}
-                  />
-                  {isConnected ? "Live" : "Offline"}
-                </span>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-1 hover:bg-surface-3 rounded-full"
-                >
-                  <X className="w-4 h-4 text-fg-subtle" />
-                </button>
+                      }`}
+                  >
+                    <span
+                      className={`mr-1 size-2 rounded-full ${isConnected ? "bg-success" : "bg-danger"
+                        }`}
+                    />
+                    {isConnected ? "Live" : "Offline"}
+                  </span>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    aria-label="Close"
+                    className="grid size-8 place-items-center rounded-full hover:bg-surface-3"
+                  >
+                    <X className="size-4 text-fg-subtle" />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Search */}
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-fg-faint w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search notifications..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm bg-surface text-fg placeholder-fg-subtle"
-              />
-            </div>
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-faint" />
+                <input
+                  type="text"
+                  placeholder="Search notifications..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-lg border border-line-strong bg-surface py-2 pl-10 pr-4 text-sm text-fg placeholder-fg-subtle focus:border-transparent focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-            {/* Mark All Read Button */}
-            <div className="flex justify-end w-full">
+              {/* Mark All Read Button */}
               {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllRead}
-                  className="flex items-center space-x-1 text-sm text-primary hover:text-primary"
-                >
-                  <CheckCheck className="w-4 h-4" />
-                  <span>Mark all read</span>
-                </button>
+                <div className="mt-2 flex w-full justify-end">
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-primary hover:bg-primary-soft"
+                  >
+                    <CheckCheck className="size-4" />
+                    <span>Mark all read</span>
+                  </button>
+                </div>
               )}
             </div>
-          </div>
 
-          {/* Notifications List */}
-          <div className="max-h-96 overflow-y-auto">
-            {loading ? (
-              <div className="p-4 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto"></div>
-                <p className="text-sm text-fg-subtle mt-2">
-                  Loading notifications...
-                </p>
-              </div>
-            ) : filteredNotifications?.length === 0 ? (
-              <div className="p-8 text-center text-fg-subtle">
-                <Bell className="w-12 h-12 mx-auto mb-3 text-fg-faint" />
-                <p className="text-sm">No notifications found</p>
-                {searchTerm && (
-                  <p className="text-xs mt-1">Try adjusting your search</p>
-                )}
-              </div>
-            ) : (
-              <>
-                {filteredNotifications.map((notification) => (
-                  <NotificationItem
-                    key={notification.id || notification._id}
-                    notification={notification}
-                    onClick={() => handleNotificationClick(notification)}
-                    getIcon={getNotificationIcon}
-                    formatTime={formatTime}
-                    isRead={notification.readBy?.some(
-                      (read) => read.userId?.toString() === admin.id?.toString()
-                    )}
-                    onMarkRead={() =>
-                      markAsRead(notification.id || notification._id)
-                    }
-                  />
-                ))}
-
-                {/* Load More Button */}
-                {hasMore && !searchTerm && (
-                  <div className="p-4 border-t border-line">
-                    <button
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-primary-soft hover:bg-primary-soft text-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loadingMore ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-                          <span className="text-sm">Loading more...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="w-4 h-4" />
-                          <span className="text-sm">Load More</span>
-                        </>
+            {/* Notifications List */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain sm:max-h-96 sm:flex-none">
+              {loading ? (
+                <div className="p-6 text-center">
+                  <div className="mx-auto size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <p className="mt-2 text-sm text-fg-subtle">
+                    Loading notifications...
+                  </p>
+                </div>
+              ) : filteredNotifications?.length === 0 ? (
+                <div className="p-8 text-center text-fg-subtle">
+                  <Bell className="mx-auto mb-3 size-12 text-fg-faint" />
+                  <p className="text-sm">No notifications found</p>
+                  {searchTerm && (
+                    <p className="mt-1 text-xs">Try adjusting your search</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {filteredNotifications.map((notification) => (
+                    <NotificationItem
+                      key={notification.id || notification._id}
+                      notification={notification}
+                      onClick={() => handleNotificationClick(notification)}
+                      getIcon={getNotificationIcon}
+                      formatTime={formatTime}
+                      isRead={notification.readBy?.some(
+                        (read) => read.userId?.toString() === admin.id?.toString()
                       )}
-                    </button>
-                  </div>
-                )}
-              </>
+                      onMarkRead={() =>
+                        markAsRead(notification.id || notification._id)
+                      }
+                    />
+                  ))}
+
+                  {/* Load More Button */}
+                  {hasMore && !searchTerm && (
+                    <div className="border-t border-line p-3 sm:p-4">
+                      <button
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-soft px-4 py-2 text-primary transition-colors hover:bg-primary-soft/70 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {loadingMore ? (
+                          <>
+                            <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            <span className="text-sm">Loading more...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="size-4" />
+                            <span className="text-sm">Load More</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            {filteredNotifications?.length > 0 && (
+              <div className="shrink-0 border-t border-line bg-surface-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <div className="flex items-center justify-between text-xs text-fg-subtle">
+                  <span>
+                    {filteredNotifications?.length} of {totalNotifications}{" "}
+                    notifications
+                  </span>
+                  <span>{unreadCount} unread</span>
+                </div>
+              </div>
             )}
           </div>
-
-          {/* Footer */}
-          {filteredNotifications?.length > 0 && (
-            <div className="p-3 border-t border-line bg-surface-2">
-              <div className="flex items-center justify-between text-xs text-fg-subtle">
-                <span>
-                  {filteredNotifications?.length} of {totalNotifications}{" "}
-                  notifications
-                </span>
-                <span>{unreadCount} unread</span>
-              </div>
-            </div>
-          )}
-        </div>
+        </>
       )}
     </div>
   );

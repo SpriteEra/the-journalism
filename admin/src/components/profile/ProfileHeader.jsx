@@ -10,7 +10,7 @@ export default function ProfileHeader({ name, src, badges, subtitle, about, meta
   return (
     <Card padded={false} className={cn("overflow-hidden", className)}>
       <div className="relative h-28 overflow-hidden bg-linear-to-br from-surface-3 via-surface-2 to-surface sm:h-36">
-        {actions && <div className="absolute top-2 right-2 z-100 flex flex-wrap items-center justify-end gap-2 pt-3 z-10">{actions}</div>}
+        {actions && <div className="absolute top-2 right-2 flex flex-wrap items-center justify-end gap-2 pt-3 z-10">{actions}</div>}
         <span aria-hidden className="absolute -right-10 -top-16 size-64 rounded-full bg-accent/25 blur-3xl" />
         <span aria-hidden className="absolute -bottom-12 left-1/4 size-48 rounded-full bg-info/20 blur-3xl" />
         {children}

@@ -137,38 +137,49 @@ export default function Reporters() {
   const unblock = useApiMutation((u) => httpClient.patch("/block-unblock", { userId: u._id, action: "unblock" }).then((r) => r.data), { invalidate: ["users"], success: "User unblocked" });
   const del = useApiMutation(() => httpClient.delete("/admin/delete-user", { data: { data: dialog.user._id } }).then((r) => r.data), { invalidate: ["users"], onSuccess: close });
 
+  // shared by the desktop table (actions column) and the mobile card (top-right corner)
+  const rowMenu = (u) => {
+    const self = u._id === me?.id;
+    return (
+      <Menu trigger={<IconButton label="Actions" size="icon-sm"><MoreHorizontal className="size-4.5" /></IconButton>} width="w-56">
+        <MenuItem as={Link} to={`/dashboard/reporters/${u._id}`} icon={IdCard}>View profile</MenuItem>
+        {can("user.update") && <MenuItem as={Link} to={`/dashboard/reporters/${u._id}/edit`} icon={Pencil}>Edit profile</MenuItem>}
+        {can("user.permissions") && !self && u.role !== "admin" && <MenuItem icon={ListChecks} onClick={() => setDialog({ type: "perms", user: u })}>Permissions</MenuItem>}
+        {can("user.password.reset") && <MenuItem icon={KeyRound} onClick={() => setDialog({ type: "password", user: u })}>Reset password</MenuItem>}
+        {can("user.block") && !self && (u.is_blocked ? <MenuItem icon={Unlock} onClick={() => unblock.mutate(u)}>Unblock</MenuItem> : <MenuItem icon={Ban} onClick={() => setDialog({ type: "block", user: u })}>Block…</MenuItem>)}
+        {can("user.delete") && !self && <><MenuSeparator /><MenuItem icon={Trash2} tone="danger" onClick={() => setDialog({ type: "delete", user: u })}>Delete</MenuItem></>}
+      </Menu>
+    );
+  };
+
   const columns = [
     {
       key: "user", header: "Member", primary: true, cell: (u) => (
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-start gap-3 md:items-center">
           <Avatar name={u.fullName || u.username} src={u.profile} className="shrink-0" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <Link to={`/dashboard/reporters/${u._id}`} className="block truncate font-medium text-fg hover:text-primary">{u.fullName || u.username}</Link>
             <p className="truncate text-xs text-fg-subtle">@{u.username}</p>
             <p className="truncate text-xs text-fg-subtle">{u.email}</p>
+
+            {/* phones only: role + status + joined date under the name */}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 md:hidden">
+              <Badge tone={u.role === "admin" ? "accent" : "primary"} size="sm" className="capitalize">{u.role}</Badge>
+              {u.is_blocked ? <StatusBadge status="blocked" /> : <StatusBadge status="active" />}
+              <span className="text-[11px] text-fg-subtle">Joined {fmtDate(u.createdAt)}</span>
+            </div>
+            {u.is_blocked && u.blockedUntil && <p className="mt-1 text-[11px] text-fg-subtle md:hidden">Blocked until {fmtDate(u.blockedUntil)}</p>}
           </div>
+          {/* phones only: menu in the top-right corner of the card */}
+          <div className="-mr-1 shrink-0 md:hidden" onClick={(e) => e.stopPropagation()}>{rowMenu(u)}</div>
         </div>
       ),
     },
-    { key: "role", header: "Role", cell: (u) => <Badge tone={u.role === "admin" ? "accent" : "primary"} className="capitalize">{u.role}</Badge> },
+    { key: "role", header: "Role", hideOnMobile: true, cell: (u) => <Badge tone={u.role === "admin" ? "accent" : "primary"} className="capitalize">{u.role}</Badge> },
     { key: "publishing", header: "Publishing", cell: (u) => (u.role === "admin" ? <span className="text-xs text-fg-subtle">Always</span> : can("user.trust") && u._id !== me?.id ? <Switch checked={u.trusted} onChange={() => trust.mutate(u)} label={undefined} className="w-fit" /> : <Badge tone={u.trusted ? "success" : "neutral"} size="sm">{u.trusted ? "Auto-publish" : "Needs review"}</Badge>) },
-    { key: "status", header: "Status", cell: (u) => (u.is_blocked ? <div><StatusBadge status="blocked" />{u.blockedUntil && <p className="mt-0.5 text-[11px] text-fg-subtle">until {fmtDate(u.blockedUntil)}</p>}</div> : <StatusBadge status="active" />) },
+    { key: "status", header: "Status", hideOnMobile: true, cell: (u) => (u.is_blocked ? <div><StatusBadge status="blocked" />{u.blockedUntil && <p className="mt-0.5 text-[11px] text-fg-subtle">until {fmtDate(u.blockedUntil)}</p>}</div> : <StatusBadge status="active" />) },
     { key: "joined", header: "Joined", hideOnMobile: true, cell: (u) => <span className="text-xs">{fmtDate(u.createdAt)}</span> },
-    {
-      key: "actions", header: "", align: "right", cell: (u) => {
-        const self = u._id === me?.id;
-        return (
-          <Menu trigger={<IconButton label="Actions" size="icon-sm"><MoreHorizontal className="size-4.5" /></IconButton>} width="w-56">
-            <MenuItem as={Link} to={`/dashboard/reporters/${u._id}`} icon={IdCard}>View profile</MenuItem>
-            {can("user.update") && <MenuItem as={Link} to={`/dashboard/reporters/${u._id}/edit`} icon={Pencil}>Edit profile</MenuItem>}
-            {can("user.permissions") && !self && u.role !== "admin" && <MenuItem icon={ListChecks} onClick={() => setDialog({ type: "perms", user: u })}>Permissions</MenuItem>}
-            {can("user.password.reset") && <MenuItem icon={KeyRound} onClick={() => setDialog({ type: "password", user: u })}>Reset password</MenuItem>}
-            {can("user.block") && !self && (u.is_blocked ? <MenuItem icon={Unlock} onClick={() => unblock.mutate(u)}>Unblock</MenuItem> : <MenuItem icon={Ban} onClick={() => setDialog({ type: "block", user: u })}>Block…</MenuItem>)}
-            {can("user.delete") && !self && <><MenuSeparator /><MenuItem icon={Trash2} tone="danger" onClick={() => setDialog({ type: "delete", user: u })}>Delete</MenuItem></>}
-          </Menu>
-        );
-      },
-    },
+    { key: "actions", header: "", align: "right", hideOnMobile: true, cell: (u) => rowMenu(u) },
   ];
 
   return (
@@ -201,7 +212,7 @@ export default function Reporters() {
       />
 
       <Card padded={false}>
-        <div className="flex flex-col gap-3 border-b border-line p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-line p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
           <form className="w-full lg:max-w-sm" onSubmit={(e) => { e.preventDefault(); patch({ search }); }}>
             <SearchInput value={search} onChange={(v) => { setSearch(v); if (!v) patch({ search: "" }); }} placeholder="Search name, username or email (Enter)" />
           </form>
@@ -209,6 +220,7 @@ export default function Reporters() {
             <div className="sm:w-44"><Select size="sm" aria-label="Role" value={params.role} onChange={(e) => patch({ role: e.target.value })} options={[{ value: "all", label: "All roles" }, ...roleOptions(roles)]} /></div>
             <div className="sm:w-40"><Select size="sm" aria-label="Status" value={params.status} onChange={(e) => patch({ status: e.target.value })} options={[{ value: "all", label: "Any status" }, { value: "active", label: "Active" }, { value: "blocked", label: `Blocked${data?.blockedTotal ? ` (${data.blockedTotal})` : ""}` }]} /></div>
           </div>
+          <p className="text-xs text-fg-subtle lg:hidden">{data?.total ?? 0} members</p>
         </div>
         {error ? <ErrorState error={error} onRetry={refetch} /> : (
           <>

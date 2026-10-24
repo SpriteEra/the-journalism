@@ -188,7 +188,7 @@ export default function Overview() {
       ) : error ? <ErrorState error={error} onRetry={refetch} /> : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label={t("Stories published")} value={o?.news.published ?? 0} icon={FileText} tone="success" change={o?.news.change.publishedPercent} loading={isLoading} spark={seriesOf("published")} rows={[["Avg reads / story", num(o?.news.avgViews)], ["Reporters active", num(o?.news.activeReporters)]]} />
+            <StatCard label={t("Stories published")} value={o?.news.published ?? 0} icon={FileText} tone="black" change={o?.news.change.publishedPercent} loading={isLoading} spark={seriesOf("published")} rows={[["Avg reads / story", num(o?.news.avgViews)], ["Reporters active", num(o?.news.activeReporters)]]} />
             <StatCard label={t("Reads on those stories")} value={o?.news.views ?? 0} icon={Eye} tone="info" change={o?.news.change.viewsPercent} loading={isLoading} spark={seriesOf("views")} rows={[["Best hour", bestHour?.reads ? `${bestHour.hour}:00` : "—"], ["Top story", num(d?.topArticles?.[0]?.activity?.total_reads)]]} />
             <StatCard label={t("Waiting for review")} value={pending} icon={Hourglass} tone="warning" loading={isLoading} hint={aging ? `${aging.over24h} waiting over 24h` : undefined} invert rows={[["Avg approval", `${d?.approval?.avgApprovalHours ?? 0}h`], ["Approved in range", num(d?.approval?.approvedInRange)]]} />
             <StatCard label={t("Shorts & videos")} value={content?.shortVideos?.total?.published ?? 0} icon={Clapperboard} tone="violet" loading={isLoading} rows={[["YouTube news", num(content?.youtubeVideos?.published)], ["Photo galleries", num(content?.gallery?.published)]]} />

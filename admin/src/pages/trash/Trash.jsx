@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Calendar, Eye, FileText, Hash, History, MessageSquareWarning, RotateCcw, Trash2, User } from "lucide-react";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient.js";
@@ -14,8 +14,6 @@ import UpdateStackPanel from "../../components/UpdateStack.jsx";
 import { Button, Card, EmptyState, PageHeader } from "../../components/ui";
 
 const RETENTION_DAYS = 30;
-/** Space taken above the page content (top bar + page padding). Adjust if the card ends too high or the page scrolls. */
-const PAGE_OFFSET = "7.5rem";
 
 /** Days before an item is removed for good, with a colour that gets louder as the date gets close. */
 function daysLeft(deletedAt) {
@@ -75,13 +73,13 @@ const Trash = () => {
 
   return (
     <>
-      {/* Full-height page: header on top, card fills the rest, pagination pinned to the card's bottom edge. */}
-      <div className="flex flex-col" style={{ minHeight: `calc(100dvh - ${PAGE_OFFSET})` }}>
+      {/* Phones: page grows with its content. sm and up: card fills the height, pagination pinned to the bottom. */}
+      <div className="flex flex-col sm:min-h-[calc(100dvh-7.5rem)]">
         <PageHeader
           title="Trash"
           description={`Deleted items stay here for ${RETENTION_DAYS} days. Restore them before they are removed for good.`}
           actions={
-            <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-sm text-fg-muted">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs text-fg-muted sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm">
               <Trash2 className="size-4" aria-hidden />
               <span className="font-semibold tabular-nums text-fg">{data?.count ?? 0}</span> {data?.count === 1 ? "item" : "items"}
             </span>
@@ -89,7 +87,7 @@ const Trash = () => {
         />
 
         <Card padded={false} className="flex min-h-0 flex-1 flex-col">
-          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 p-3 sm:overflow-y-auto sm:p-4">
             <AsyncWrapper isError={isError} isPending={isPending} error={error}>
               {data?.data?.length ? (
                 data.data.map((item) => {
@@ -98,59 +96,68 @@ const Trash = () => {
                   const title = doc?.title || doc?.fullName || "Deleted Item";
                   const left = item.deletedAt ? daysLeft(item.deletedAt) : null;
                   return (
-                    <article key={item._id} className="group flex flex-col gap-4 rounded-2xl border border-line bg-surface p-3 transition-all duration-200 hover:border-danger/50 hover:shadow-md sm:flex-row sm:p-4">
-                      {/* Thumbnail */}
-                      <div className="shrink-0">
-                        <div className={`size-24 overflow-hidden bg-surface-2 sm:size-28 ${isUser ? "rounded-full" : "rounded-xl"}`}>
-                          <img src={isUser ? doc?.profile || "/avatar.png" : doc?.banner} alt={title} className="size-full object-cover opacity-90 grayscale-[30%] transition group-hover:opacity-100 group-hover:grayscale-0" onError={handleImageError} />
-                        </div>
-                      </div>
-
-                      {/* Details */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-fg-muted">
-                            <FileText className="size-3.5" aria-hidden />{item.model}
-                          </span>
-                          {left && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${left.tone}`}>{left.text}</span>}
-                        </div>
-
-                        <h3 className="hindi-font mt-2 line-clamp-2 text-lg font-semibold leading-snug text-fg">{title}</h3>
-
-                        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
-                          <Meta icon={Calendar} label="Deleted">{formatDate(item.deletedAt)}</Meta>
-                          <Meta icon={User} label="By">{item.deletedBy?.fullName || item.deletedBy?.username || item.deletedBy}</Meta>
-                          {doc?.news_id && <Meta icon={Hash} label="ID"><span className="font-mono text-xs">{doc.news_id}</span></Meta>}
-                        </div>
-
-                        {item.reason && (
-                          <div className="mt-3 flex items-start gap-2 rounded-xl bg-warning-soft px-3 py-2 text-sm">
-                            <MessageSquareWarning className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-                            <p className="min-w-0 text-fg"><span className="font-semibold text-warning">Reason: </span>{item.reason}</p>
+                    <article
+                      key={item._id}
+                      className="group flex flex-col gap-3 rounded-2xl border border-line bg-surface p-3 transition-all duration-200 hover:border-danger/40 hover:shadow-md sm:flex-row sm:gap-4 sm:p-4"
+                    >
+                      {/* phones: thumbnail + details side by side; sm and up: wrapper disappears */}
+                      <div className="flex gap-3 sm:contents">
+                        <div className="shrink-0">
+                          <div className={`size-16 overflow-hidden bg-surface-2 ring-1 ring-line sm:size-28 ${isUser ? "rounded-full" : "rounded-xl"}`}>
+                            <img
+                              src={isUser ? doc?.profile || "/avatar.png" : doc?.banner}
+                              alt={title}
+                              className="size-full object-cover opacity-90 grayscale-[30%] transition group-hover:opacity-100 group-hover:grayscale-0"
+                              onError={handleImageError}
+                            />
                           </div>
-                        )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-fg-muted">
+                              <FileText className="size-3.5" aria-hidden />{item.model}
+                            </span>
+                            {left && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${left.tone}`}>{left.text}</span>}
+                          </div>
+
+                          <h3 className="hindi-font mt-1.5 line-clamp-2 text-base font-semibold leading-snug text-fg sm:mt-2 sm:text-lg">{title}</h3>
+
+                          <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-1.5">
+                            <Meta icon={Calendar} label="Deleted">{formatDate(item.deletedAt)}</Meta>
+                            <Meta icon={User} label="By">{item.deletedBy?.fullName || item.deletedBy?.username || item.deletedBy}</Meta>
+                            {doc?.news_id && <Meta icon={Hash} label="ID"><span className="font-mono text-xs">{doc.news_id}</span></Meta>}
+                          </div>
+
+                          {item.reason && (
+                            <div className="mt-3 flex items-start gap-2 rounded-xl bg-warning-soft px-3 py-2 text-sm">
+                              <MessageSquareWarning className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+                              <p className="min-w-0 break-words text-fg"><span className="font-semibold text-warning">Reason: </span>{item.reason}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex shrink-0 flex-wrap gap-2 sm:w-32 sm:flex-col sm:justify-center">
-                        <Button size="sm" leftIcon={RotateCcw} className="sm:w-full" onClick={() => { setId(item._id); setIsRestore(true); }}>Restore</Button>
-                        <Button size="sm" variant="outline" leftIcon={Eye} className="sm:w-full" onClick={() => { setId(item._id); setDetailIsModalOpen(true); }}>Details</Button>
+                      {/* actions: equal-width row on phones, column on the right from sm up */}
+                      <div className="flex gap-2 border-t border-line pt-3 sm:w-32 sm:shrink-0 sm:flex-col sm:justify-center sm:border-0 sm:pt-0">
+                        <Button size="sm" leftIcon={RotateCcw} className="flex-1 sm:w-full sm:flex-none" onClick={() => { setId(item._id); setIsRestore(true); }}>Restore</Button>
+                        <Button size="sm" variant="outline" leftIcon={Eye} className="flex-1 sm:w-full sm:flex-none" onClick={() => { setId(item._id); setDetailIsModalOpen(true); }}>Details</Button>
                         {doc?.update_stack && (
-                          <Button size="sm" variant="outline" leftIcon={History} className="sm:w-full" onClick={() => { setId(doc.update_stack); setIsShowUpdatedStack(true); }}>History</Button>
+                          <Button size="sm" variant="outline" leftIcon={History} className="flex-1 sm:w-full sm:flex-none" onClick={() => { setId(doc.update_stack); setIsShowUpdatedStack(true); }}>History</Button>
                         )}
                       </div>
                     </article>
                   );
                 })
               ) : (
-                <div className="grid h-full place-items-center">
+                <div className="grid min-h-[16rem] place-items-center sm:h-full">
                   <EmptyState icon={Trash2} title="कोई डिलीट की गई खबर उपलब्ध नहीं है" description="No deleted items found in trash" />
                 </div>
               )}
             </AsyncWrapper>
           </div>
 
-          <div className="shrink-0 border-t border-line px-3 py-3 sm:px-4">
+          <div className="shrink-0 overflow-x-auto border-t border-line bg-surface px-3 py-3 sm:px-4">
             <Pagination totalItems={data?.count} itemsPerPage={itemsPerPage} defaultCurrent={1} current={page} onChange={(val) => setPage(val)} isLoading={isPending} />
           </div>
         </Card>

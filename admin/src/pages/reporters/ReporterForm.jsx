@@ -92,28 +92,35 @@ export default function ReporterForm() {
   const aboutLen = f.about.trim().length;
   const preview = useMemo(() => ({ title: `${f.fullName || "Full name"}${f.designation ? ` — ${f.designation}` : ""}`, desc: f.about.slice(0, 160) || "The about text becomes the description in search results." }), [f.fullName, f.designation, f.about]);
   const bad = (k) => (errors[k] ? { "data-invalid": true } : {});
+  const done = [Boolean(photo.url), f.fullName.trim().length >= 2, aboutLen >= ABOUT_MIN].filter(Boolean).length;
 
   if (editing && detail.error) return <ErrorState error={detail.error} onRetry={detail.refetch} />;
-  if (editing && detail.isLoading) return <Skeleton className="h-96 w-full" />;
+  if (editing && detail.isLoading) return <Skeleton className="h-96 w-full rounded-2xl" />;
 
   return (
     <>
       <PageHeader title={editing ? "Edit team member" : "Add team member"} description="The photo, name and about text become the public author page — and its SEO."
         breadcrumbs={[{ label: "Reporters", to: "/dashboard/reporters" }, { label: editing ? "Edit" : "New" }]} />
-      <form onSubmit={submit} noValidate className="grid gap-5 pb-24 lg:grid-cols-[minmax(0,1fr)_21rem] lg:pb-6">
-        <div className="space-y-5">
+      <form onSubmit={submit} noValidate className="grid gap-4 pb-28 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:pb-6">
+        <div className="space-y-4 sm:space-y-5">
           <Card padded={false}>
             <CardHeader icon={UserRound} title="Profile" description="Required · shown on the author page" />
-            <div className="space-y-5 p-4 sm:p-5">
-              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center" {...bad("photo")}>
+            <div className="space-y-5 p-3 sm:p-5">
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left" {...bad("photo")}>
                 <button type="button" onClick={() => fileRef.current?.click()} aria-label="Choose profile photo"
-                  className={cn("group relative size-28 shrink-0 overflow-hidden rounded-full border-2 border-dashed bg-surface-2 transition-colors", errors.photo ? "border-danger" : "border-line-strong hover:border-fg")}>
+                  className={cn("group relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-dashed bg-surface-2 transition-colors sm:size-28", errors.photo ? "border-danger" : "border-line-strong hover:border-fg")}>
                   {photo.url ? <img src={photo.url} alt="" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-fg-faint"><Camera className="size-8" /></span>}
                   <span className="absolute inset-0 grid place-items-center bg-ink/55 text-xs font-medium text-paper opacity-0 transition-opacity group-hover:opacity-100">{photo.url ? "Change" : "Upload"}</span>
                 </button>
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pick} />
-                <div className="text-sm"><p className="font-medium text-fg">Profile photo <span className="text-danger">*</span></p><p className="text-fg-subtle">JPG, PNG or WebP. You can crop and zoom it after choosing.</p>{errors.photo && <p className="mt-1 text-danger">{errors.photo}</p>}
-                  <div className="mt-2 flex gap-2"><Button type="button" size="sm" variant="outline" leftIcon={Camera} onClick={() => fileRef.current?.click()}>{photo.url ? "Change photo" : "Choose photo"}</Button></div></div>
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium text-fg">Profile photo <span className="text-danger">*</span></p>
+                  <p className="text-fg-subtle">JPG, PNG or WebP. You can crop and zoom it after choosing.</p>
+                  {errors.photo && <p className="mt-1 text-danger">{errors.photo}</p>}
+                  <div className="mt-3 flex justify-center sm:justify-start">
+                    <Button type="button" size="sm" variant="outline" leftIcon={Camera} onClick={() => fileRef.current?.click()}>{photo.url ? "Change photo" : "Choose photo"}</Button>
+                  </div>
+                </div>
               </div>
               <Field label="Full name" required error={errors.fullName} {...bad("fullName")}><Input value={f.fullName} onChange={set("fullName")} maxLength={60} className="hindi-font" placeholder="e.g. Ravi Kumar / रवि कुमार" /></Field>
               <Field label="About" required error={errors.about} hint={`${aboutLen}/${ABOUT_MAX}`} {...bad("about")}>
@@ -128,19 +135,24 @@ export default function ReporterForm() {
 
           <Card padded={false}>
             <CardHeader icon={KeyRound} title="Account" description={editing ? "Sign-in details" : "How this person signs in"} />
-            <div className="space-y-4 p-4 sm:p-5">
+            <div className="space-y-4 p-3 sm:p-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Username" required={!editing} error={errors.username} {...bad("username")}><Input value={f.username} onChange={set("username")} disabled={editing} maxLength={30} autoComplete="off" /></Field>
                 <Field label="Email" required error={errors.email} {...bad("email")}><Input type="email" value={f.email} onChange={set("email")} autoComplete="off" /></Field>
               </div>
               {!editing && (
                 <Field label="Password" required error={errors.password} hint="They can change it after signing in" {...bad("password")}>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <div className="flex-1"><Input type="password" value={f.password} onChange={(e) => { setGenerated(""); set("password")(e); }} autoComplete="new-password" /></div>
-                    <Button type="button" variant="outline" leftIcon={Wand2} onClick={() => { const pw = makePassword(); setF((x) => ({ ...x, password: pw })); setGenerated(pw); }}>Generate</Button>
+                    <Button type="button" variant="outline" leftIcon={Wand2} className="w-full sm:w-auto" onClick={() => { const pw = makePassword(); setF((x) => ({ ...x, password: pw })); setGenerated(pw); }}>Generate</Button>
                   </div>
-                  {generated && <p className="mt-2 flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">Generated: <code className="font-mono font-semibold text-fg">{generated}</code>
-                    <button type="button" onClick={() => navigator.clipboard?.writeText(generated).then(() => toast.success("Copied"))} className="ml-auto text-xs font-medium text-primary hover:underline">Copy</button></p>}
+                  {generated && (
+                    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-sm">
+                      <span className="text-fg-subtle">Generated:</span>
+                      <code className="break-all font-mono font-semibold text-fg">{generated}</code>
+                      <button type="button" onClick={() => navigator.clipboard?.writeText(generated).then(() => toast.success("Copied"))} className="ml-auto text-xs font-medium text-primary hover:underline">Copy</button>
+                    </p>
+                  )}
                 </Field>
               )}
               {can("user.assign.role") && (
@@ -151,7 +163,7 @@ export default function ReporterForm() {
 
           <Card padded={false}>
             <CardHeader icon={Globe} title="More details" description="All optional" />
-            <div className="space-y-4 p-4 sm:p-5">
+            <div className="space-y-4 p-3 sm:p-5">
               <Field label="Phone"><Input value={f.phone} onChange={set("phone")} icon={Phone} inputMode="tel" placeholder="+91 …" /></Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 {SOCIALS.map(([k, label]) => <Field key={k} label={label}><Input value={f.social?.[k] || ""} onChange={(e) => setF((s) => ({ ...s, social: { ...s.social, [k]: e.target.value } }))} placeholder="https://" inputMode="url" /></Field>)}
@@ -160,18 +172,29 @@ export default function ReporterForm() {
           </Card>
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+        <aside className="space-y-4 sm:space-y-5 lg:sticky lg:top-20 lg:self-start">
           <Card padded={false}>
             <CardHeader icon={Sparkles} title="Author page preview" />
-            <div className="space-y-4 p-4">
-              <div className="flex items-center gap-3"><Avatar name={f.fullName || "?"} src={photo.url} size="xl" /><div className="min-w-0"><p className="hindi-font truncate text-base font-semibold text-fg">{f.fullName || "Full name"}</p><p className="hindi-font truncate text-sm text-fg-subtle">{f.designation || "Designation"}</p>{f.location && <p className="truncate text-xs text-fg-faint">{f.location}</p>}</div></div>
+            <div className="space-y-4 p-3 sm:p-4">
+              <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+                <Avatar name={f.fullName || "?"} src={photo.url} size="xl" />
+                <div className="min-w-0 max-w-full">
+                  <p className="hindi-font truncate text-base font-semibold text-fg">{f.fullName || "Full name"}</p>
+                  <p className="hindi-font truncate text-sm text-fg-subtle">{f.designation || "Designation"}</p>
+                  {f.location && <p className="truncate text-xs text-fg-faint">{f.location}</p>}
+                </div>
+              </div>
               <p className="hindi-font line-clamp-5 text-sm text-fg-muted">{f.about || "About text appears here."}</p>
               <div className="rounded-xl border border-line bg-surface-2/50 p-3"><p className="text-[11px] text-fg-subtle">Search result</p><p className="hindi-font line-clamp-1 text-base text-info">{preview.title}</p><p className="hindi-font line-clamp-2 text-xs text-fg-muted">{preview.desc}</p></div>
-              <div className="flex flex-wrap gap-1.5"><Badge tone={photo.url ? "success" : "warning"} size="sm">Photo</Badge><Badge tone={f.fullName.trim().length >= 2 ? "success" : "warning"} size="sm">Name</Badge><Badge tone={aboutLen >= ABOUT_MIN ? "success" : "warning"} size="sm">About</Badge></div>
+              <div>
+                <div className="mb-1 flex justify-between text-xs text-fg-subtle"><span>Required fields</span><span>{done}/3</span></div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-surface-3"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / 3) * 100}%` }} /></div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-1.5 sm:justify-start"><Badge tone={photo.url ? "success" : "warning"} size="sm">Photo</Badge><Badge tone={f.fullName.trim().length >= 2 ? "success" : "warning"} size="sm">Name</Badge><Badge tone={aboutLen >= ABOUT_MIN ? "success" : "warning"} size="sm">About</Badge></div>
             </div>
           </Card>
           {!editing && <Alert tone="info"><ShieldCheck className="mr-1 inline size-4" />New members start with the permissions of the chosen role.</Alert>}
-          <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-line bg-surface/95 p-3 backdrop-blur lg:static lg:z-auto lg:flex-col lg:border-0 lg:bg-transparent lg:p-0">
+          <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-surface/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:static lg:z-auto lg:flex-col lg:border-0 lg:bg-transparent lg:p-0">
             <Button as={Link} to={editing ? `/dashboard/reporters/${id}` : "/dashboard/reporters"} variant="outline" size="lg" className="flex-1 lg:w-full">Cancel</Button>
             <Button type="submit" size="lg" loading={busy} className="flex-[2] lg:w-full">{editing ? "Save changes" : "Create team member"}</Button>
           </div>

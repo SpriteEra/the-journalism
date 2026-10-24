@@ -102,6 +102,8 @@
   --sidebar-width: 16.5rem;
   --sidebar-width-collapsed: 4.75rem;
   --topbar-height: 3.75rem;
+
+
 }
 
 .dark {
@@ -230,6 +232,8 @@
 
   --font-sans: "Inter", "Anek Devanagari", ui-sans-serif, system-ui, sans-serif;
   --font-hindi: "Anek Devanagari", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-khand: "Khand", sans-serif;
+  --font-mukta: "Mukta", sans-serif;
 
   --breakpoint-xs: 30rem;
 }

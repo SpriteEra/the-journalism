@@ -119,7 +119,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
       </aside>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="presentation">
+        <div className="fixed inset-0 z-101 lg:hidden" role="presentation">
           <div className="absolute inset-0 animate-fade-in bg-overlay" onClick={onCloseMobile} aria-hidden />
           <aside className="absolute inset-y-0 left-0 w-[min(20rem,86vw)] animate-slide-in-left shadow-pop" aria-label="Menu">{body(true)}</aside>
         </div>

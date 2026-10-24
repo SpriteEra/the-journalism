@@ -19,22 +19,25 @@ function PermissionPicker({ catalog, value, onChange, mine, isSuper, disabled })
     onChange([...n]);
   };
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {catalog.map((g) => {
         const usable = g.items.filter((i) => allowed(i.key));
         const selected = g.items.filter((i) => set.has(i.key)).length;
         return (
-          <fieldset key={g.group} className="rounded-xl border border-line">
+          <fieldset key={g.group} className="overflow-hidden rounded-xl border border-line">
             <legend className="sr-only">{g.group}</legend>
-            <div className="flex items-center justify-between gap-3 border-b border-line bg-surface-2/60 px-4 py-2.5">
-              <p className="text-sm font-semibold text-fg">{g.group} <span className="ml-1 text-xs font-normal text-fg-subtle">{selected}/{g.items.length}</span></p>
+            <div className="flex items-center justify-between gap-3 border-b border-line bg-surface-2/60 px-3 py-2.5 sm:px-4">
+              <p className="min-w-0 truncate text-sm font-semibold text-fg">
+                {g.group}
+                <span className="ml-2 rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium tabular-nums text-fg-subtle">{selected}/{g.items.length}</span>
+              </p>
               {!disabled && usable.length > 0 && (
-                <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => toggleGroup(g.items, selected < usable.length)}>
+                <button type="button" className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-primary hover:bg-primary-soft" onClick={() => toggleGroup(g.items, selected < usable.length)}>
                   {selected < usable.length ? "Select all" : "Clear"}
                 </button>
               )}
             </div>
-            <div className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
+            <div className="grid gap-x-6 gap-y-3 p-3 sm:grid-cols-2 sm:p-4">
               {g.items.map((i) => (
                 <Checkbox key={i.key} checked={set.has(i.key)} onChange={() => toggle(i.key)} disabled={disabled || !allowed(i.key)} label={i.label}
                   description={!allowed(i.key) ? "You don't have this permission" : i.key} />
@@ -73,7 +76,7 @@ function RoleForm({ role, onClose }) {
     <Modal open onClose={onClose} size="xl" title={editing ? `Edit role · ${role.displayName || role.name}` : "Create role"}
       description="Roles decide what a team member can see and do. Permissions are checked on the server for every request."
       footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" form="role-form" loading={save.isPending}>{editing ? "Save changes" : "Create role"}</Button></>}>
-      <form id="role-form" onSubmit={submit} className="space-y-5">
+      <form id="role-form" onSubmit={submit} className="space-y-4 sm:space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Role key" required hint={editing ? "The key cannot be changed" : "Used internally, e.g. desk-editor"}>
             <Input value={form.name} onChange={(e) => set({ name: e.target.value.toLowerCase().replace(/\s+/g, "-") })} disabled={editing} placeholder="desk-editor" />
@@ -82,7 +85,11 @@ function RoleForm({ role, onClose }) {
         </div>
         <Field label="Description"><Textarea rows={2} value={form.description} onChange={(e) => set({ description: e.target.value })} maxLength={200} /></Field>
         {editing && !role.isSystem && <Switch checked={form.isActive} onChange={(v) => set({ isActive: v })} label="Role is active" description="Disabled roles lock out everyone who has them" />}
-        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        {error && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-fg">Permissions</p>
+          <Badge tone="primary" size="sm">{form.permissions.length} selected</Badge>
+        </div>
         {isLoading ? <Skeleton className="h-60 w-full" /> : (
           <PermissionPicker catalog={cat?.groups || []} value={form.permissions} onChange={(permissions) => set({ permissions })} mine={mine} isSuper={isSuper} />
         )}
@@ -114,36 +121,41 @@ export default function Roles() {
   return (
     <>
       <PageHeader title="Roles & permissions" description="Create roles for your newsroom and choose exactly what each one can do."
-        actions={can("role.create") && <Button leftIcon={Plus} onClick={() => setEditing({})}>New role</Button>} />
+        actions={can("role.create") && (
+          <>
+            <Button className="hidden sm:inline-flex" leftIcon={Plus} onClick={() => setEditing({})}>New role</Button>
+            <Button className="sm:hidden" size="icon" aria-label="New role" onClick={() => setEditing({})}><Plus className="size-5" /></Button>
+          </>
+        )} />
       {error ? <ErrorState error={error} onRetry={refetch} /> : isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-44" />)}</div>
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}</div>
       ) : !roles.length ? <Card><EmptyState icon={KeyRound} title="No roles yet" /></Card> : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           {roles.map((r) => (
-            <Card key={r._id} className={cn("flex flex-col gap-4", !r.isActive && "opacity-70")}>
+            <Card key={r._id} className={cn("flex flex-col gap-3 transition-shadow hover:shadow-md sm:gap-4", !r.isActive && "opacity-70")}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">{r.isSystem ? <Lock className="size-5" /> : <ShieldCheck className="size-5" />}</span>
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary sm:size-11">{r.isSystem ? <Lock className="size-5" /> : <ShieldCheck className="size-5" />}</span>
                   <div className="min-w-0">
                     <h3 className="truncate font-semibold text-fg">{r.displayName || r.name}</h3>
                     <p className="truncate font-mono text-xs text-fg-subtle">{r.name}</p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex shrink-0 flex-col items-end gap-1">
                   {r.isSystem && <Badge tone="primary" size="sm">Built-in</Badge>}
                   {!r.isActive && <Badge tone="danger" size="sm">Disabled</Badge>}
                 </div>
               </div>
-              <p className="line-clamp-2 min-h-10 text-sm text-fg-subtle">{r.description || "No description"}</p>
-              <div className="flex items-center gap-4 text-sm text-fg-muted">
+              <p className="line-clamp-2 text-sm text-fg-subtle sm:min-h-10">{r.description || "No description"}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-sm text-fg-muted">
                 <span className="inline-flex items-center gap-1.5"><Users className="size-4 text-fg-faint" />{r.users} user{r.users === 1 ? "" : "s"}</span>
                 <span className="inline-flex items-center gap-1.5"><KeyRound className="size-4 text-fg-faint" />{r.name === "admin" ? "Full access" : `${r.permissionCount} permissions`}</span>
               </div>
               <div className="mt-auto flex gap-2 border-t border-line pt-3">
                 {r.name === "admin" ? <p className="text-xs text-fg-subtle">The admin role always has full access and cannot be edited.</p> : (
                   <>
-                    {can("role.update") && <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setEditing(r)}>Edit</Button>}
-                    {can("role.delete") && !r.isSystem && <Button size="sm" variant="danger-soft" leftIcon={Trash2} onClick={() => setDeleting(r)}>Delete</Button>}
+                    {can("role.update") && <Button size="sm" variant="outline" leftIcon={Pencil} className="flex-1 sm:flex-none" onClick={() => setEditing(r)}>Edit</Button>}
+                    {can("role.delete") && !r.isSystem && <Button size="sm" variant="danger-soft" leftIcon={Trash2} className="flex-1 sm:flex-none" onClick={() => setDeleting(r)}>Delete</Button>}
                   </>
                 )}
               </div>

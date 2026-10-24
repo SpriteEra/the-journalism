@@ -18,7 +18,7 @@ import { TrendChart } from "../components/charts/Charts";
 import ProfileHeader from "../components/profile/ProfileHeader";
 import UpdatePasswordUser from "../components/UpdatePasswordUser";
 import NotificationSettings from "../components/NotificationSettings";
-import { Avatar, Badge, Button, Card, CardHeader, ErrorState, Field, ImageCropper, Input, Modal, PageHeader, PremiumBadge, Skeleton, StatCard, Textarea } from "../components/ui";
+import { Badge, Button, Card, CardHeader, ErrorState, Field, ImageCropper, Input, Modal, PageHeader, PremiumBadge, Skeleton, StatCard, Textarea } from "../components/ui";
 
 const ABOUT_MIN = 20; const ABOUT_MAX = 800;
 const SOCIALS = [["website", "Website"], ["x", "X (Twitter)"], ["facebook", "Facebook"], ["instagram", "Instagram"], ["youtube", "YouTube"], ["linkedin", "LinkedIn"]];
@@ -26,9 +26,9 @@ const THEMES = [["light", "Light", Sun], ["dark", "Dark", Moon], ["system", "Sys
 
 function Row({ icon: Icon, label, value, children }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl bg-surface-2/70 p-3.5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-fg-muted ring-1 ring-line"><Icon className="size-5" /></span>
-      <div className="min-w-0"><p className="text-xs font-medium text-fg-subtle">{label}</p>{children || <p className="hindi-font truncate text-sm font-semibold text-fg">{value || "—"}</p>}</div>
+    <div className="flex items-start gap-3 rounded-2xl bg-surface-2/70 p-3 sm:p-3.5">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface text-fg-muted ring-1 ring-line sm:size-10"><Icon className="size-4 sm:size-5" /></span>
+      <div className="min-w-0 flex-1"><p className="text-xs font-medium text-fg-subtle">{label}</p>{children || <p className="hindi-font truncate text-sm font-semibold text-fg">{value || "—"}</p>}</div>
     </div>
   );
 }
@@ -80,14 +80,19 @@ function ProfileEditor({ profile, onDone }) {
   return (
     <Card padded={false}>
       <CardHeader icon={Pencil} title="Edit profile" description="Shown on your public author page" actions={<Button variant="ghost" size="sm" leftIcon={X} onClick={onDone}>Cancel</Button>} />
-      <form onSubmit={save} noValidate className="space-y-5 p-4 sm:p-5">
-        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <button type="button" onClick={() => fileRef.current?.click()} aria-label="Choose profile photo" className={cn("group relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-dashed bg-surface-2", errors.photo ? "border-danger" : "border-line-strong hover:border-fg")}>
+      <form onSubmit={save} noValidate className="space-y-5 p-3 sm:p-5">
+        <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:gap-4 sm:text-left">
+          <button type="button" onClick={() => fileRef.current?.click()} aria-label="Choose profile photo" className={cn("group relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-dashed bg-surface-2 transition-colors", errors.photo ? "border-danger" : "border-line-strong hover:border-fg")}>
             {photo.url ? <img src={photo.url} alt="" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-fg-faint"><Camera className="size-7" /></span>}
             <span className="absolute inset-0 grid place-items-center bg-ink/55 text-xs font-medium text-paper opacity-0 transition-opacity group-hover:opacity-100">Change</span>
           </button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pick} />
-          <div className="text-sm"><p className="font-medium text-fg">Profile photo <span className="text-danger">*</span></p><p className="text-fg-subtle">Crop and zoom after choosing.</p>{errors.photo && <p className="text-danger">{errors.photo}</p>}</div>
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-fg">Profile photo <span className="text-danger">*</span></p>
+            <p className="text-fg-subtle">Crop and zoom after choosing.</p>
+            {errors.photo && <p className="text-danger">{errors.photo}</p>}
+            <Button type="button" size="sm" variant="outline" leftIcon={Camera} className="mt-2" onClick={() => fileRef.current?.click()}>{photo.url ? "Change photo" : "Choose photo"}</Button>
+          </div>
         </div>
         <Field label="Full name" required error={errors.fullName}><Input value={f.fullName} onChange={set("fullName")} maxLength={60} className="hindi-font" /></Field>
         <Field label="About" required error={errors.about} hint={`${f.about.trim().length}/${ABOUT_MAX}`} info="Shown on your author page and used as its search description."><Textarea rows={5} value={f.about} maxLength={ABOUT_MAX} onChange={set("about")} className="hindi-font" /></Field>
@@ -96,10 +101,16 @@ function ProfileEditor({ profile, onDone }) {
           <Field label="Location" hint="Optional"><Input icon={MapPin} value={f.location} onChange={set("location")} maxLength={80} className="hindi-font" /></Field>
           <Field label="Phone" hint="Optional"><Input icon={Phone} value={f.phone} onChange={set("phone")} inputMode="tel" /></Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {SOCIALS.map(([k, label]) => <Field key={k} label={label} hint="Optional"><Input value={f.social?.[k] || ""} onChange={(e) => setF((s) => ({ ...s, social: { ...s.social, [k]: e.target.value } }))} placeholder="https://" inputMode="url" /></Field>)}
+        <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-subtle">Links</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {SOCIALS.map(([k, label]) => <Field key={k} label={label} hint="Optional"><Input value={f.social?.[k] || ""} onChange={(e) => setF((s) => ({ ...s, social: { ...s.social, [k]: e.target.value } }))} placeholder="https://" inputMode="url" /></Field>)}
+          </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-line pt-4"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button type="submit" loading={busy}>Save changes</Button></div>
+        <div className="flex gap-2 border-t border-line pt-4 sm:justify-end">
+          <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={onDone}>Cancel</Button>
+          <Button type="submit" loading={busy} className="flex-[2] sm:flex-none">Save changes</Button>
+        </div>
       </form>
       <ImageCropper open={Boolean(cropSrc)} src={cropSrc} onClose={() => setCropSrc("")} onDone={(blob, url) => { setPhoto({ blob, url }); setErrors((x) => ({ ...x, photo: undefined })); setCropSrc(""); }} />
     </Card>
@@ -130,29 +141,35 @@ export default function Profile() {
     <>
       <PageHeader title={t("My profile")} description="Your details, numbers and preferences" />
 
-      <ProfileHeader className="mb-5" name={data?.fullName || data?.username} src={data?.profile}
+      <ProfileHeader className="mb-4 sm:mb-5" name={data?.fullName || data?.username} src={data?.profile}
         badges={user?.role && <Badge tone={user.role === "admin" ? "accent" : "primary"} className="capitalize">{user.role}</Badge>}
         subtitle={data?.designation ? `${data.designation}${data.location ? ` · ${data.location}` : ""}` : data?.location}
         about={data?.about}
-        actions={<><PremiumBadge>Spriteera Newsroom</PremiumBadge>{!editing && <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setEditing(true)}>Edit profile</Button>}</>}
-        meta={isPending ? <Skeleton className="h-4 w-56" /> : <><span>@{data?.username}</span><span className="inline-flex items-center gap-1.5"><Mail className="size-4" />{data?.email}</span><span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" />{t("Joined")} {fmtDate(data?.createdAt)}</span></>} />
+        actions={<>
+          {/* <PremiumBadge>Spriteera Newsroom</PremiumBadge> */}
+          {!editing && <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setEditing(true)}>Edit profile</Button>}</>}
+        meta={isPending ? <Skeleton className="h-4 w-56" /> : <><span>@{data?.username}</span><span className="inline-flex min-w-0 items-center gap-1.5"><Mail className="size-4 shrink-0" /><span className="truncate">{data?.email}</span></span><span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4 shrink-0" />{t("Joined")} {fmtDate(data?.createdAt)}</span></>} />
 
-      {missing && !editing && <Card className="mb-5 border-warning/40 bg-warning-soft/50"><p className="text-sm text-fg-muted"><b className="text-fg">Complete your profile.</b> Add a photo, your full name and a short about text — they appear on your public author page.</p></Card>}
+      {missing && !editing && (
+        <Card className="mb-4 border-warning/40 bg-warning-soft/50 sm:mb-5">
+          <p className="text-sm text-fg-muted"><b className="text-fg">Complete your profile.</b> Add a photo, your full name and a short about text — they appear on your public author page.</p>
+        </Card>
+      )}
 
       {showStats && (
-        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard label={`${t("Stories published")} · 30d`} value={r?.summary.published ?? 0} icon={FileText} tone="success" loading={perf.isLoading} change={r?.comparison.publishedChangePercent} />
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-5 sm:grid-cols-3 sm:gap-4">
+          <StatCard className="col-span-2 sm:col-span-1" label={`${t("Stories published")} · 30d`} value={r?.summary.published ?? 0} icon={FileText} tone="black" loading={perf.isLoading} change={r?.comparison.publishedChangePercent} />
           <StatCard label={t("Total reads")} value={r?.summary.totalViews ?? 0} icon={Eye} tone="info" loading={perf.isLoading} change={r?.comparison.viewsChangePercent} />
           <StatCard label="Avg reads / story" value={r?.summary.avgViewsPerArticle ?? 0} icon={TrendingUp} tone="violet" loading={perf.isLoading} />
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-5">
-        <div className="space-y-5 lg:col-span-3">
+      <div className="grid gap-4 sm:gap-5 lg:grid-cols-5">
+        <div className="min-w-0 space-y-4 sm:space-y-5 lg:col-span-3">
           {editing && data ? <ProfileEditor profile={data} onDone={() => setEditing(false)} /> : (
             <Card padded={false}>
               <CardHeader icon={User} title="Account information" />
-              <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+              <div className="grid gap-2.5 p-3 sm:grid-cols-2 sm:gap-3 sm:p-5">
                 <Row icon={User} label="Username" value={data?.username} />
                 <Row icon={FileText} label="Full name" value={data?.fullName} />
                 <Row icon={Mail} label={t("Email")} value={data?.email} />
@@ -166,15 +183,15 @@ export default function Profile() {
           {showStats && (
             <Card padded={false}>
               <CardHeader title="Your last 30 days" description="Stories and reads per day" />
-              <div className="p-4">{perf.isLoading ? <Skeleton className="h-56 w-full" /> : <TrendChart data={(r?.trends.daily || []).map((x) => ({ bucket: x.date, published: x.published, views: x.views }))} series={[{ key: "published", name: "Stories" }, { key: "views", name: "Reads" }]} height={240} />}</div>
+              <div className="p-3 sm:p-4">{perf.isLoading ? <Skeleton className="h-56 w-full" /> : <TrendChart data={(r?.trends.daily || []).map((x) => ({ bucket: x.date, published: x.published, views: x.views }))} series={[{ key: "published", name: "Stories" }, { key: "views", name: "Reads" }]} height={240} />}</div>
             </Card>
           )}
         </div>
 
-        <div className="space-y-5 lg:col-span-2">
+        <div className="min-w-0 space-y-4 sm:space-y-5 lg:col-span-2">
           <Card padded={false}>
             <CardHeader icon={ShieldCheck} title="Security & notifications" />
-            <div className="space-y-2.5 p-4 sm:p-5">
+            <div className="space-y-2.5 p-3 sm:p-5">
               <Button variant="outline" leftIcon={KeyRound} className="w-full justify-start" onClick={() => setPwd(true)}>Change password</Button>
               <Button variant="outline" leftIcon={Bell} className="w-full justify-start" onClick={() => setNotif(true)}>Manage notifications</Button>
               <p className="inline-flex items-center gap-1.5 pt-1 text-xs text-fg-faint"><Lock className="size-3.5" />Sessions are protected with signed tokens.</p>
@@ -183,7 +200,7 @@ export default function Profile() {
 
           <Card padded={false}>
             <CardHeader icon={Palette} title="Appearance & language" description="Only the panel's own text changes — what you write stays as you write it." />
-            <div className="space-y-4 p-4 sm:p-5">
+            <div className="space-y-4 p-3 sm:p-5">
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t("Theme")}</p>
                 <div className="grid grid-cols-3 gap-2">
@@ -196,7 +213,7 @@ export default function Profile() {
                 <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-subtle"><Languages className="size-3.5" />{t("Language")}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {LANGUAGES.map((l) => (
-                    <button key={l.code} type="button" aria-pressed={i18n.language === l.code} onClick={() => i18n.changeLanguage(l.code)} className={cn("flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition-colors", i18n.language === l.code ? "border-fg bg-surface-2 text-fg" : "border-line text-fg-muted hover:bg-surface-2")}>{l.label}{i18n.language === l.code && <Check className="size-4" />}</button>
+                    <button key={l.code} type="button" aria-pressed={i18n.language === l.code} onClick={() => i18n.changeLanguage(l.code)} className={cn("flex items-center justify-between gap-2 rounded-2xl border px-3 py-3 text-sm font-medium transition-colors sm:px-4", i18n.language === l.code ? "border-fg bg-surface-2 text-fg" : "border-line text-fg-muted hover:bg-surface-2")}><span className="truncate">{l.label}</span>{i18n.language === l.code && <Check className="size-4 shrink-0" />}</button>
                   ))}
                 </div>
               </div>

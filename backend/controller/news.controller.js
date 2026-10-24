@@ -832,9 +832,10 @@ export const searchNewsForLinking = tryCatch(async (req, res) => {
 
 export const getSingleNewsReporter = tryCatch(async (req, res) => {
     const news = await News.findOne({ news_id: req.query.news_id })
-        .populate('author', 'username _id').populate('updatedBy', 'username _id').populate('approved_by', 'username _id')
+        .populate('author', 'username profile email designation about _id').populate('updatedBy', 'username _id').populate('approved_by', 'username _id')
         .populate({ path: 'relatedNews', select: 'news_id title banner -_id' })
         .populate(TAXONOMY_POPULATE);
+
     if (!news || news.isDeleted) throw new ErrorHandler(404, 'News not found');
     const own = String(news.author?._id) === String(req.user._id);
     if (!(req.can(P.NEWS_VIEW_ALL) || (own && (req.can(P.NEWS_VIEW_OWN) || req.can(P.NEWS_UPDATE_OWN))))) throw new ErrorHandler(403, 'You cannot view this news');

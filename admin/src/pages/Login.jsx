@@ -127,7 +127,7 @@ export default function Login() {
 
         {/* right: form */}
         <main className="flex flex-col justify-center p-6 sm:p-12 lg:p-16">
-          <Brand className="mb-6 sm:mb-10 lg:hidden" />
+          <img className="h-8 w-fit object-contain mb-5 mx-auto" src="/logo.png" />
           <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-fg">Welcome back</h1>
           <p className="text-sm md:text-base sm:mt-2 text-fg-subtle">Sign in to your newsroom account</p>
 

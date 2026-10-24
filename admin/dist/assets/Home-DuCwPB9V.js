@@ -1,1 +1,0 @@
-import{e as n,u as c,k as o,r as i,j as r,bg as u}from"./index-DCk_mo9m.js";const l=()=>{const{user:s}=n(t=>t.user),{can:a}=c(),e=o();return i.useEffect(()=>{s?e(a("analytics.view")?"/dashboard":"/dashboard/news",{replace:!0}):e("/login",{replace:!0})},[s,e,a]),r.jsx("div",{className:"grid min-h-dvh place-items-center bg-canvas",children:r.jsx(u,{})})};export{l as default};
