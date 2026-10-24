@@ -139,7 +139,7 @@ export default function NewsPreview({ open, onClose, news }) {
                       <time dateTime={new Date(publishedAt).toISOString()} className={cn("whitespace-nowrap text-[13px] leading-normal text-black/75", lg && "text-sm")}>
                         {fmtDate(publishedAt, true)}
                       </time>
-                      <ShareRow />
+                      <ShareRow lg={lg} />
                     </div>
                   </div>
                   {/* {places && <p className="mt-2 text-xs text-black/60">{places}</p>} */}
@@ -233,8 +233,8 @@ export default function NewsPreview({ open, onClose, news }) {
             {/* ad column, desktop only (the frontend renders <SideAds /> here) */}
             {lg && (
               <section className="relative col-span-2 min-h-50 space-y-3.5 pt-9">
-                <div className="sticky top-4">
-                  <div className="grid h-[250px] place-items-center border border-dashed border-black/20 bg-black/[0.03] text-xs text-black/40">
+                <div className="sticky top-0">
+                  <div className="grid h-[250px] text-center pt-0.5 border bg-black/[0.03] text-xs text-black/40 rounded">
                     {t("Ad space")}
                   </div>
                 </div>
@@ -270,14 +270,13 @@ export const FollowOnGoogle = () => {
   );
 };
 
-const ShareRow = () => {
+const ShareRow = ({ lg }) => {
 
   return (
     <div className="flex items-center gap-2 lg:gap-3 justify-end w-full">
-      <div className="max-lg:hidden">
-        <FollowOnGoogle />
+      {lg &&
+        <FollowOnGoogle />}
 
-      </div>
 
       <button
         type="button"

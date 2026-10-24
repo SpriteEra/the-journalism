@@ -1,1 +1,0 @@
-import{j as e,F as b,w as c}from"./index-XZxuA9n1.js";const i=({required:s=!1,LabelTitle:l,inputVal:t,handleInputValue:m,placeholder:n,type:o="text",name:x,readOnly:p=!1,icon:j,min:a})=>e.jsx(b,{label:l,required:s,className:"mb-2 sm:mb-5",children:e.jsx(c,{required:s,type:o,readOnly:p,name:x,value:t??"",onChange:m,placeholder:n,icon:j,...a?{min:a}:{}})});export{i as I};

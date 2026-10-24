@@ -1,1 +1,0 @@
-import{j as s,Z as t}from"./index-XZxuA9n1.js";const l=({isOpen:e,onClose:o,btnDanger:n=!1,onConfirm:r=null,description:a="",btnTitle:i="Delete",title:m=""})=>s.jsx(t,{open:e,onClose:o,onConfirm:r||o,title:m,message:a,confirmLabel:i,tone:n?"danger":"primary"});export{l as C};
