@@ -1,29 +1,14 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Play } from "lucide-react";
-
-/* Replace with real data (props or API) */
-const DEFAULT_ITEMS = [
-    {
-        id: 1,
-        title: "सीजेपी संस्थापक अभिजीत दिपके ने सीईसी ज्ञानेश कुमार के इस्तीफे की मांग की, क्या कहा",
-        image: "/demo/news2.png",
-        href: "/video/1",
-    },
-    {
-        id: 2,
-        title: "शराब घोटाला केस में क्या-क्या हुआ? केजरीवाल के बरी होने से जस्टिस कांता के हटने तक की कहानी",
-        image: "/demo/news3.png",
-        href: "/video/2",
-    },
-];
+import Image from "next/image";
 
 const VideoSection = ({
     title = "वीडियो",
-    titleHref = "/video",
-    items = DEFAULT_ITEMS,
+    titleHref = "/videos",
+    items = [],
     className = "",
 }) => {
+    if (!items.length) return null;
     return (
         <section
             aria-label={title}
@@ -32,13 +17,13 @@ const VideoSection = ({
             {/* Header */}
             <Link
                 href={titleHref} className="group mb-2 inline-flex items-center gap-1 text-xl font-semibold text-black">
-                वीडियो
+                {title}
                 <ChevronRight className="size-5" />
             </Link>
 
             {/* Videos */}
             <ul className="space-y-5 max-lg:grid max-lg:grid-cols-2 max-lg:gap-2">
-                {items.map((item) => (
+                {items.slice(0, 2).map((item) => (
                     <li key={item.id}>
                         <Link href={item.href} className="group block">
                             {/* 16:9 thumbnail with play button */}

@@ -5,6 +5,9 @@ import {
     createState, updateState, deleteState, getStatesAdmin, getStatesPublic, getStateBySlug,
     createDistrict, updateDistrict, deleteDistrict, getDistrictsAdmin, getDistrictBySlug, getNewsByTaxonomy,
 } from '../controller/taxonomy.controller.js';
+import {
+    getHomeSectionsAdmin, createHomeSection, updateHomeSection, deleteHomeSection, reorderHomeSections, getHomeSectionsPublic,
+} from '../controller/homesection.controller.js';
 
 
 // mounted at /api/v1/admin  (admin only)
@@ -18,6 +21,7 @@ export async function taxonomyPublicRouter(app) {
     app.get('/states', getStatesPublic);
     app.get('/states/:slug', getStateBySlug);
     app.get('/districts/:slug', getDistrictBySlug);
+    app.get('/home-sections', getHomeSectionsPublic);          // ordered home page sections + their latest news
     app.get('/:type/:slug/news', getNewsByTaxonomy);
 }
 
@@ -35,4 +39,11 @@ export async function taxonomyAdminRouter(app) {
     app.post('/districts', { onRequest: [...perm(P.DISTRICT_CREATE)] }, createDistrict);
     app.put('/districts/:id', { onRequest: [...perm(P.DISTRICT_UPDATE)] }, updateDistrict);
     app.delete('/districts/:id', { onRequest: [...perm(P.DISTRICT_DELETE)] }, deleteDistrict);
+
+    // home page sections (max 9, drag to reorder)
+    app.get('/home-sections', { onRequest: [...staff] }, getHomeSectionsAdmin);
+    app.post('/home-sections', { onRequest: [...perm(P.HOME_SECTION_MANAGE)] }, createHomeSection);
+    app.put('/home-sections/reorder', { onRequest: [...perm(P.HOME_SECTION_MANAGE)] }, reorderHomeSections);
+    app.put('/home-sections/:id', { onRequest: [...perm(P.HOME_SECTION_MANAGE)] }, updateHomeSection);
+    app.delete('/home-sections/:id', { onRequest: [...perm(P.HOME_SECTION_MANAGE)] }, deleteHomeSection);
 }

@@ -1,3 +1,4 @@
+import { LayoutList } from "lucide-react";
 import {
   BarChart3, CalendarCheck, CalendarClock, CalendarCog, CalendarDays, FileText, FolderTree, Images, KeyRound, LayoutGrid, Megaphone,
   PlaySquare, Rss, Save, ScrollText, ShieldCheck, Sparkles, Tags, Trash2, Trophy, UserCog, Users, Video,
@@ -34,6 +35,7 @@ export const NAV = [
     title: "Content setup",
     items: [
       { label: "Categories", to: "/dashboard/categories", icon: FolderTree, perm: ["taxonomy.view"] },
+      { to: "/dashboard/home-sections", label: "Home sections", icon: LayoutList, perms: ["taxonomy.view"] },
       { label: "Topics", to: "/dashboard/tags", icon: Tags, perm: ["taxonomy.view"] },
       {
         label: "Advertising", icon: Megaphone, perm: ["ads.manage"], key: "ads",

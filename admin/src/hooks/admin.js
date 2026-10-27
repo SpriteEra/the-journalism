@@ -12,7 +12,6 @@ const get = (url, params) => httpClient.get(url, { params: cleanParams(params) }
 
 export const useApiMutation = (fn, { invalidate = [], success, onSuccess } = {}) => {
   const qc = useQueryClient();
-  console.log('hello')
   return useMutation({
     mutationFn: fn,
     onSuccess: (data, vars) => {
@@ -41,6 +40,8 @@ export const useTagSuggest = (q) => useQuery({ queryKey: ["tag-suggest", q], que
 export const useCategories = () => useQuery({ queryKey: ["categories"], queryFn: () => get("/categories"), select: (d) => d.categories });
 export const useStates = () => useQuery({ queryKey: ["states"], queryFn: () => get("/states"), select: (d) => d.states, staleTime: REFERENCE_STALE });
 export const useDistricts = (state) => useQuery({ queryKey: ["districts", state || "all"], queryFn: () => get("/districts", { state }), select: (d) => d.districts, staleTime: REFERENCE_STALE });
+export const useHomeSections = () => useQuery({ queryKey: ["home-sections"], queryFn: () => get("/home-sections") });
+
 
 // short videos
 export const useShortVideos = (params) => useQuery({ queryKey: ["short-videos", params], queryFn: () => get("/short-videos", params), placeholderData: (p) => p });

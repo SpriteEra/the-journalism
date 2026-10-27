@@ -5,7 +5,7 @@ import District from '../model/district.model.js';
 import News from '../model/news.models.js';
 import tryCatch from '../utils/asyncFunction.js';
 import ErrorHandler from '../utils/errorHandler.js';
-import { syncRouteSlug } from '../utils/newsRoute.js';
+import { newsPath, syncRouteSlug } from '../utils/newsRoute.js';
 import { makeSlug, uniqueSlug, parseJSON, toBool } from '../utils/slug.js';
 import { sanitizeSeo, resolveSeo, assembleJsonLd, collectionLd } from '../utils/seo.js';
 import { uploadImage, deleteImage } from '../utils/uploadImage.js';
@@ -16,7 +16,7 @@ import { cached, clearCache, setPublicCache } from '../utils/cache.js';
 const invalidateTaxonomy = () => { clearCache('tax:'); clearCache('home:'); clearCache('analytics:'); };
 
 const isId = (v) => mongoose.Types.ObjectId.isValid(v);
-const NEWS_LIST_FIELDS = 'news_id title description banner location post_time tags -_id';
+const NEWS_LIST_FIELDS = 'news_id slug primaryRoute.slug title description banner location post_time isVideo tags -_id';
 
 /** Shared: build the { seo: { meta, jsonLd } } block for a taxonomy page. */
 const taxonomySeoBlock = ({ doc, name, type, slug, breadcrumbs }) => {
@@ -40,7 +40,7 @@ const listNews = async (filter, req) => {
     const { page, limit, skip } = paging(req);
     const rows = await News.find({ draft: false, isPublished: true, isDeleted: false, ...filter })
         .sort({ post_time: -1, _id: -1 }).skip(skip).limit(limit + 1).select(NEWS_LIST_FIELDS).populate({ path: 'tags', select: 'title slug -_id' }).lean();
-    return { news: rows.slice(0, limit), hasMore: rows.length > limit, page, limit };
+    return { news: rows.slice(0, limit).map(toCard), hasMore: rows.length > limit, page, limit };
 };
 
 // ═══════════════════════════ CATEGORY ═══════════════════════════
@@ -137,6 +137,23 @@ export const getCategoryTree = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, categories: tree });
 });
 
+
+/** One story -> the card shape the website uses (same as the home page and getNewses) */
+const toCard = (n) => ({
+    id: n.news_id,
+    title: n.title,
+    description: n.description || '',
+    image: n.banner || '',
+    href: newsPath(n),                 // /{section}/news/{slug}
+    isVideo: Boolean(n.isVideo),
+    location: n.location || '',
+    publishedAt: n.post_time,
+    tags: n.tags || [],
+});
+
+/** Latest-first list (post_time desc, _id tie-break) using the "limit + 1" trick, so no slow count(). */
+
+
 /** Public: category page = data + resolved SEO + json-ld + first page of latest news. */
 export const getCategoryBySlug = tryCatch(async (req, res) => {
     const category = await Category.findOne({ slug: req.params.slug.toLowerCase(), isDeleted: false, isActive: true }).lean();
@@ -148,8 +165,10 @@ export const getCategoryBySlug = tryCatch(async (req, res) => {
     if (parent) breadcrumbs.push({ name: parent.name, url: buildUrl('category', { slug: parent.slug }) });
     breadcrumbs.push({ name: category.seo?.breadcrumbTitle || category.name, url: buildUrl('category', { slug: category.slug }) });
 
-    const filter = parent ? { subCategory: category._id } : { $or: [{ category: category._id }, { subCategory: { $in: children.map((c) => c._id) } }] };
-    const list = await listNews(filter, req);
+    const filter = parent
+        ? { subCategory: category._id }
+        : { $or: [{ category: category._id }, { subCategory: { $in: children.map((c) => c._id) } }] };
+    const list = await listNews(filter, req);          // { news: [cards], hasMore, page, limit }
 
     setPublicCache(res, 60);
     res.status(200).json({

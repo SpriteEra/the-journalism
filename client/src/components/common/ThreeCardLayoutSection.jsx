@@ -17,6 +17,7 @@ const StackedFeaturedCard = ({ item, priority = false }) => {
                         alt={title || ""}
                         fill
                         priority={priority}
+                        unoptimized={process.env.NODE_ENV === 'development'}
                         sizes="(max-width: 1024px) 100vw, 700px"
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
@@ -48,6 +49,7 @@ const HorizontalNewsCard = ({ item }) => {
                         src={image || "/banner.png"}
                         alt={title || ""}
                         fill
+                        unoptimized={process.env.NODE_ENV === 'development'}
                         sizes="(max-width: 1024px) 40vw, 240px"
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                     />

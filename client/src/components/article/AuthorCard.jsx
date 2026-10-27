@@ -15,8 +15,8 @@ import Image from "next/image";
  */
 
 const AuthorCard = ({ author, label = "लेखक के बारे में", className = "" }) => {
-    if (!author || !author.name) return null;
-    const { name, bio, image, href } = author;
+    if (!author || !author.fullName) return null;
+    const { fullName, about, profile, profileUrl } = author;
 
 
     return (
@@ -26,8 +26,8 @@ const AuthorCard = ({ author, label = "लेखक के बारे मे�
         >
             <div className="relative size-21 lg:size-25 shrink-0 overflow-hidden rounded-full bg-gray-200 lg:size-36">
                 <Image
-                    src={image || "/banner.png"}
-                    alt={name}
+                    src={profile || "/banner.png"}
+                    alt={fullName}
                     fill
                     sizes="(max-width: 1024px) 96px, 144px"
                     className="object-cover object-top"
@@ -38,13 +38,13 @@ const AuthorCard = ({ author, label = "लेखक के बारे मे�
                 <p className="text-xs lg:text-[15px]">{label}</p>
 
 
-                <Link href={href} className={`text-2xl font-bold leading-normal text-black lg:text-3xl block transition-colors hover:text-primary`}>
-                    {name}
+                <Link href={profileUrl || '/'} className={`text-2xl font-bold leading-normal text-black lg:text-3xl block transition-colors hover:text-primary`}>
+                    {fullName}
                 </Link>
 
-                {bio && (
+                {about && (
                     <p className="lg:mt-1 line-clamp-2 text-sm leading-snug text-black/65 lg:text-lg lg:leading-6.25">
-                        {bio}
+                        {about}
                     </p>
                 )}
             </div>

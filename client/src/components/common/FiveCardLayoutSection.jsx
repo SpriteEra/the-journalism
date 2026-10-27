@@ -36,6 +36,7 @@ const FeaturedNewsCard = ({ item, className = "", priority = false }) => {
                         alt={title || ""}
                         fill
                         priority={priority}
+                        unoptimized={process.env.NODE_ENV === 'development'}
                         sizes="(max-width: 1024px) 100vw, 750px"
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />

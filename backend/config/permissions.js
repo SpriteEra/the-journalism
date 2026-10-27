@@ -38,6 +38,7 @@ export const PERMISSIONS = {
     TAG_UPDATE: 'tag.update',
     TAG_DELETE: 'tag.delete',
     TAG_MERGE: 'tag.merge',           // merge duplicate tags into one
+    HOME_SECTION_MANAGE: 'homeSection.manage',
 
     // ── media / other content ───────────────────────────────────────────────
     LIVE_CREATE: 'live.create',
@@ -100,52 +101,68 @@ export const P = PERMISSIONS;
 
 /** Human readable catalogue (grouped) — served by GET /admin/permissions so the UI can render checkboxes. */
 export const PERMISSION_CATALOG = [
-    { group: 'News', items: [
-        [P.NEWS_CREATE, 'Create news (drafts, or submit for approval)'],
-        [P.NEWS_VIEW_OWN, 'See own news in the dashboard'],
-        [P.NEWS_VIEW_ALL, 'See every reporter\'s news + the approval queue'],
-        [P.NEWS_UPDATE_OWN, 'Edit own news'],
-        [P.NEWS_UPDATE_ANY, 'Edit anybody\'s news'],
-        [P.NEWS_DELETE_OWN, 'Delete own news (drafts only, unless they can publish)'],
-        [P.NEWS_DELETE_ANY, 'Delete anybody\'s news'],
-        [P.NEWS_PUBLISH, 'Publish directly without approval (same as the "trusted" switch)'],
-        [P.NEWS_APPROVE, 'Approve pending news from other reporters'],
-        [P.NEWS_SCHEDULE, 'Schedule news for later'],
-        [P.NEWS_FEATURE, 'Choose the featured story at the top of the site (for a limited time)'],
-    ] },
-    { group: 'Categories, states & districts', items: [
-        [P.TAXONOMY_VIEW, 'View the category / state / district lists'],
-        [P.CATEGORY_CREATE, 'Create categories & sub-categories'], [P.CATEGORY_UPDATE, 'Edit categories'], [P.CATEGORY_DELETE, 'Delete categories'],
-        [P.STATE_CREATE, 'Create states'], [P.STATE_UPDATE, 'Edit states'], [P.STATE_DELETE, 'Delete states'],
-        [P.DISTRICT_CREATE, 'Create districts'], [P.DISTRICT_UPDATE, 'Edit districts'], [P.DISTRICT_DELETE, 'Delete districts'],
-    ] },
-    { group: 'Tags', items: [
-        [P.TAG_CREATE, 'Create tags (also from the news form)'], [P.TAG_UPDATE, 'Edit tags'], [P.TAG_DELETE, 'Delete tags'], [P.TAG_MERGE, 'Merge duplicate tags'],
-    ] },
-    { group: 'Live / shorts & videos / gallery / events', items: [
-        [P.LIVE_CREATE, 'Create live news'], [P.LIVE_MANAGE_OWN, 'Manage own live news'], [P.LIVE_MANAGE_ANY, 'Manage any live news'], [P.LIVE_PUBLISH, 'Go live without approval'],
-        [P.VIDEO_CREATE, 'Upload shorts / videos and add YouTube links'], [P.VIDEO_MANAGE_OWN, 'Manage own shorts / videos'], [P.VIDEO_MANAGE_ANY, 'Manage any short / video and approve pending ones'], [P.VIDEO_PUBLISH, 'Publish shorts / videos without approval'],
-        [P.VIDEO_SHORTS_MANAGE, 'Manage auto-imported YouTube shorts'], [P.VIDEO_SYNC, 'Run / view YouTube sync'], [P.YT_MANAGE, 'Manage YouTube video news'],
-        [P.GALLERY_CREATE, 'Create gallery news'], [P.GALLERY_MANAGE_OWN, 'Manage own gallery news'], [P.GALLERY_MANAGE_ANY, 'Manage any gallery news'],
-        [P.EVENT_CREATE, 'Create event news'], [P.EVENT_MANAGE_OWN, 'Manage own event news'], [P.EVENT_MANAGE_ANY, 'Manage any event news'], [P.EVENT_CATEGORY_MANAGE, 'Manage event categories'],
-    ] },
-    { group: 'Site tools', items: [
-        [P.BREAKING_MANAGE, 'Manage breaking news'], [P.ADS_MANAGE, 'Manage advertisements'], [P.PANCHANG_MANAGE, 'Manage panchang'], [P.TOOLS_AI, 'Use AI tag / trend tools'],
-        [P.TRASH_VIEW_OWN, 'See own trash'], [P.TRASH_VIEW_ALL, 'See everybody\'s trash'], [P.TRASH_RESTORE, 'Restore trashed items'],
-    ] },
-    { group: 'Analytics', items: [
-        [P.ANALYTICS_VIEW, 'Open the admin analytics dashboard'], [P.ANALYTICS_REFRESH, 'Force-refresh cached analytics'],
-        [P.REPORTER_PERFORMANCE_OWN, 'See own performance report'], [P.REPORTER_PERFORMANCE_ALL, 'See every reporter\'s performance + leaderboard'],
-    ] },
-    { group: 'Activity logs', items: [
-        [P.LOGS_VIEW, 'See the admin-panel activity log (last 10 days)'], [P.LOGS_USER_VIEW, 'See the user-panel activity log (last 10 days)'],
-    ] },
-    { group: 'Users & roles', items: [
-        [P.USER_VIEW, 'List users'], [P.USER_CREATE, 'Create users'], [P.USER_UPDATE, 'Edit users'], [P.USER_DELETE, 'Delete users'],
-        [P.USER_BLOCK, 'Block / unblock users'], [P.USER_TRUST, 'Change auto-publish (trusted) switch'], [P.USER_PASSWORD_RESET, 'Reset other users\' passwords'],
-        [P.USER_ASSIGN_ROLE, 'Assign roles to users'], [P.USER_PERMISSIONS, 'Grant / deny single permissions per user'],
-        [P.ROLE_VIEW, 'View roles'], [P.ROLE_CREATE, 'Create roles'], [P.ROLE_UPDATE, 'Edit roles'], [P.ROLE_DELETE, 'Delete roles'],
-    ] },
+    {
+        group: 'News', items: [
+            [P.NEWS_CREATE, 'Create news (drafts, or submit for approval)'],
+            [P.NEWS_VIEW_OWN, 'See own news in the dashboard'],
+            [P.NEWS_VIEW_ALL, 'See every reporter\'s news + the approval queue'],
+            [P.NEWS_UPDATE_OWN, 'Edit own news'],
+            [P.NEWS_UPDATE_ANY, 'Edit anybody\'s news'],
+            [P.NEWS_DELETE_OWN, 'Delete own news (drafts only, unless they can publish)'],
+            [P.NEWS_DELETE_ANY, 'Delete anybody\'s news'],
+            [P.NEWS_PUBLISH, 'Publish directly without approval (same as the "trusted" switch)'],
+            [P.NEWS_APPROVE, 'Approve pending news from other reporters'],
+            [P.NEWS_SCHEDULE, 'Schedule news for later'],
+            [P.NEWS_FEATURE, 'Choose the featured story at the top of the site (for a limited time)'],
+        ]
+    },
+    {
+        group: 'Categories, states & districts', items: [
+            [P.TAXONOMY_VIEW, 'View the category / state / district lists'],
+            [P.CATEGORY_CREATE, 'Create categories & sub-categories'], [P.CATEGORY_UPDATE, 'Edit categories'], [P.CATEGORY_DELETE, 'Delete categories'],
+            [P.STATE_CREATE, 'Create states'], [P.STATE_UPDATE, 'Edit states'], [P.STATE_DELETE, 'Delete states'],
+            [P.DISTRICT_CREATE, 'Create districts'], [P.DISTRICT_UPDATE, 'Edit districts'], [P.DISTRICT_DELETE, 'Delete districts'],
+        ]
+    },
+    {
+        group: 'Tags', items: [
+            [P.TAG_CREATE, 'Create tags (also from the news form)'], [P.TAG_UPDATE, 'Edit tags'], [P.TAG_DELETE, 'Delete tags'], [P.TAG_MERGE, 'Merge duplicate tags'],
+        ]
+    },
+    {
+        group: 'Live / shorts & videos / gallery / events', items: [
+            [P.LIVE_CREATE, 'Create live news'], [P.LIVE_MANAGE_OWN, 'Manage own live news'], [P.LIVE_MANAGE_ANY, 'Manage any live news'], [P.LIVE_PUBLISH, 'Go live without approval'],
+            [P.VIDEO_CREATE, 'Upload shorts / videos and add YouTube links'], [P.VIDEO_MANAGE_OWN, 'Manage own shorts / videos'], [P.VIDEO_MANAGE_ANY, 'Manage any short / video and approve pending ones'], [P.VIDEO_PUBLISH, 'Publish shorts / videos without approval'],
+            [P.VIDEO_SHORTS_MANAGE, 'Manage auto-imported YouTube shorts'], [P.VIDEO_SYNC, 'Run / view YouTube sync'], [P.YT_MANAGE, 'Manage YouTube video news'],
+            [P.GALLERY_CREATE, 'Create gallery news'], [P.GALLERY_MANAGE_OWN, 'Manage own gallery news'], [P.GALLERY_MANAGE_ANY, 'Manage any gallery news'],
+            [P.EVENT_CREATE, 'Create event news'], [P.EVENT_MANAGE_OWN, 'Manage own event news'], [P.EVENT_MANAGE_ANY, 'Manage any event news'], [P.EVENT_CATEGORY_MANAGE, 'Manage event categories'],
+        ]
+    },
+    {
+        group: 'Site tools', items: [
+            [P.BREAKING_MANAGE, 'Manage breaking news'], [P.ADS_MANAGE, 'Manage advertisements'], [P.PANCHANG_MANAGE, 'Manage panchang'], [P.TOOLS_AI, 'Use AI tag / trend tools'],
+            [P.TRASH_VIEW_OWN, 'See own trash'], [P.TRASH_VIEW_ALL, 'See everybody\'s trash'], [P.TRASH_RESTORE, 'Restore trashed items'],
+        ]
+    },
+    {
+        group: 'Analytics', items: [
+            [P.ANALYTICS_VIEW, 'Open the admin analytics dashboard'], [P.ANALYTICS_REFRESH, 'Force-refresh cached analytics'],
+            [P.REPORTER_PERFORMANCE_OWN, 'See own performance report'], [P.REPORTER_PERFORMANCE_ALL, 'See every reporter\'s performance + leaderboard'],
+        ]
+    },
+    {
+        group: 'Activity logs', items: [
+            [P.LOGS_VIEW, 'See the admin-panel activity log (last 10 days)'], [P.LOGS_USER_VIEW, 'See the user-panel activity log (last 10 days)'],
+        ]
+    },
+    {
+        group: 'Users & roles', items: [
+            [P.USER_VIEW, 'List users'], [P.USER_CREATE, 'Create users'], [P.USER_UPDATE, 'Edit users'], [P.USER_DELETE, 'Delete users'],
+            [P.USER_BLOCK, 'Block / unblock users'], [P.USER_TRUST, 'Change auto-publish (trusted) switch'], [P.USER_PASSWORD_RESET, 'Reset other users\' passwords'],
+            [P.USER_ASSIGN_ROLE, 'Assign roles to users'], [P.USER_PERMISSIONS, 'Grant / deny single permissions per user'],
+            [P.ROLE_VIEW, 'View roles'], [P.ROLE_CREATE, 'Create roles'], [P.ROLE_UPDATE, 'Edit roles'], [P.ROLE_DELETE, 'Delete roles'],
+        ]
+    },
 ].map((g) => ({ group: g.group, items: g.items.map(([key, label]) => ({ key, label })) }));
 
 export const ALL_PERMISSION_KEYS = Object.freeze(Object.values(PERMISSIONS));

@@ -20,6 +20,7 @@ const NewsCard = ({ item, className = "", priority = false }) => {
                         src={image || "/banner.png"}
                         alt={title || ""}
                         fill
+                        unoptimized={process.env.NODE_ENV === 'development'}
                         priority={priority}
                         sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 300px"
                         className="object-cover transition-transform duration-300 group-hover:scale-105"

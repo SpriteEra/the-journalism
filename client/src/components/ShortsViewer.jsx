@@ -47,9 +47,25 @@ const ShortsViewer = ({ items = [], startId }) => {
     const item = items[index];
     const prev = items[index - 1];
     const next = items[index + 1];
-    const ytId = getYouTubeId(item?.videoUrl);
+    const ytId = item?.youtubeId || getYouTubeId(item?.videoUrl);
 
     useEffect(() => setMounted(true), []);
+
+    // a short stored only as an HLS stream (.m3u8): Safari plays it natively, other browsers through hls.js
+    useEffect(() => {
+        const v = videoRef.current;
+        if (!v || ytId || item?.videoUrl || !item?.hlsUrl) return undefined;
+        if (v.canPlayType("application/vnd.apple.mpegurl")) { v.src = item.hlsUrl; return undefined; }
+        let hls;
+        let cancelled = false;
+        import("hls.js").then(({ default: Hls }) => {
+            if (cancelled || !Hls.isSupported()) return;
+            hls = new Hls();
+            hls.loadSource(item.hlsUrl);
+            hls.attachMedia(v);
+        });
+        return () => { cancelled = true; hls?.destroy(); };
+    }, [item?.hlsUrl, item?.videoUrl, ytId, index, mounted]);
 
     const go = useCallback(
         (dir) =>
@@ -240,7 +256,7 @@ const ShortsViewer = ({ items = [], startId }) => {
                             ) : (
                                 <video
                                     ref={videoRef}
-                                    src={item.videoUrl}
+                                    src={item.videoUrl || undefined}
                                     poster={item.image}
                                     autoPlay
                                     loop

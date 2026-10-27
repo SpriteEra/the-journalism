@@ -31,17 +31,91 @@ export function TaxonomyFields({ value, onChange, categoryRequired = false, erro
   const cats = useCategories();
   const states = useStates();
   const districts = useDistricts();
-  const v = { ...emptyTaxonomy, ...value };
+  // const v = { ...emptyTaxonomy, ...value };
+  // console.log(v)
 
-  const tops = useMemo(() => (cats.data || []).filter((c) => !c.parent && c.isActive !== false), [cats.data]);
-  const subs = useMemo(() => (cats.data || []).filter((c) => c.parent && c.isActive !== false), [cats.data]);
-  const subOptions = subs.filter((s) => v.category.includes(String(s.parent)));
+  // const tops = useMemo(() => (cats.data || []).filter((c) => !c.parent && c.isActive !== false), [cats.data]);
+  // const subs = useMemo(() => (cats.data || []).filter((c) => c.parent && c.isActive !== false), [cats.data]);
+  // const subOptions = subs.filter((s) => v.category.includes(String(s.parent)));
   const stateOptions = (states.data || []).filter((s) => s.isActive !== false);
-  const districtOptions = (districts.data || []).filter((d) => d.isActive !== false && (!v.state.length || v.state.includes(String(d.state?._id || d.state))));
+  // // const districtOptions = (districts.data || []).filter((d) => d.isActive !== false && (!v.state.length || v.state.includes(String(d.state?._id || d.state))));
 
-  const setCategory = (category) => onChange({ ...v, category, subCategory: v.subCategory.filter((id) => category.includes(String(subs.find((s) => s._id === id)?.parent))) });
-  const setState = (state) => onChange({ ...v, state, district: v.district.filter((id) => { const d = (districts.data || []).find((x) => x._id === id); return !state.length || state.includes(String(d?.state?._id || d?.state)); }) });
+  // const setCategory = (category) => onChange({ ...v, category, subCategory: v.subCategory.filter((id) => category.includes(String(subs.find((s) => s._id === id)?.parent))) });
+  // const setState = (state) => onChange({ ...v, state, district: v.district.filter((id) => { const d = (districts.data || []).find((x) => x._id === id); return !state.length || state.includes(String(d?.state?._id || d?.state)); }) });
 
+
+  const getId = (value) => {
+    if (!value) return "";
+    return String(
+      typeof value === "object" ? value._id ?? value.id : value
+    );
+  };
+
+  const v = {
+    category: [],
+    subCategory: [],
+    state: [],
+    district: [],
+    ...value,
+  };
+
+  const tops = useMemo(
+    () =>
+      (cats.data || []).filter(
+        (c) => !c.parent && c.isActive !== false
+      ),
+    [cats.data]
+  );
+
+  const subs = useMemo(
+    () =>
+      (cats.data || []).filter(
+        (c) => c.parent && c.isActive !== false
+      ),
+    [cats.data]
+  );
+
+  const subOptions = subs.filter((s) =>
+    v.category.includes(getId(s.parent))
+  );
+
+  const setCategory = (category) => {
+    const selectedCategories = category.map(getId);
+
+    const validSubCategories = v.subCategory.filter((id) => {
+      const sub = subs.find((s) => getId(s._id) === getId(id));
+
+      return (
+        sub &&
+        selectedCategories.includes(getId(sub.parent))
+      );
+    });
+
+    onChange({
+      ...v,
+      category: selectedCategories,
+      subCategory: validSubCategories,
+    });
+  };
+
+  const setState = (state) => {
+    const selectedStates = state.map(getId);
+
+    onChange({
+      ...v,
+      state: selectedStates,
+      district: v.district.filter((id) => {
+        const district = (districts.data || []).find(
+          (d) => getId(d._id) === getId(id)
+        );
+
+        return (
+          district &&
+          selectedStates.includes(getId(district.state))
+        );
+      }),
+    });
+  };
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Field label="Categories" required={categoryRequired} error={errors.category} hint="Category or state — at least one" info="The sections of the website the story appears in (Politics, Sports …). One of them can be the primary section used in the story link.">
@@ -50,14 +124,14 @@ export function TaxonomyFields({ value, onChange, categoryRequired = false, erro
           value={v.category}
           onChange={setCategory}
           placeholder="Choose categories"
-          max={10}
+          max={20}
         />
       </Field>
       <Field label="Sub-categories" hint={v.category.length ? "Optional" : "Choose a category first"}>
         <MultiSelect options={subOptions.map((c) => ({ value: c._id, label: c.name }))} value={v.subCategory} onChange={(subCategory) => onChange({ ...v, subCategory })} disabled={!v.category.length} placeholder="Choose sub-categories" emptyText="This category has no sub-categories" max={30} />
       </Field>
       <Field label="States" hint="Category or state — at least one" info="Use for local news. A story can also use a state as the first part of its link.">
-        <MultiSelect options={stateOptions.map((s) => ({ value: s._id, label: s.displayName || s.state }))} value={v.state} onChange={setState} placeholder="Choose states" max={10} />
+        <MultiSelect options={stateOptions.map((s) => ({ value: s._id, label: s.displayName || s.state }))} value={v.state} onChange={setState} placeholder="Choose states" max={30} />
       </Field>
       {/* <Field label="Districts" hint={v.state.length ? "From the chosen states" : "Optional – choose a state to narrow the list"}>
         <MultiSelect options={districtOptions.map((d) => ({ value: d._id, label: d.displayName || d.district }))} value={v.district} onChange={(district) => onChange({ ...v, district })} placeholder="Choose districts" max={50} />

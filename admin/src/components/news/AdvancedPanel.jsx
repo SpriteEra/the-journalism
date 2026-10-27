@@ -29,8 +29,8 @@ function SerpPreview({ title, description, url }) {
   return (
     <div className="rounded-sm sm:rounded-xl border border-line bg-surface-2/50 p-2 sm:p-3.5">
       <p className="truncate text-xs text-fg-subtle">{url}</p>
-      <p className="hindi-font mt-0.5 line-clamp-1 text-lg leading-snug text-info">{title || "Page title appears here"}</p>
-      <p className="hindi-font mt-0.5 line-clamp-2 text-sm text-fg-muted">{description || "The description shown under the title in search results."}</p>
+      <p className="hindi-font mt-0.5 line-clamp-1 text-lg leading-snug text-info py-0.5">{title || "Page title appears here"}</p>
+      <p className="hindi-font line-clamp-2 text-sm text-fg-muted">{description || "The description shown under the title in search results."}</p>
     </div>
   );
 }
@@ -122,7 +122,7 @@ export default function AdvancedPanel({ blog, update, title, description, canFea
         >
           <KeywordInput value={seo.focusKeyword} onChange={(v) => setSeo({ focusKeyword: v })} />
         </Field>
-        <SerpPreview title={mTitle || title} description={mDesc || description} url="yoursite.com › news › …" />
+        <SerpPreview title={mTitle || title} description={mDesc || description} url="thejournalism.news › news › …" />
       </Section>
 
       <Section icon={Link2} title="Related stories" description="Optional · link up to 5 other stories under this one" open={open.related} onToggle={() => toggle("related")}

@@ -7,6 +7,7 @@ const ArticleCard = ({ item, divider = true, priority = false, className = "" })
     if (!item) return null;
     const { title, description, image, href = "#", author } = item;
 
+
     return (
         <article
             className={`w-full py-2.5 max-lg:pb-2 sm:py-3 first:pt-0 ${divider ? "border-b border-black/10" : ""} ${className}`}

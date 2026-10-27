@@ -281,9 +281,9 @@ const PublishForm = () => {
                   })}
                 />
               </Field>
-              <Field label={t("Reporter credit")} hint="Optional" info="The reporter / agency name printed as the byline, for example “Ravi Kumar” or “PTI”. Leave empty to show the author's own name.">
+              {/* <Field label={t("Reporter credit")} hint="Optional" info="The reporter / agency name printed as the byline, for example “Ravi Kumar” or “PTI”. Leave empty to show the author's own name.">
                 <Input value={ref_reporter || ""} onChange={(e) => update({ ref_reporter: e.target.value })} placeholder="Name shown as the byline" className="hindi-font" />
-              </Field>
+              </Field> */}
             </div>
           </Card>
 
@@ -342,7 +342,7 @@ const PublishForm = () => {
                 <Switch checked={Boolean(is_literature)} onChange={(v) => update({ is_literature: v })} />
                 <span className="text-sm"><b className="text-fg">Literature</b><span className="block text-fg-subtle">Shown in the literature section instead of the news feed.</span></span>
               </label> */}
-              {!is_literature && <Field label="Location" hint="Village / town as written on the story" info="The exact place the news happened, for example “chandauli”. Used for local search and the place line of the story."><Input value={location || ""} onChange={(e) => update({ location: e.target.value })} placeholder="e.g. chandauli" /></Field>}
+              {/* {!is_literature && <Field label="Location" hint="Village / town as written on the story" info="The exact place the news happened, for example “chandauli”. Used for local search and the place line of the story."><Input value={location || ""} onChange={(e) => update({ location: e.target.value })} placeholder="e.g. chandauli" /></Field>} */}
             </div>
           </Card>
 

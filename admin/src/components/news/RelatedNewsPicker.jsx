@@ -4,7 +4,7 @@ import { useNewsLinkSearch } from "../../hooks/news";
 import { handleImageError } from "../../utils/imageError";
 import { fmtDate } from "../../lib/api";
 import { cn } from "../../lib/cn";
-import { Badge, Skeleton } from "../ui";
+import { Skeleton } from "../ui";
 
 export const RELATED_MAX = 5;
 
@@ -13,10 +13,14 @@ export default function RelatedNewsPicker({ value = [], onChange, selfId }) {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   useEffect(() => { const t = setTimeout(() => setDebounced(q), 300); return () => clearTimeout(t); }, [q]);
-  const { data = [], isFetching } = useNewsLinkSearch(debounced, selfId);
+
+  const term = debounced.trim().length >= 2 ? debounced.trim() : ""; // 0–1 chars => latest stories
+  const isSearching = term !== "";
+  const { data = [], isFetching } = useNewsLinkSearch(term, selfId);
   const full = value.length >= RELATED_MAX;
   const chosen = new Set(value.map((x) => x.news_id));
-  const results = data.filter((n) => !chosen.has(n.news_id));
+  const filtered = data.filter((n) => !chosen.has(n.news_id));
+  const results = isSearching ? filtered : filtered.slice(0, RELATED_MAX);
   const add = (n) => { if (!full) onChange([...value, { news_id: n.news_id, title: n.title, banner: n.banner }]); };
 
   return (
@@ -24,22 +28,27 @@ export default function RelatedNewsPicker({ value = [], onChange, selfId }) {
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
         <input value={q} onChange={(e) => setQ(e.target.value)} disabled={full} placeholder={full ? `You have added ${RELATED_MAX} stories` : "Search a published story by title or keyword"}
-          className="hindi-font h-11 w-full rounded-control border border-line-strong bg-surface pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-fg-faint focus:border-fg disabled:bg-surface-2" />
+          className="hindi-font py-1.5 pt-3 w-full rounded-control border border-line-strong bg-surface pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-fg-faint focus:border-fg disabled:bg-surface-2" />
       </div>
 
-      {debounced.trim().length >= 2 && !full && (
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="Search results">
-          {isFetching && !data.length ? [0, 1].map((i) => <li key={i} className="p-3"><Skeleton className="h-10 w-full" /></li>)
-            : results.length ? results.map((n) => (
-              <li key={n.news_id}>
-                <button type="button" onClick={() => add(n)} className="flex w-full items-center gap-3 p-2.5 text-left transition-colors hover:bg-surface-2">
-                  <img src={`${n.banner}?q=60&w=120`} alt="" onError={handleImageError} className="h-10 w-16 shrink-0 rounded-md bg-surface-3 object-cover" />
-                  <span className="min-w-0 flex-1"><span className="hindi-font line-clamp-1 text-sm font-medium text-fg">{n.title}</span><span className="text-xs text-fg-subtle">{fmtDate(n.post_time)}</span></span>
-                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-fg text-canvas"><Plus className="size-4" /></span>
-                </button>
-              </li>
-            )) : <li className="p-4 text-center text-sm text-fg-subtle">No published story found</li>}
-        </ul>
+      {!full && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-fg-subtle">
+            {isSearching ? "Search results" : "Latest stories"}
+          </p>
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label={isSearching ? "Search results" : "Latest stories"}>
+            {isFetching && !data.length ? [0, 1].map((i) => <li key={i} className="p-3"><Skeleton className="h-10 w-full" /></li>)
+              : results.length ? results.map((n) => (
+                <li key={n.news_id}>
+                  <button type="button" onClick={() => add(n)} className="flex w-full items-center gap-3 p-2.5 text-left transition-colors hover:bg-surface-2">
+                    <img src={`${n.banner}?q=60&w=120`} alt="" onError={handleImageError} className="h-10 w-16 shrink-0 rounded-md bg-surface-3 object-cover" />
+                    <span className="min-w-0 flex-1"><span className="hindi-font line-clamp-1 text-sm font-medium text-fg">{n.title}</span><span className="text-xs text-fg-subtle">{fmtDate(n.post_time)}</span></span>
+                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-fg text-canvas"><Plus className="size-4" /></span>
+                  </button>
+                </li>
+              )) : <li className="p-4 text-center text-sm text-fg-subtle">{isSearching ? "No published story found" : "No published stories yet"}</li>}
+          </ul>
+        </div>
       )}
 
       {value.length > 0 && (

@@ -3,18 +3,6 @@ import { Play } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
-/**
- * Horizontal row of vertical (9:16) short-video thumbnails.
- *
- * Props
- *  - title / titleHref   section heading
- *  - items       array of { id, title?, image, href }
- *                (title is only used for alt text / aria-label)
- *  - className   extra classes for the <section>
- *
- * Visible cards: 2.5 (mobile) -> 4 (sm) -> 5 (md) -> 6 (lg), the rest scrolls.
- */
-
 const ShortVideoCard = ({ item }) => {
     const { title = "", image, href = "#" } = item;
 
@@ -28,6 +16,7 @@ const ShortVideoCard = ({ item }) => {
                 src={image || "/banner.png"}
                 alt={title}
                 fill
+                unoptimized={process.env.NODE_ENV === 'development'}
                 sizes="(max-width: 640px) 40vw, (max-width: 1024px) 20vw, 170px"
                 className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />

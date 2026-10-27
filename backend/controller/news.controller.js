@@ -28,9 +28,25 @@ import { keywordClauses, parseKeywords, sameKeywords } from "../utils/newsKeywor
 import { currentFeatured, parseFeatured, prepareFeature, unfeatureOthers } from "../utils/featured.js";
 import { parseRelatedIds, resolveRelated } from "../utils/relatedNews.js";
 import { makeNewsSlug, needsRedirect, newsPath, newsUrl, parsePrimaryInput, pickPrimary } from "../utils/newsRoute.js";
+import HomeSection from "../model/homesection.model.js";
+import { resolveFilter } from "./homesection.controller.js";
+import { attachPrimaryName } from "../utils/primaryRoutes.js";
 
 const PUBLIC_Q = { draft: false, isPublished: true, isDeleted: false };
-const CARD_FIELDS = 'news_id slug primaryRoute.slug title location post_time banner -_id';    // slug + primaryRoute.slug = enough to build /{section}/news/{slug}
+const CARD_FIELDS = 'news_id slug primaryRoute.slug title description location post_time banner isVideo -_id';
+
+/** One story -> the card shape the website uses */
+const toCard = (n) => ({
+    id: n.news_id,
+    title: n.title,
+    description: n.description || '',
+    image: n.banner || '',
+    href: newsPath(n),                 // /{section}/news/{slug}
+    isVideo: Boolean(n.isVideo),
+    location: n.location || '',
+    publishedAt: n.post_time,
+});
+const toCards = (rows) => rows.map(toCard);
 const clampInt = (v, def, min, max) => Math.min(Math.max(parseInt(v) || def, min), max);
 const toBool = (v) => v === true || v === 'true';
 const sameIds = (a = [], b = []) => JSON.stringify([...a].map(String).sort()) === JSON.stringify([...b].map(String).sort());
@@ -49,7 +65,8 @@ const contentBlocks = (content) => (Array.isArray(content) ? content[0]?.blocks 
 const queryList = (q, key) => pick(q, key, `${key}[]`);
 
 /** Card lists for the home page etc. share the same "latest published" shape. */
-const latestFor = (filter, limit) => News.find({ ...PUBLIC_Q, ...filter }).sort({ post_time: -1 }).limit(limit).select(CARD_FIELDS).lean();
+const latestFor = async (filter, limit) =>
+    toCards(await News.find({ ...PUBLIC_Q, ...filter }).sort({ post_time: -1 }).limit(limit).select(CARD_FIELDS).lean());
 
 /** Populates the four taxonomy arrays with just what a UI needs to show chips. */
 const TAXONOMY_POPULATE = [
@@ -82,13 +99,38 @@ export function getCurrentDate() {
  * If none is flagged yet, the first 15 active categories are used, so the page is never empty.
  * Each section carries the latest 8 published news of that category (sub-category news always also carries its parent category).
  */
+
+const HOME_ITEMS = 5;
 export const getHomeNews = tryCatch(async (req, res) => {
     const data = await cached('home:sections', 60, async () => {
+        const configured = await HomeSection.find({ isActive: true }).sort({ order: 1 }).lean();
+
+        // 1) admin-arranged sections (drag order from the "Home page sections" screen)
+        if (configured.length) {
+            const rows = await Promise.all(configured.map(async (s) => {
+                const target = await resolveFilter(s);            // { name, slug, filter } or null if category/state/district is gone or inactive
+                if (!target) return null;
+                const news = await latestFor(target.filter, HOME_ITEMS);
+                if (!news.length) return null;
+                return {
+                    title: target.slug || s.kind,                 // same field the frontend already reads
+                    name: s.title || target.name,
+                    slug: target.slug,
+                    id: s.ref,
+                    kind: s.kind,
+                    data: news,
+                };
+            }));
+            return rows.filter(Boolean);                          // Promise.all keeps the saved order
+        }
+
+        // 2) nothing configured yet: old behaviour
         let cats = await Category.find({ isDeleted: false, isActive: true, parent: null, showOnHome: true }).sort({ order: 1, name: 1 }).select('name slug').lean();
         if (!cats.length) cats = await Category.find({ isDeleted: false, isActive: true, parent: null }).sort({ order: 1, name: 1 }).limit(15).select('name slug').lean();
-        const rows = await Promise.all(cats.map(async (c) => ({ c, data: await latestFor({ category: c._id }, 8) })));
-        return rows.filter((r) => r.data.length).map(({ c, data: news }) => ({ title: c.slug, name: c.name, slug: c.slug, id: c._id, data: news }));
+        const rows = await Promise.all(cats.map(async (c) => ({ c, data: await latestFor({ category: c._id }, HOME_ITEMS) })));
+        return rows.filter((r) => r.data.length).map(({ c, data: news }) => ({ title: c.slug, name: c.name, slug: c.slug, id: c._id, kind: 'category', data: news }));
     }, { stale: 120 });
+
     setPublicCache(res, 60);
     res.status(200).json(data);
 });
@@ -125,10 +167,12 @@ export const getNewses = tryCatch(async (req, res) => {
     const query = { ...PUBLIC_Q, ...filter };
     if (body.location) query.location = String(body.location).trim().toLowerCase();
 
-    const [news, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
         News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
         body.iscount ? News.countDocuments(query) : Promise.resolve(undefined),
     ]);
+    const news = toCards(rows);
+    console.log(news)
     return res.status(200).json(body.iscount ? { news, total } : news);
 });
 
@@ -176,19 +220,31 @@ export const getLatestNews = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, news: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
 });
 
-const FEATURED_SELECT = 'news_id slug primaryRoute.slug title description banner location post_time tags featured design isVideo -_id';
+const FEATURED_SELECT = 'news_id slug primaryRoute.kind primaryRoute.ref primaryRoute.slug title description banner post_time featured isVideo author -_id ';
 
 /** GET /api/v1/featured — the ONE story for the top of the site: the featured story while its time lasts, otherwise the latest story. */
 export const getFeaturedPublic = tryCatch(async (req, res) => {
     const data = await cached('home:featured', 30, async () => {
         const now = new Date();
+        const tagPopulate = { path: 'tags', select: 'title slug -_id' };
+
         let doc = await News.findOne({ ...PUBLIC_Q, 'featured.isFeatured': true, 'featured.until': { $gt: now } })
-            .sort({ 'featured.startedAt': -1 }).select(FEATURED_SELECT).populate({ path: 'tags', select: 'title slug -_id' }).lean();
+            .sort({ 'featured.startedAt': -1 })
+            .select(FEATURED_SELECT)
+            .populate('author', 'fullName profile profileUrl designation')
+            .lean();
+
         let isFallback = false;
         if (!doc) {
             isFallback = true;
-            doc = await News.findOne(PUBLIC_Q).sort({ post_time: -1, _id: -1 }).select(FEATURED_SELECT).populate({ path: 'tags', select: 'title slug -_id' }).lean();
+            doc = await News.findOne(PUBLIC_Q)
+                .sort({ post_time: -1, _id: -1 })
+                .select(FEATURED_SELECT)
+                .populate(tagPopulate)
+                .populate('author', 'fullName profile profileUrl designation')
+                .lean();
         }
+        await attachPrimaryName(doc);
         return { news: doc || null, isFallback, until: isFallback ? null : doc.featured.until };
     });
     setPublicCache(res, 30);
@@ -213,8 +269,9 @@ export const getSingleNews = tryCatch(async (req, res, next) => {
     // the param is the story's slug (new URLs) or its news_id (old URLs)
     const key = String(req.params.news_id || '').slice(0, 200);
     const news = await News.findOne({ $or: [{ slug: key }, { news_id: key }] })
-        .select('news_id slug primaryRoute title description content tags banner location post_time contentUpdatedAt createdAt updatedAt imageRef isVideo isPublished isDeleted draft video ref_reporter seo relatedNews category subCategory state district -_id')
+        .select('news_id slug primaryRoute title description content tags banner location post_time contentUpdatedAt createdAt updatedAt imageRef isVideo isPublished isDeleted draft video ref_reporter seo relatedNews category subCategory state district author -_id')
         .populate(TAXONOMY_POPULATE)
+        .populate('author', 'fullName about designation profile profileUrl')
         .populate({ path: 'relatedNews', match: { draft: false, isPublished: true, isDeleted: false }, select: 'news_id slug primaryRoute.slug title banner -_id' })
         .lean();
 
@@ -317,16 +374,27 @@ export const findStateNews = tryCatch(async (req, res) => {
 });
 
 /** GET /news/search-news?search=&page=&limit=  – title, location and the NAMES of tags / categories / states / districts */
+// ड़ / ढ़ / क़ ... can be stored as one character or as letter + nukta; accept both
+const NUKTA = { '\u0915\u093C': '\u0958', '\u0916\u093C': '\u0959', '\u0917\u093C': '\u095A', '\u091C\u093C': '\u095B', '\u0921\u093C': '\u095C', '\u0922\u093C': '\u095D', '\u092B\u093C': '\u095E', '\u092F\u093C': '\u095F' };
+const tolerantPattern = (s) => {
+    let out = escapeRegex(s.normalize('NFC'));            // NFC splits the one-character form into letter + nukta
+    for (const [split, joined] of Object.entries(NUKTA)) out = out.split(split).join(`(?:${split}|${joined})`);
+    return out;
+};
+
 export const searchNews = tryCatch(async (req, res) => {
-    const search = String(req.query.search || '').trim().slice(0, 100);
+    const search = String(req.query.search || '').trim().slice(0, 150);
     const page = clampInt(req.query.page, 1, 1, 100000);
     const limit = clampInt(req.query.limit, 20, 1, 50);
 
     const query = { ...PUBLIC_Q };
     if (search) {
-        const rx = new RegExp(escapeRegex(search), 'i');          // user input is escaped: no regex injection / ReDoS
-        const tax = await findTaxonomyByName(rx);
-        const or = [{ title: rx }, { location: rx }, ...keywordClauses(rx)];
+        const tokens = search.split(/\s+/).filter(Boolean).slice(0, 8);           // every word must appear, in any order
+        const tokenRx = tokens.map((t) => new RegExp(tolerantPattern(t), 'i'));
+        const phraseRx = new RegExp(tolerantPattern(search), 'i');
+
+        const tax = await findTaxonomyByName(phraseRx);
+        const or = [{ $and: tokenRx.map((rx) => ({ $or: [{ title: rx }, { location: rx }, ...keywordClauses(rx)] })) }];
         if (tax.tags.length) or.push({ tags: { $in: tax.tags } });
         if (tax.category.length) or.push({ category: { $in: tax.category } });
         if (tax.subCategory.length) or.push({ subCategory: { $in: tax.subCategory } });
@@ -334,11 +402,11 @@ export const searchNews = tryCatch(async (req, res) => {
         if (tax.district.length) or.push({ district: { $in: tax.district } });
         query.$or = or;
     }
-    const [news, total] = await Promise.all([
-        News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select('news_id title post_time banner -_id').lean(),
+    const [rows, total] = await Promise.all([
+        News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
         News.countDocuments(query),
     ]);
-    return res.status(200).json({ news, total });
+    return res.status(200).json({ news: toCards(rows), total });
 });
 
 export const getNewsInfiniteScroll = tryCatch(async (req, res, next) => {
@@ -821,11 +889,20 @@ export const getNewsAuthors = tryCatch(async (req, res) => {
  */
 export const searchNewsForLinking = tryCatch(async (req, res) => {
     const q = String(req.query.q || '').trim().slice(0, 100);
-    if (q.length < 2) return res.status(200).json({ success: true, news: [] });
-    const rx = new RegExp(escapeRegex(q), 'i');
-    const query = { draft: false, isPublished: true, isDeleted: false, $or: [{ title: rx }, ...keywordClauses(rx)] };
+
+    const query = { draft: false, isPublished: true, isDeleted: false };
+    if (q.length >= 2) {
+        const rx = new RegExp(escapeRegex(q), 'i');
+        query.$or = [{ title: rx }, ...keywordClauses(rx)];
+    }
     if (req.query.exclude) query.news_id = { $ne: String(req.query.exclude).slice(0, 64) };
-    const news = await News.find(query).sort({ post_time: -1 }).limit(10).select('news_id title banner post_time -_id').lean();
+
+    const news = await News.find(query)
+        .sort({ post_time: -1 })
+        .limit(10) // 10 so there are still 5 left after hiding already-linked ones
+        .select('news_id title banner post_time -_id')
+        .lean();
+
     res.set('Cache-Control', 'private, max-age=20');
     return res.status(200).json({ success: true, news });
 });

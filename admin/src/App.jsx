@@ -67,6 +67,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const Roles = lazy(() => import("./pages/roles/Roles"));
 const Tags = lazy(() => import("./pages/tags/Tags"));
 const Categories = lazy(() => import("./pages/taxonomy/Categories"));
+const HomeSections = lazy(() => import("./pages/homesection/HomeSection"));   // 👈 new
 const ShortVideos = lazy(() => import("./pages/shortVideos/ShortVideos"));
 
 const App = () => {
@@ -200,6 +201,7 @@ const App = () => {
 
             {/* content setup */}
             <Route path="categories" element={<ProtectedRoute component={Categories} permission="taxonomy.view" />} />
+            <Route path="home-sections" element={<ProtectedRoute component={HomeSections} permission="taxonomy.view" />} />
             <Route path="tags" element={<ProtectedRoute component={Tags} permission="taxonomy.view" />} />
             <Route path="ora-ai" element={<ProtectedRoute component={TrendsDashboard} permission="tools.ai" />} />
 

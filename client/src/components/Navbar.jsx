@@ -83,7 +83,8 @@ const formatIST = (d) => {
 /* Height of the top bar (date + socials). Must match `h-8` below (32px). */
 const TOP_BAR_H = 32;
 
-const Navbar = () => {
+const Navbar = ({ items = [], socials = [], popular = [] }) => {
+    const navItems = [{ label: "होम", href: "/" }, ...items];
     const pathname = usePathname();
     const [now, setNow] = useState("");
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -241,7 +242,7 @@ const Navbar = () => {
                             {/* overflow-x-auto on small screens (scrollable row),
                   overflow-visible on lg+ so dropdowns aren't clipped */}
                             <ul className="no-scrollbar flex h-full items-stretch gap-7 overflow-x-auto whitespace-nowrap lg:gap-14 lg:overflow-visible">
-                                {NAV_ITEMS.map((item) => {
+                                {navItems.map((item) => {
                                     const hasDrop = !!item.children;
                                     const active = isActive(item);
                                     const open = openMenu === item.label;
@@ -349,7 +350,7 @@ const Navbar = () => {
                         </div>
 
                         <ul className="flex-1 overflow-y-auto px-4 py-2">
-                            {NAV_ITEMS.map((item) => {
+                            {navItems.map((item) => {
                                 const hasDrop = !!item.children;
                                 const expanded = mobileSub === item.label;
                                 return (

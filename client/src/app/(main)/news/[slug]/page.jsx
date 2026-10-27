@@ -51,6 +51,7 @@ const page = () => {
                     breadcrumb={article.breadcrumb}
                     title={article.title}
                 />
+
                 <div className='lg:border border-black/5 lg:p-3'>
                     <article>
                         <h1 className="font-khand text-[32px] tracking-[0.01em] font-bold leading-10.5 lg:leading-12.5 lg:text-[45px]">

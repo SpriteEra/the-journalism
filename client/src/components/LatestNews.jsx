@@ -1,22 +1,18 @@
-import Image from "next/image";
+import Image from "@/components/common/Img";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { getLatest } from "@/lib/data";
 
-/* Replace with real data (props or API) */
-const DEFAULT_ITEMS = Array.from({ length: 6 }, (_, i) => ({
-    id: i + 1,
-    title: "यूपी में बड़ा प्रशासनिक फेरबदल, कई एडीएम समेत 20 अधिकारियों के तबादले",
-    image: "/demo/news1.png",
-    href: `/live/${i + 1}`,
-}));
-
-const LatestNews = ({
-    title = "लाइव न्यूज़",
-    titleHref = "/live",
-    moreHref = "/live",
-    items = DEFAULT_ITEMS,
+const LatestNews = async ({
+    title = "लेटेस्ट न्यूज़",
+    titleHref = "/latest",
+    items,                // optional: pass your own list to skip the fetch
+    limit = 6,
     className = "",
 }) => {
+    const list = items ?? (await getLatest({ limit })).items;
+    if (!list.length) return null;
+
     return (
         <section
             aria-label={title}
@@ -24,13 +20,13 @@ const LatestNews = ({
         >
             {/* Header */}
             <Link href={titleHref} className="group mb-2 inline-flex items-center gap-1 text-xl font-semibold text-black">
-                लेटेस्ट न्यूज़
+                {title}
                 <ChevronRight className="size-5" />
             </Link>
 
             {/* List */}
             <ul className="divide-y divide-black/5">
-                {items.map((item) => (
+                {list.map((item) => (
                     <li key={item.id} className="first:pt-0 py-2.5 lg:py-3 first:pb-3 last:pb-2">
                         <Link href={item.href} className="group flex items-center gap-3">
                             <div className="relative h-[68px] lg:h-[58px] w-22 lg:w-20 shrink-0 overflow-hidden rounded-xs bg-gray-200">
@@ -49,7 +45,6 @@ const LatestNews = ({
                     </li>
                 ))}
             </ul>
-
         </section>
     );
 };

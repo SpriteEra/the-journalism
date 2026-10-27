@@ -179,7 +179,7 @@ export const useNewsLinkSearch = (q, exclude, enabled = true) =>
   useQuery({
     queryKey: ['news-link-search', q, exclude],
     queryFn: async () => (await httpClient.get('/news-link-search', { params: { q, exclude } })).data.news,
-    enabled: enabled && q.trim().length >= 2,
+    enabled,
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
