@@ -32,7 +32,6 @@ export const resolveRelated = async (ids, selfNewsId) => {
     const oids = ids.filter((x) => mongoose.isValidObjectId(x));
     const slugs = ids.filter((x) => !mongoose.isValidObjectId(x));
 
-    console.log(slugs)
     const docs = await News.find({
         draft: false, isPublished: true, isDeleted: false,
         $or: [{ news_id: { $in: slugs } }, { _id: { $in: oids } }],

@@ -172,7 +172,6 @@ export const getNewses = tryCatch(async (req, res) => {
         body.iscount ? News.countDocuments(query) : Promise.resolve(undefined),
     ]);
     const news = toCards(rows);
-    console.log(news)
     return res.status(200).json(body.iscount ? { news, total } : news);
 });
 

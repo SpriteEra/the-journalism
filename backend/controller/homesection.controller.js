@@ -44,7 +44,6 @@ const readLimit = (v) => {
 
 // ═══════════════════════════ ADMIN ═══════════════════════════
 export const getHomeSectionsAdmin = tryCatch(async (req, res) => {
-    console.log("hello")
     const sections = await HomeSection.find().sort({ order: 1, createdAt: 1 }).lean();
     res.status(200).json({ success: true, sections, max: HOME_SECTION_MAX });
 });

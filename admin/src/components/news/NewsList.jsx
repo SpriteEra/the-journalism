@@ -65,7 +65,6 @@ export default function NewsList({ title, description, draft = false, needApprov
     const id = toast.loading("Loading preview…");
     try {
       const full = await fetchSingleNews(n.news_id);
-      console.log(full)
       const nm = (list, pick) => (list || []).map(pick).filter(Boolean);
       const a = full.author || {};
 

@@ -115,7 +115,6 @@ const page = async () => {
     ]);
     const hero = featured || latest.items[0] || null;
     const blocks = buildBlocks(Array.isArray(sections) ? sections : []);
-    console.log(featured)
     const renderBlock = (b) => {
         if (b.layout === 'four') return <FourCardLayoutSection key={b.key} items={b.items} title={b.title} titleHref={b.titleHref} />;
         if (b.layout === 'five') return <FiveCardLayoutSection key={b.key} items={b.items} title={b.title} titleHref={b.titleHref} perColumn={2} bgClassName={b.bg} />;

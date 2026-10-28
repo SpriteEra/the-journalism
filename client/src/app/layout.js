@@ -6,6 +6,7 @@ import { getMenu, getPopularTopics } from "@/lib/data";
 import { abs, siteDescription, siteName, siteUrl, socials } from "@/lib/site";
 import { categoryPath, subCategoryPath } from "@/lib/adapters";
 import UnderConstruction from "@/components/Underconstruction";
+import Footer from "@/components/Footer";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 const mukta = Mukta({ variable: "--font-mukta", subsets: ["latin", "devanagari"], weight: ["200", "300", "400", "500", "600", "700", "800"], display: "swap" });
@@ -50,6 +51,7 @@ export default async function RootLayout({ children }) {
         <UnderConstruction logo="/logo.png" name={siteName()} socials={links} />
         <Navbar items={items} socials={links} popular={popular.map((t) => t.label)} />
         {children}
+        <Footer />
       </body>
     </html>
   );

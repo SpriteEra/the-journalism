@@ -17,7 +17,7 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "img.thejournalism.com",
+        hostname: "img.thejournalism.news",
         pathname: "/image/**",
       },
     ],
