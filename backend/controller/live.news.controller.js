@@ -1,6 +1,4 @@
-import mongoose from 'mongoose';
 import LiveNews from '../model/live.news.model.js';
-import Category from '../model/category.model.js';
 import UpdateStack from '../model/updatedstack.model.js';
 import tryCatch from '../utils/asyncFunction.js';
 import ErrorHandler from '../utils/errorHandler.js';
@@ -16,9 +14,9 @@ import { P } from '../config/permissions.js';
 const isAdmin = (u, req) => req.can(P.LIVE_MANAGE_ANY);
 // may go live directly; everyone else can only keep drafts
 const canPublish = (u, req) => req.can(P.LIVE_PUBLISH);
-const LIST_FIELDS = 'title slug image caption status startTime endTime post_time contentUpdatedAt category state district updates.time';
+const LIST_FIELDS = 'title slug image caption status startTime endTime post_time contentUpdatedAt updates.time';
 
-const lowerList = (v) => parseJSON(v, []).map((s) => String(s).trim().toLowerCase()).filter(Boolean);
+const cleanTags = (v) => [...new Set(parseJSON(v, []).map((s) => String(s?.title ?? s).trim()).filter(Boolean))].slice(0, 30);
 const dateOrUndef = (v) => { if (!v) return undefined; const d = new Date(v); return Number.isNaN(d.getTime()) ? undefined : d; };
 
 const logStack = async (liveId, userId, description) => {
@@ -45,7 +43,7 @@ const applyStatus = (live, status) => {
     live.status = status;
     if (status === 'live') {
         if (!live.post_time) live.post_time = new Date();
-        if (!live.startTime) live.startTime = new Date();
+        if (!live.startTime || live.startTime > new Date()) live.startTime = new Date(); // "go live now" on a scheduled story starts it now
         live.endTime = undefined;
     }
     if (status === 'ended' && !live.endTime) live.endTime = new Date();
@@ -70,17 +68,10 @@ export const createLiveNews = tryCatch(async (req, res) => {
     let image = b.image || '';
     if (req.files?.image) image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
 
-    let category;
-    if (b.category) {
-        if (!mongoose.Types.ObjectId.isValid(b.category) || !(await Category.exists({ _id: b.category, isDeleted: false }))) throw new ErrorHandler(400, 'Invalid category');
-        category = b.category;
-    }
-
     const live = new LiveNews({
         title: b.title.trim(), slug, image, imageAlt: b.imageAlt || '', caption: b.caption || '',
-        content: parseJSON(b.content, []), category,
-        state: lowerList(b.state), district: lowerList(b.district),
-        tags: parseJSON(b.tags, []), startTime, author: req.user._id,
+        content: parseJSON(b.content, []),
+        tags: cleanTags(b.tags), startTime, author: req.user._id,
         seo: sanitizeSeo(b.seo) || {},
     });
     applyStatus(live, status);
@@ -100,16 +91,9 @@ export const updateLiveNews = tryCatch(async (req, res) => {
     if (b.caption !== undefined) { live.caption = b.caption; changes.push('caption'); }
     if (b.imageAlt !== undefined) live.imageAlt = b.imageAlt;
     if (b.content !== undefined) { live.content = parseJSON(b.content, live.content); changes.push('content'); }
-    if (b.tags !== undefined) live.tags = parseJSON(b.tags, live.tags);
-    if (b.state !== undefined) live.state = lowerList(b.state);
-    if (b.district !== undefined) live.district = lowerList(b.district);
+    if (b.tags !== undefined) live.tags = cleanTags(b.tags);
     if (b.startTime !== undefined) { live.startTime = dateOrUndef(b.startTime); changes.push('startTime'); }
     if (b.endTime !== undefined) { live.endTime = dateOrUndef(b.endTime); changes.push('endTime'); }
-    if (b.category !== undefined) {
-        if (!b.category || b.category === 'null') live.category = undefined;
-        else if (mongoose.Types.ObjectId.isValid(b.category) && await Category.exists({ _id: b.category, isDeleted: false })) live.category = b.category;
-        else throw new ErrorHandler(400, 'Invalid category');
-    }
     const seo = sanitizeSeo(b.seo);
     if (seo) { live.seo = seo; changes.push('seo'); }
     if (req.files?.image) {
@@ -125,6 +109,10 @@ export const updateLiveNews = tryCatch(async (req, res) => {
     if (b.status && b.status !== live.status) {
         if (!['draft', 'scheduled', 'live', 'ended'].includes(b.status)) throw new ErrorHandler(400, 'Invalid status');
         if (b.status !== 'draft' && !canPublish(req.user, req)) throw new ErrorHandler(403, 'You are not allowed to publish live news');
+        if (['scheduled', 'live'].includes(b.status) && !live.image) throw new ErrorHandler(400, 'Cover image is required');
+        if (b.status === 'scheduled' && (!live.startTime || live.startTime <= new Date())) throw new ErrorHandler(400, 'Scheduled live news needs a future startTime');
+        if (b.status === 'ended' && live.status === 'draft') throw new ErrorHandler(400, 'A draft cannot be ended. Go live first or delete it');
+        if (b.status === 'draft' && live.post_time) throw new ErrorHandler(400, 'Live news that was already public cannot go back to draft');
         applyStatus(live, b.status);
         changes.push(`status -> ${b.status}`);
     }
@@ -141,6 +129,7 @@ export const updateLiveNews = tryCatch(async (req, res) => {
 export const endLiveNews = tryCatch(async (req, res) => {
     const live = await findOwned(req);
     if (live.status === 'ended') throw new ErrorHandler(400, 'Already ended');
+    if (live.status !== 'live') throw new ErrorHandler(400, 'Only live coverage can be ended');
     applyStatus(live, 'ended');
     live.contentUpdatedAt = new Date();
     live.updatedBy = req.user._id;
@@ -168,7 +157,7 @@ export const getLiveNewsAdmin = tryCatch(async (req, res) => {
     if (req.query.search) q.title = { $regex: String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
     const [items, total] = await Promise.all([
         LiveNews.find(q).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit)
-            .select(`${LIST_FIELDS} author activity`).populate('author', 'username').lean(),
+            .select(`${LIST_FIELDS} author activity createdAt`).populate('author', 'username').lean(),
         LiveNews.countDocuments(q),
     ]);
     res.status(200).json({ success: true, items, total, page, limit });
@@ -250,18 +239,20 @@ export const getLiveNewsList = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, items, hasMore: rows.length > limit, page, limit });
 });
 
+/** Fields of the main story shown on the public page (the timeline `updates` are deliberately NOT part of it). */
+const MAIN_FIELDS = 'title slug image imageAlt caption content tags status startTime endTime post_time contentUpdatedAt';
+const PUBLIC_STATUS = ['live', 'ended'];
+
+/** One live story, MAIN part only: no timeline updates. */
 export const getLiveNewsBySlug = tryCatch(async (req, res) => {
-    const live = await LiveNews.findOne({ slug: req.params.slug.toLowerCase(), isDeleted: false, status: { $in: ['live', 'ended'] } })
-        .populate('category', 'name slug').lean();
+    const live = await LiveNews.findOne({ slug: req.params.slug.toLowerCase(), isDeleted: false, status: { $in: PUBLIC_STATUS } })
+        .select(`${MAIN_FIELDS} seo`).lean();
     if (!live) throw new ErrorHandler(404, 'Live news not found');
 
     LiveNews.updateOne({ _id: live._id }, { $inc: { 'activity.total_reads': 1, 'activity.total_today_count': 1 } }).catch(() => { });
 
-    // newest first, pinned on top, deleted hidden
-    const updates = (live.updates || []).filter((u) => !u.isDeleted)
-        .sort((a, b) => (b.pinned - a.pinned) || (new Date(b.time) - new Date(a.time)));
     const url = buildUrl('live', { slug: live.slug });
-    const description = live.seo?.metaDescription || live.caption || updates[0]?.caption || '';
+    const description = live.seo?.metaDescription || live.caption || '';
     const breadcrumbs = [
         { name: 'Home', url: seoConfig.siteUrl() || '/' },
         { name: 'Live', url: `${seoConfig.siteUrl()}/live` },
@@ -269,15 +260,47 @@ export const getLiveNewsBySlug = tryCatch(async (req, res) => {
     ];
     const meta = resolveSeo({
         seo: live.seo || {}, title: live.title, description, image: live.image, url, ogType: 'article',
-        publishedTime: live.post_time, modifiedTime: live.contentUpdatedAt, section: live.category?.name, tags: live.tags,
+        publishedTime: live.post_time, modifiedTime: live.contentUpdatedAt, tags: live.tags,
     });
+    // updates are not on the page any more, so they are not in the structured data either (it must match what the reader sees)
     const jsonLd = assembleJsonLd(
-        liveBlogLd({ title: live.title, description, image: live.image, url, start: live.startTime, end: live.endTime, updated: live.contentUpdatedAt, published: live.post_time, updates }),
+        liveBlogLd({ title: live.title, description, image: live.image, url, start: live.startTime, end: live.endTime, updated: live.contentUpdatedAt, published: live.post_time, updates: [] }),
         { seo: live.seo || {}, breadcrumbs },
     );
-    const { updates: _omit, seo: _seo, ...rest } = live;
+    const { seo: _seo, ...rest } = live;
     setPublicCache(res, live.status === 'live' ? 5 : 120);
-    res.status(200).json({ success: true, live: { ...rest, isLive: live.status === 'live', updates }, breadcrumbs, seo: { meta, jsonLd } });
+    res.status(200).json({ success: true, live: { ...rest, isLive: live.status === 'live' }, breadcrumbs, seo: { meta, jsonLd } });
+});
+
+/**
+ * The story that comes AFTER :slug, in the same order as the list (live first, newest first, then ended).
+ * The page calls this while the reader scrolls: GET /live/:slug/next?limit=1  ->  { items:[main story], hasMore }
+ * Pass the slug of the LAST story already shown to get the one after it.
+ */
+export const getLiveNewsNext = tryCatch(async (req, res) => {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 1, 1), 5);
+    const cur = await LiveNews.findOne({ slug: req.params.slug.toLowerCase(), isDeleted: false, status: { $in: PUBLIC_STATUS } })
+        .select('status post_time').lean();
+    if (!cur) throw new ErrorHandler(404, 'Live news not found');
+
+    // "older than the current one" within the same status (post_time, then _id as tie-break) ...
+    const older = cur.post_time
+        ? { $or: [{ post_time: { $lt: cur.post_time } }, { post_time: cur.post_time, _id: { $lt: cur._id } }] }
+        : { post_time: null, _id: { $lt: cur._id } };
+    const branches = [{ status: cur.status, ...older }];
+    // ... and when the current one is live, every ended story comes after it
+    if (cur.status === 'live') branches.push({ status: 'ended' });
+
+    const rows = await LiveNews.find({ isDeleted: false, $or: branches })
+        .sort({ status: -1, post_time: -1, _id: -1 }) // same order as getLiveNewsList
+        .limit(limit + 1).select(MAIN_FIELDS).lean();
+
+    const items = rows.slice(0, limit).map((l) => ({ ...l, isLive: l.status === 'live' }));
+    if (items.length) {
+        LiveNews.updateMany({ _id: { $in: items.map((i) => i._id) } }, { $inc: { 'activity.total_reads': 1, 'activity.total_today_count': 1 } }).catch(() => { });
+    }
+    setPublicCache(res, 15);
+    res.status(200).json({ success: true, items, hasMore: rows.length > limit });
 });
 
 /** Scheduled -> live automatically (called by a cron in index.js). */

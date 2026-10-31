@@ -16,7 +16,7 @@ import Image from "next/image";
 
 const AuthorCard = ({ author, label = "लेखक के बारे में", className = "" }) => {
     if (!author || !author.fullName) return null;
-    const { fullName, about, profile, profileUrl } = author;
+    const { fullName, about, profile, username } = author;
 
 
     return (
@@ -38,7 +38,7 @@ const AuthorCard = ({ author, label = "लेखक के बारे मे�
                 <p className="text-xs lg:text-[15px]">{label}</p>
 
 
-                <Link href={profileUrl || '/'} className={`text-2xl font-bold leading-normal text-black lg:text-3xl block transition-colors hover:text-primary`}>
+                <Link href={`/author/${username}`} className={`text-2xl font-bold leading-normal text-black lg:text-3xl block transition-colors hover:text-primary`}>
                     {fullName}
                 </Link>
 

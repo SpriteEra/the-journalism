@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getSection } from "@/lib/data";
-import { categoryPath, subCategoryPath, toMetadata } from "@/lib/adapters";
+import { categoryPath, statePath, subCategoryPath, toMetadata } from "@/lib/adapters";
 import { abs } from "@/lib/site";
 import CategoryList from "@/components/CategoryList";
 
@@ -27,6 +27,7 @@ export default async function page({ params, searchParams }) {
     const page = pageOf(await searchParams);
     const sec = await resolve(category, page);
     if (!sec) notFound();
+    if (sec.kind === "state") permanentRedirect(statePath(category)); // states live at /state/{slug}
 
     const { name, items, hasMore } = sec
 

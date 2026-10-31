@@ -1,0 +1,1 @@
+import{au as s,h as i,aV as l}from"./index-BrBHQvdA.js";const t=(e,a)=>i.get(e,{params:l(a)}).then(n=>n.data),r=e=>s({queryKey:["live-news","list",e],queryFn:()=>t("/live",e),placeholderData:a=>a}),u=e=>s({queryKey:["live-news","item",e],queryFn:()=>t(`/live/${e}`),enabled:!!e,select:a=>a.live,refetchOnMount:"always"});export{u as a,r as u};

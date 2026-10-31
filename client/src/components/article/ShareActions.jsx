@@ -35,10 +35,10 @@ export const FollowOnGoogle = ({
 
 
 
-const ShareActions = ({ title = "", googleSourceHref }) => {
+const ShareActions = ({ title = "", googleSourceHref, url }) => {
     const [copied, setCopied] = useState(false);
 
-    const getUrl = () => (typeof window !== "undefined" ? window.location.href : "");
+    const getUrl = () => url || (typeof window !== "undefined" ? window.location.href : "");
 
     const handleShare = async () => {
         const url = getUrl();

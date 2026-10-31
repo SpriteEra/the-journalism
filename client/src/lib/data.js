@@ -125,6 +125,12 @@ export async function getAuthor(username) {
   return r?.author ? { author: r.author, seo: r.seo || {} } : null;
 }
 
+/** the stories one author published, newest first: { items:[card], hasMore, page } */
+export async function getAuthorNews(username, { page = 1, limit = 12 } = {}) {
+  const r = await safe(apiGet(`/news/authors/${encodeURIComponent(username)}/news`, { params: { page, limit }, revalidate: 30 }), { news: [], hasMore: false });
+  return { items: toCards(r.news), hasMore: Boolean(r.hasMore), page: r.page || page };
+}
+
 // ───────────────────────── videos & shorts ─────────────────────────
 export async function getShorts({ page = 1, limit = 12 } = {}) {
   const r = await safe(apiGet("/short-videos", { params: { kind: "short", page, limit }, revalidate: TTL.list() }), { videos: [], hasMore: false });
@@ -160,6 +166,12 @@ export async function getLiveList({ page = 1, limit = 12, status } = {}) {
 export async function getLive(slug) {
   const r = await apiGetOrNull(`/live/${encodeURIComponent(slug)}`, { revalidate: 5 });
   return r?.live ? { live: r.live, seo: r.seo || {}, breadcrumbs: r.breadcrumbs || [] } : null;
+}
+
+/** the live story AFTER `slug` (same order as the list): { items:[main story, no updates], hasMore } */
+export async function getNextLive(slug, { limit = 1 } = {}) {
+  const r = await safe(apiGet(`/live/${encodeURIComponent(slug)}/next`, { params: { limit }, revalidate: 15 }), { items: [], hasMore: false });
+  return { items: r.items || [], hasMore: Boolean(r.hasMore) };
 }
 
 // ───────────────────────── ads ─────────────────────────

@@ -131,7 +131,7 @@ const page = async () => {
         <div>
             <section className='grid grid-cols-1 lg:grid-cols-8 gap-2 lg:page-container py-5'>
                 <div className='order-3 lg:order-1 lg:col-span-2  lg:px-2'>
-                    <LiveNews />
+                    <LiveNews items={live.items} />
                 </div>
                 <HeroStory story={hero} />
                 <div className='order-2 lg:order-3 lg:col-span-2 max-lg:page-container'>

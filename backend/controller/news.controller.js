@@ -270,7 +270,7 @@ export const getSingleNews = tryCatch(async (req, res, next) => {
     const news = await News.findOne({ $or: [{ slug: key }, { news_id: key }] })
         .select('news_id slug primaryRoute title description content tags banner location post_time contentUpdatedAt createdAt updatedAt imageRef isVideo isPublished isDeleted draft video ref_reporter seo relatedNews category subCategory state district author -_id')
         .populate(TAXONOMY_POPULATE)
-        .populate('author', 'fullName about designation profile profileUrl')
+        .populate('author', 'fullName about designation profile profileUrl username')
         .populate({ path: 'relatedNews', match: { draft: false, isPublished: true, isDeleted: false }, select: 'news_id slug primaryRoute.slug title banner -_id' })
         .lean();
 

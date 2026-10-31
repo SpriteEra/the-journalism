@@ -69,12 +69,15 @@ const Tags = lazy(() => import("./pages/tags/Tags"));
 const Categories = lazy(() => import("./pages/taxonomy/Categories"));
 const HomeSections = lazy(() => import("./pages/homesection/HomeSection"));   // 👈 new
 const ShortVideos = lazy(() => import("./pages/shortVideos/ShortVideos"));
+const LiveNews = lazy(() => import("./pages/live/LiveNews"));
+const LiveNewsForm = lazy(() => import("./pages/live/LiveNewsForm"));
 
 const App = () => {
   const dispatch = useDispatch();
   const [currentToast, setCurrentToast] = useState(null);
   const [appInitialized, setAppInitialized] = useState(false);
   const { newNotifications } = useSocket();
+  const LIVE_MANAGE = ["live.manage.own", "live.manage.any"];
   const VIDEO_PERMS = ["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage"];
   // ✅ Load user data on app initialization
   useEffect(() => {
@@ -174,6 +177,9 @@ const App = () => {
             <Route path="schedule-news" element={<ProtectedRoute component={ScheduledNews} permission="news.schedule" />} />
             <Route path="review-news" element={<ProtectedRoute component={ReviewNews} permission="news.approve" />} />
             <Route path="review-news/edit-news/:news_id" element={<ProtectedRoute component={CreateNews} permission="news.approve" />} />
+            <Route path="live" element={<ProtectedRoute component={LiveNews} permission={["live.create", ...LIVE_MANAGE]} />} />
+            <Route path="live/new" element={<ProtectedRoute component={LiveNewsForm} permission="live.create" />} />
+            <Route path="live/:slug/edit" element={<ProtectedRoute component={LiveNewsForm} permission={LIVE_MANAGE} />} />
             <Route path="breaking-news" element={<ProtectedRoute component={BreakingNews} permission="breaking.manage" />} />
 
             {/* media */}

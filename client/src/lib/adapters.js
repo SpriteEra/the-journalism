@@ -19,6 +19,7 @@ export const categoryPath = (slug) => `/${slug}`;
 export const subCategoryPath = (parentSlug, slug) => `/${parentSlug}/${slug}`;
 export const topicPath = (slug) => `/topic/${slug}`;
 export const authorPath = (username) => `/author/${username}`;
+export const statePath = (slug) => `/state/${slug}`;
 export const districtPath = (slug) => `/district/${slug}`;
 
 /** a story card from any list endpoint */

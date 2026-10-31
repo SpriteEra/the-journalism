@@ -1,4 +1,4 @@
-import { LayoutList } from "lucide-react";
+import { LayoutList, Radio } from "lucide-react";
 import {
   BarChart3, CalendarCheck, CalendarClock, CalendarCog, CalendarDays, FileText, FolderTree, Images, KeyRound, LayoutGrid, Megaphone,
   PlaySquare, Rss, Save, ScrollText, ShieldCheck, Sparkles, Tags, Trash2, Trophy, UserCog, Users, Video,
@@ -17,6 +17,7 @@ export const NAV = [
       { label: "Review queue", to: "/dashboard/review-news", icon: ShieldCheck, perm: ["news.approve"] },
       { label: "Drafts", to: "/dashboard/draft-news", icon: Save, perm: ["news.view.own", "news.view.all"] },
       { label: "Scheduled", to: "/dashboard/schedule-news", icon: CalendarClock, perm: ["news.schedule"] },
+      { label: "Live news", to: "/dashboard/live", icon: Radio, perm: ["live.create", "live.manage.own", "live.manage.any"] },
       // { label: "Breaking news", to: "/dashboard/breaking-news", icon: Rss, perm: ["breaking.manage"] },
     ],
   },

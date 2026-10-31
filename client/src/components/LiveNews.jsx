@@ -17,6 +17,8 @@ const LiveNews = ({
     items = DEFAULT_ITEMS,
     className = "",
 }) => {
+
+    if (!items.length) return null;
     return (
         <section
             aria-label={title}

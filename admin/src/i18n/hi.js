@@ -5,7 +5,7 @@
 export const hi = {
   // ── navigation ──
   "Newsroom": "न्यूज़रूम", "Media": "मीडिया", "Content setup": "सामग्री सेटअप", "Team & insights": "टीम और विश्लेषण",
-  "Overview": "अवलोकन", "News": "समाचार", "Review queue": "समीक्षा सूची", "Drafts": "ड्राफ्ट", "Scheduled": "निर्धारित",
+  "Overview": "अवलोकन", "News": "समाचार", "Review queue": "समीक्षा सूची", "Drafts": "ड्राफ्ट", "Scheduled": "निर्धारित", "Live news": "लाइव समाचार",
   "Breaking news": "ब्रेकिंग न्यूज़", "Shorts & videos": "शॉर्ट्स और वीडियो", "YouTube news": "यूट्यूब समाचार",
   "Photo gallery": "फोटो गैलरी", "Events": "कार्यक्रम", "Event categories": "कार्यक्रम श्रेणियाँ", "Panchang": "पंचांग",
   "Categories": "श्रेणियाँ", "Topics": "विषय", "Tags": "टैग", "Advertising": "विज्ञापन", "Ora AI": "ओरा एआई",

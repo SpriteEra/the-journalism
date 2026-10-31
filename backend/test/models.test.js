@@ -36,3 +36,13 @@ test('all new / changed models compile and default the seo block', async () => {
     // auto-imported yt videos need no manual description/location any more
     assert.equal(new YtNews({ title: 't', news_id: 'y', videoLinkId: 'v', update_stack: id }).validateSync(), undefined);
 });
+
+test('live news follows the slim schema: no category / state / district, updates kept for later', async () => {
+    const Live = await load('../model/live.news.model.js');
+    const id = new (await import('mongoose')).default.Types.ObjectId();
+    for (const k of ['category', 'state', 'district']) assert.equal(Live.schema.path(k), undefined, `${k} must not exist`);
+    for (const k of ['title', 'slug', 'image', 'imageAlt', 'caption', 'content', 'tags', 'status', 'startTime', 'endTime', 'post_time', 'contentUpdatedAt', 'updates', 'seo']) assert.ok(Live.schema.path(k), `${k} missing`);
+    const l = new Live({ title: 'x', slug: 'x', author: id });
+    assert.equal(l.validateSync(), undefined);
+    assert.deepEqual(l.updates.toObject(), []);
+});

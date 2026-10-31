@@ -84,7 +84,19 @@ const formatIST = (d) => {
 const TOP_BAR_H = 32;
 
 const Navbar = ({ items = [], socials = [], popular = [] }) => {
-    const navItems = [{ label: "होम", href: "/" }, ...items];
+    // "राज्य" (/state) goes INSIDE the "देश-विदेश" dropdown, as its last link, not as a menu item of its own.
+    // (If there is no "देश-विदेश" item, it is shown as a plain item second from last so it never disappears.)
+    const STATE_LINK = { label: "राज्य", href: "/state" };
+    let statePlaced = false;
+    const menuItems = items.map((it) => {
+        if (!statePlaced && String(it.label).replace(/\s+/g, "") === "देश-विदेश") {
+            statePlaced = true;
+            return { ...it, children: [...(it.children || []), STATE_LINK] };
+        }
+        return it;
+    });
+    const navItems = [{ label: "होम", href: "/" }, ...menuItems];
+    if (!statePlaced) navItems.splice(Math.max(navItems.length - 1, 1), 0, STATE_LINK);
     const pathname = usePathname();
     const [now, setNow] = useState("");
     const [drawerOpen, setDrawerOpen] = useState(false);

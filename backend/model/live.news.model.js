@@ -20,9 +20,6 @@ const liveNewsSchema = new Schema({
     imageAlt: { type: String, default: '' },
     caption: { type: String, default: '' },          // photo caption + short strap line
     content: { type: [], default: [] },              // intro / main body (same format as News.content)
-    category: { type: Schema.Types.ObjectId, ref: 'Category' },
-    state: { type: [String], default: [] },
-    district: { type: [String], default: [] },
     tags: { type: [String], default: [] },
 
     status: { type: String, enum: ['draft', 'scheduled', 'live', 'ended'], default: 'draft', index: true },

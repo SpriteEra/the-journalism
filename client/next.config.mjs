@@ -20,6 +20,10 @@ const nextConfig = {
         hostname: "img.thejournalism.news",
         pathname: "/image/**",
       },
+      {
+        protocol: "http",
+        hostname: "localhost",
+      },
     ],
   },
 

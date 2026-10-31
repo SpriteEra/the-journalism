@@ -3,6 +3,7 @@ import { P } from '../config/permissions.js';
 import {
     createLiveNews, updateLiveNews, endLiveNews, deleteLiveNews, getLiveNewsAdmin, getLiveNewsAdminSingle,
     addLiveUpdate, editLiveUpdate, deleteLiveUpdate, getLiveNewsList, getLiveNewsBySlug,
+    getLiveNewsNext,
 } from '../controller/live.news.controller.js';
 
 
@@ -14,6 +15,7 @@ export async function livePublicRouter(app) {
     // /api/v1/live
     app.get('/', getLiveNewsList);
     app.get('/:slug', getLiveNewsBySlug);
+    app.get('/:slug/next', getLiveNewsNext);
 }
 
 export async function liveAdminRouter(app) {
