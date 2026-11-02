@@ -17,7 +17,7 @@ export function CardHeader({ title, description, actions, className, icon: Icon,
         {Icon && <span className="grid size-9 shrink-0 place-items-center rounded-control bg-primary-soft text-primary"><Icon className="size-4.5" /></span>}
         <div className="min-w-0">
           <h3 className="flex items-center gap-1 text-base font-semibold text-fg"><span className="truncate">{title}</span>{info && <InfoTip>{info}</InfoTip>}</h3>
-          {description && <p className="text-xs sm:text-sm text-fg-subtle max-sm:-mt-0.5">{description}</p>}
+          {description && <p className="text-xs sm:text-[13px] text-fg-subtle -mt-0.5">{description}</p>}
         </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, X, Flame, Clock, Trash2, TrendingUp, ArrowRight } from "lucide-react";
+import { Search, X, Flame, Clock, Trash2, TrendingUp, ArrowRight, Hash } from "lucide-react";
+import { topicPath } from "@/lib/adapters";   // if this can't be imported in a client component, replace with: (slug) => `/topic/${slug}`
 
 /* ------------------------------------------------------------------ */
 /*  Config – edit here                                                 */
@@ -27,14 +28,16 @@ const MAX_RESULTS = 8;
 const STORAGE_KEY = "tj_recent_searches";
 const MAX_RECENT = 6;
 
-/* Map whatever your API returns to { id, title, href, image, ts }.
-   Accepts an array, or an object with results / data / items / articles. */
+/* Maps the API response to { items, tags }.
+   items = live blogs first, then news: { id, title, href, image, ts }
+   tags  = matching topics: { id, title, href } */
 const normalize = (json) => {
-    const list = Array.isArray(json)
+    const base = Array.isArray(json)
         ? json
-        : json?.results ?? json?.data ?? json?.items ?? json?.articles ?? [];
+        : json?.news ?? json?.results ?? json?.data ?? json?.items ?? json?.articles ?? [];
+    const live = Array.isArray(json?.live) ? json.live : [];
 
-    return list.slice(0, MAX_RESULTS).map((r, i) => {
+    const items = [...live, ...base].slice(0, MAX_RESULTS).map((r, i) => {
         const date = r.publishedAt ?? r.published_at ?? r.date ?? r.created_at;
         const ts = date ? new Date(date).getTime() : null;
         return {
@@ -45,6 +48,14 @@ const normalize = (json) => {
             ts: Number.isFinite(ts) ? ts : null,
         };
     });
+
+    const tags = (Array.isArray(json?.tags) ? json.tags : []).map((t) => ({
+        id: t.id ?? t.slug,
+        title: t.title,
+        href: topicPath(t.slug),
+    }));
+
+    return { items, tags };
 };
 
 /* ------------------------------------------------------------------ */
@@ -144,6 +155,7 @@ const SearchModal = ({ onClose }) => {
     const [recent, setRecent] = useState([]);
     const [shown, setShown] = useState(false); // drives the open animation
     const [results, setResults] = useState([]);
+    const [tags, setTags] = useState([]);
     const [status, setStatus] = useState("idle"); // idle | loading | done | error
 
     const q = query.trim();
@@ -175,6 +187,7 @@ const SearchModal = ({ onClose }) => {
     useEffect(() => {
         if (q.length < MIN_CHARS) {
             setResults([]);
+            setTags([]);
             setStatus("idle");
             return;
         }
@@ -184,7 +197,9 @@ const SearchModal = ({ onClose }) => {
 
         const id = setTimeout(async () => {
             if (cache.current.has(q)) {
-                setResults(cache.current.get(q));
+                const cached = cache.current.get(q);
+                setResults(cached.items);
+                setTags(cached.tags);
                 setStatus("done");
                 return;
             }
@@ -193,9 +208,10 @@ const SearchModal = ({ onClose }) => {
                     signal: ctrl.signal,
                 });
                 if (!res.ok) throw new Error("bad response");
-                const list = normalize(await res.json());
-                cache.current.set(q, list);
-                setResults(list);
+                const data = normalize(await res.json());
+                cache.current.set(q, data);
+                setResults(data.items);
+                setTags(data.tags);
                 setStatus("done");
             } catch (err) {
                 if (err.name !== "AbortError") setStatus("error");
@@ -225,6 +241,11 @@ const SearchModal = ({ onClose }) => {
         addRecentSearch(item); // moves it to the top of recent
         onClose();
         router.push(item.href);
+    };
+
+    const openTag = (t) => {
+        onClose();
+        router.push(t.href);
     };
 
     const clearAll = () => {
@@ -325,6 +346,27 @@ const SearchModal = ({ onClose }) => {
                                 खोज परिणाम
                             </h3>
 
+                            {/* matching topics */}
+                            {status === "done" && tags.length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-xs font-medium text-black/60">विषय</p>
+                                    <ul className="mt-2 flex flex-wrap gap-2">
+                                        {tags.map((t) => (
+                                            <li key={t.id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openTag(t)}
+                                                    className="group flex items-center gap-1.5 rounded-full border border-primary/30 bg-[#FFECE6] px-3 py-1.5 text-[13px] font-medium text-black transition-colors hover:bg-primary hover:text-white"
+                                                >
+                                                    <Hash className="size-3.5 text-primary group-hover:text-white" aria-hidden />
+                                                    {t.title}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
                             {status === "loading" && (
                                 <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
                                     {Array.from({ length: 4 }).map((_, i) => (
@@ -339,7 +381,7 @@ const SearchModal = ({ onClose }) => {
                                 </p>
                             )}
 
-                            {status === "done" && results.length === 0 && (
+                            {status === "done" && results.length === 0 && tags.length === 0 && (
                                 <p className="mt-3 text-sm text-black/60">
                                     “{q}” के लिए कोई परिणाम नहीं मिला। दूसरा शब्द आज़माएं।
                                 </p>
@@ -347,7 +389,7 @@ const SearchModal = ({ onClose }) => {
 
                             {status === "done" && results.length > 0 && (
                                 <>
-                                    <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                    <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
                                         {results.map((item) => (
                                             <li key={item.id}>
                                                 <ItemRow item={item} onOpen={openItem} />

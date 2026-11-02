@@ -6,6 +6,7 @@ const districtSchema = new Schema({
     district: { type: String, unique: true, required: true, lowercase: true, trim: true },
     slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     displayName: { type: String, default: '' },
+    order: { type: Number, default: 0 },
     state: { type: Schema.Types.ObjectId, ref: 'State' },
     description: { type: String, default: '' },
     image: { type: String, default: '' },

@@ -86,6 +86,12 @@ function Check_({ ok, children }) {
   );
 }
 
+// categories that should never be chosen as the URL section
+const HIDDEN_ROUTE_SLUGS = ["other", "others", "anya"];
+const isHiddenRoute = (c) =>
+  HIDDEN_ROUTE_SLUGS.includes(String(c?.slug || "").toLowerCase()) ||
+  /^(other|others|anya|अन्य)$/i.test(String(c?.name || "").trim());
+
 const PublishForm = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -170,16 +176,30 @@ const PublishForm = () => {
     update({ keywords: { hi: kw.hi.filter((k) => !rm.has(k.toLowerCase())), en: kw.en.filter((k) => !rm.has(k.toLowerCase())) } });
   };
 
-  // ── primary section of the URL: one of the chosen categories / states ──
-  const routeOptions = useMemo(() => [
-    ...(category || []).map((id) => { const c = (cats.data || []).find((x) => x._id === id); return c && { kind: "category", id, name: c.name, slug: c.slug }; }),
-    ...(state || []).map((id) => { const x = (states.data || []).find((y) => y._id === id); return x && { kind: "state", id, name: x.displayName || x.state, slug: x.slug }; }),
-  ].filter(Boolean), [category, state, cats.data, states.data]);
+  // ── primary section of the URL: one of the chosen categories / sub-categories / states ──
+  const routeAll = useMemo(() => {
+    const find = (id) => (cats.data || []).find((x) => x._id === id);
+    return [
+      ...(category || []).map((id) => { const c = find(id); return c && { kind: "category", id, name: c.name, slug: c.slug, hidden: isHiddenRoute(c) }; }),
+      ...(subCategory || []).map((id) => { const c = find(id); return c && { kind: "subCategory", id, name: c.name, slug: c.slug, hidden: isHiddenRoute(c) }; }),
+      ...(state || []).map((id) => { const x = (states.data || []).find((y) => y._id === id); return x && { kind: "state", id, name: x.displayName || x.state, slug: x.slug }; }),
+    ].filter(Boolean);
+  }, [category, subCategory, state, cats.data, states.data]);
+
+  // "Other / Anya" is never offered as a choice
+  const routeOptions = useMemo(() => routeAll.filter((o) => !o.hidden), [routeAll]);
   const primary = routeOptions.find((o) => o.kind === blog.primaryRoute?.kind && o.id === blog.primaryRoute?.id) || routeOptions[0];
+
+  // when only "Other" is chosen there is nothing to pick, but the link still uses it
+  const linkBase = primary || routeAll[0];
+
   useEffect(() => {      // keep the stored choice valid when the editor unselects the section that was primary
     if (primary && (blog.primaryRoute?.id !== primary.id || blog.primaryRoute?.kind !== primary.kind)) setBlog((p) => ({ ...p, primaryRoute: { kind: primary.kind, id: primary.id } }));
   }, [primary?.id, primary?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const kindLabel = { category: "category", subCategory: "sub-category", state: "state" };
   const origin = (import.meta.env.VITE_CLIENT_URL || "yoursite.com").replace(/^https?:\/\//, "");
+
 
   const saveDraft = async () => {
     if (!title?.trim()) return toast.error("Add a title first");
@@ -191,7 +211,7 @@ const PublishForm = () => {
       toast.success("Saved as draft", { id });
       localStorage.removeItem("blog");
       queryClient.invalidateQueries({ queryKey: ["news"] });
-      navigate("/dashboard/drafts");
+      navigate("/dashboard/draft-news");
     } catch (e) { toast.error(errMsg(e, "Could not save the draft"), { id }); } finally { setBusy(false); }
   };
   const canDraft = mode !== "edit" || blog.draft === true;
@@ -251,17 +271,40 @@ const PublishForm = () => {
       navigate("/dashboard/schedule-news");
     } catch (e) { toast.error(errMsg(e, "Failed to schedule"), { id }); }
   };
-
+  const showSchedule =
+    (mode !== "edit" && type !== "guest-news") ||
+    (mode === "edit" && type === "schedule_news");
   return (
     <div className="mx-auto w-full max-w-7xl pb-20  lg:pb-8">
-      <div className="mb-3 sm:mb-5 flex flex-wrap items-center gap-2 sm:gap-3">
-        <ArrowLeft className="text-black size-4.5 md:size-5 lg:size-6" onClick={goBackToEditor} />
+      <div className="sticky top-15 z-20 -mx-1 mb-3 sm:mb-5 flex flex-wrap items-center gap-2 sm:gap-3 bg-surface/90 backdrop-blur-xs px-2 py-2 sm:px-3 shadow-sm lg:flex-nowrap">
+        <ArrowLeft className="text-black size-4.5 md:size-5 lg:size-6 cursor-pointer" onClick={goBackToEditor} />
         <div className="min-w-0 flex-1">
           <h1 className="text-base font-semibold tracking-tight text-fg sm:text-xl">{t("Story details")}</h1>
           <p className="text-xs text-fg-subtle">Topic, keywords, URL section and publishing options.</p>
         </div>
-      </div>
 
+        {/* Desktop only: actions in the header, right side */}
+        <div className="hidden lg:flex items-center gap-2">
+          <Button variant="ghost" leftIcon={Eye} onClick={() => setPreviewOpen(true)} className="border border-line">
+            {t("Full preview")}
+          </Button>
+          {canDraft && (
+            <Button variant="outline" leftIcon={FileClock} disabled={busy} onClick={saveDraft}>
+              Save as draft
+            </Button>
+          )}
+          {showSchedule && (
+            <Button variant="outline" leftIcon={CalendarClock} onClick={() => setScheduleOpen(true)}>
+              {mode === "edit" ? "Update schedule" : t("Schedule")}
+            </Button>
+          )}
+          {type !== "schedule_news" && (
+            <Button leftIcon={Send} loading={busy} onClick={submit}>
+              {t(verb)}
+            </Button>
+          )}
+        </div>
+      </div>
       <div className="grid gap-3 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] ">
         <div className="space-y-3 sm:space-y-5 w-full flex flex-col">
           <Card padded={false}>
@@ -311,10 +354,10 @@ const PublishForm = () => {
 
               <div className="rounded-lg sm:rounded-2xl border border-line bg-surface-2/50 p-2 sm:p-4">
                 <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-fg"><Link2 className="size-4 text-fg-subtle" />Story link
-                  <InfoTip>The first part of the link is the primary section. It is required: pick a category or a state above. If you choose several, mark the one the link should use - readers and Google will see this link.</InfoTip>
+                  <InfoTip>The first part of the link is the primary section. It is required: pick a category, sub-category or state above. If you choose several, mark the one the link should use. Readers and Google will see this link.</InfoTip>
                 </p>
-                {routeOptions.length === 0 ? (
-                  <p className="rounded-xl bg-warning-soft p-3 text-sm text-fg-muted">Choose a category or a state - the story link needs one of them.</p>
+                {!linkBase ? (
+                  <p className="rounded-xl bg-warning-soft p-3 text-sm text-fg-muted">Choose a category, sub-category or state - the story link needs one of them.</p>
                 ) : (
                   <>
                     {routeOptions.length > 1 && (
@@ -324,14 +367,14 @@ const PublishForm = () => {
                           return (
                             <button key={o.kind + o.id} type="button" role="radio" aria-checked={on} onClick={() => update({ primaryRoute: { kind: o.kind, id: o.id } })}
                               className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", on ? "border-fg bg-fg text-canvas" : "border-line bg-surface text-fg-muted hover:border-line-strong")}>
-                              {on && <Check className="size-3" strokeWidth={3} />}{o.name}<span className={cn("text-[10px]", on ? "opacity-70" : "text-fg-faint")}>{o.kind === "state" ? "state" : "category"}</span>
+                              {on && <Check className="size-3" strokeWidth={3} />}{o.name}<span className={cn("text-[10px]", on ? "opacity-70" : "text-fg-faint")}>{kindLabel[o.kind]}</span>
                             </button>
                           );
                         })}
                       </div>
                     )}
                     <p className="break-all rounded-xl border border-line bg-surface px-3 py-2.5 font-mono text-xs text-fg-muted sm:text-sm">
-                      {origin}/<b className="text-fg">{primary?.slug || "…"}</b>/news/<span className="text-fg-subtle">{blog.slug || "story-name"}</span>
+                      {origin}/<b className="text-fg">{linkBase.slug || "…"}</b>/news/<span className="text-fg-subtle">{blog.slug || "story-name"}</span>
                     </p>
                     {routeOptions.length > 1 && <p className="mt-2 text-xs text-fg-subtle">Primary section: <b className="text-fg">{primary?.name}</b>. Tap another one to change it.</p>}
                   </>
@@ -349,7 +392,7 @@ const PublishForm = () => {
           <AdvancedPanel blog={blog} update={update} title={title} description={description} canFeature={can("news.feature")} currentFeatured={featuredNow} editingId={news_id} />
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+        <aside className="space-y-5 lg:sticky lg:top-34 lg:self-start">
           <Card padded={false} className="overflow-hidden">
             <div className="relative aspect-video w-full bg-surface-3">
               {banner ? <img src={banner} alt="" onError={handleImageError} className="size-full object-cover" /> : <div className="grid size-full place-items-center text-fg-faint"><ImageIcon className="size-10" /></div>}

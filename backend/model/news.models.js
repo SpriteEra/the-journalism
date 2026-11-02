@@ -120,7 +120,7 @@ export const newsSchema = new mongoose.Schema({
     // story URL = /{primaryRoute.slug}/news/{slug}   (see utils/newsRoute.js). The full path is derived, never stored.
     slug: { type: String, unique: true, sparse: true, index: true },
     primaryRoute: {
-        kind: { type: String, enum: ['category', 'state'] },
+        kind: { type: String, enum: ['category', 'subCategory', 'state'] },
         ref: { type: mongoose.Schema.Types.ObjectId },
         slug: { type: String },
     },

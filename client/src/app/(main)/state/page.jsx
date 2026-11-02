@@ -1,5 +1,6 @@
 import FiveCardLayoutSection from "@/components/common/FiveCardLayoutSection";
 import FourCardLayoutSection from "@/components/common/FourCardLayoutSection";
+import StateChips from "@/components/StateChips";
 import { getLatest, getStates } from "@/lib/data";
 import { abs } from "@/lib/site";
 
@@ -26,7 +27,7 @@ export default async function StatesPage() {
   return (
     <section className="min-h-screen">
       <h1 className="sr-only">राज्य</h1>
-
+      <StateChips states={states} />
       {withNews.length === 0 && (
         <p className="page-container mt-10 rounded border border-dashed border-black/15 p-10 text-center text-lg text-black/60">इस समय किसी राज्य की खबर उपलब्ध नहीं है।</p>
       )}

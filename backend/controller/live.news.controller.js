@@ -14,7 +14,7 @@ import { P } from '../config/permissions.js';
 const isAdmin = (u, req) => req.can(P.LIVE_MANAGE_ANY);
 // may go live directly; everyone else can only keep drafts
 const canPublish = (u, req) => req.can(P.LIVE_PUBLISH);
-const LIST_FIELDS = 'title slug image caption status startTime endTime post_time contentUpdatedAt updates.time';
+const LIST_FIELDS = 'title slug image description status startTime endTime post_time contentUpdatedAt updates.time';
 
 const cleanTags = (v) => [...new Set(parseJSON(v, []).map((s) => String(s?.title ?? s).trim()).filter(Boolean))].slice(0, 30);
 const dateOrUndef = (v) => { if (!v) return undefined; const d = new Date(v); return Number.isNaN(d.getTime()) ? undefined : d; };
@@ -69,7 +69,7 @@ export const createLiveNews = tryCatch(async (req, res) => {
     if (req.files?.image) image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
 
     const live = new LiveNews({
-        title: b.title.trim(), slug, image, imageAlt: b.imageAlt || '', caption: b.caption || '',
+        title: b.title.trim(), slug, image, imageAlt: b.imageAlt || '', description: b.description || '',
         content: parseJSON(b.content, []),
         tags: cleanTags(b.tags), startTime, author: req.user._id,
         seo: sanitizeSeo(b.seo) || {},
@@ -88,7 +88,7 @@ export const updateLiveNews = tryCatch(async (req, res) => {
     const changes = [];
 
     if (b.title !== undefined && b.title.trim() && b.title !== live.title) { live.title = b.title.trim(); changes.push('title'); }
-    if (b.caption !== undefined) { live.caption = b.caption; changes.push('caption'); }
+    if (b.description !== undefined) { live.description = b.description; changes.push('description'); }
     if (b.imageAlt !== undefined) live.imageAlt = b.imageAlt;
     if (b.content !== undefined) { live.content = parseJSON(b.content, live.content); changes.push('content'); }
     if (b.tags !== undefined) live.tags = cleanTags(b.tags);
@@ -122,7 +122,7 @@ export const updateLiveNews = tryCatch(async (req, res) => {
     await live.save();
     pushStack(live.update_stack, req.user._id, `Updated: ${changes.join(', ') || 'no field change'}`);
     res.status(200).json({ success: true, message: 'Live news updated', live });
-    if (live.status === 'live') emitLive(live.slug, 'live_meta', { title: live.title, image: live.image, caption: live.caption, status: live.status });
+    if (live.status === 'live') emitLive(live.slug, 'live_meta', { title: live.title, image: live.image, description: live.description, status: live.status });
     if (changes.some((c) => c.includes('ended'))) emitLive(live.slug, 'live_ended', { slug: live.slug, endTime: live.endTime });
 });
 
@@ -174,13 +174,13 @@ export const addLiveUpdate = tryCatch(async (req, res) => {
     if (live.status === 'ended') throw new ErrorHandler(400, 'This live coverage has ended. Re-open it first');
     const b = req.body;
     const content = parseJSON(b.content, []);
-    if (!b.title?.trim() && !b.caption?.trim() && !content.length && !req.files?.image) throw new ErrorHandler(400, 'Add a title, caption, content or image');
+    if (!b.title?.trim() && !b.description?.trim() && !content.length && !req.files?.image) throw new ErrorHandler(400, 'Add a title, description, content or image');
 
     let image = b.image || '';
     if (req.files?.image) image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
 
     live.updates.push({
-        title: b.title?.trim() || '', image, caption: b.caption || '', content,
+        title: b.title?.trim() || '', image, description: b.description || '', content,
         time: dateOrUndef(b.time) || new Date(), pinned: toBool(b.pinned), author: req.user._id,
     });
     live.contentUpdatedAt = new Date();
@@ -197,7 +197,7 @@ export const editLiveUpdate = tryCatch(async (req, res) => {
     if (!entry || entry.isDeleted) throw new ErrorHandler(404, 'Update not found');
     const b = req.body;
     if (b.title !== undefined) entry.title = b.title.trim();
-    if (b.caption !== undefined) entry.caption = b.caption;
+    if (b.description !== undefined) entry.description = b.description;
     if (b.content !== undefined) entry.content = parseJSON(b.content, entry.content);
     if (b.time !== undefined) entry.time = dateOrUndef(b.time) || entry.time;
     if (b.pinned !== undefined) entry.pinned = toBool(b.pinned);
@@ -240,19 +240,20 @@ export const getLiveNewsList = tryCatch(async (req, res) => {
 });
 
 /** Fields of the main story shown on the public page (the timeline `updates` are deliberately NOT part of it). */
-const MAIN_FIELDS = 'title slug image imageAlt caption content tags status startTime endTime post_time contentUpdatedAt';
+const MAIN_FIELDS = 'title slug image imageAlt description content tags status startTime endTime post_time contentUpdatedAt author';
 const PUBLIC_STATUS = ['live', 'ended'];
 
 /** One live story, MAIN part only: no timeline updates. */
 export const getLiveNewsBySlug = tryCatch(async (req, res) => {
     const live = await LiveNews.findOne({ slug: req.params.slug.toLowerCase(), isDeleted: false, status: { $in: PUBLIC_STATUS } })
+        .populate('author', 'fullName about designation profile username')
         .select(`${MAIN_FIELDS} seo`).lean();
     if (!live) throw new ErrorHandler(404, 'Live news not found');
 
     LiveNews.updateOne({ _id: live._id }, { $inc: { 'activity.total_reads': 1, 'activity.total_today_count': 1 } }).catch(() => { });
 
     const url = buildUrl('live', { slug: live.slug });
-    const description = live.seo?.metaDescription || live.caption || '';
+    const description = live.seo?.metaDescription || live.description || '';
     const breadcrumbs = [
         { name: 'Home', url: seoConfig.siteUrl() || '/' },
         { name: 'Live', url: `${seoConfig.siteUrl()}/live` },

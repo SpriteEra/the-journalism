@@ -91,8 +91,8 @@ export default function ReporterProfile() {
     { label: "Shorts", icon: PlaySquare, value: other.shortVideos?.shorts?.published || 0, views: other.shortVideos?.shorts?.views || 0 },
     { label: t("Shorts & videos"), icon: Clapperboard, value: other.shortVideos?.total?.published || 0, views: other.shortVideos?.total?.views || 0 },
     { label: t("YouTube news"), icon: Video, value: other.youtubeVideos.published, views: other.youtubeVideos.views },
-    { label: t("Photo gallery"), icon: Images, value: other.gallery.published, views: other.gallery.views },
-    { label: t("Events"), icon: CalendarDays, value: other.events.published, views: other.events.views },
+    // { label: t("Photo gallery"), icon: Images, value: other.gallery.published, views: other.gallery.views },
+    // { label: t("Events"), icon: CalendarDays, value: other.events.published, views: other.events.views },
     { label: "Live", icon: Radio, value: other.liveNews.published, views: other.liveNews.views },
   ] : [];
   const mix = uploads.filter((x) => x.label !== t("Shorts & videos") && x.value > 0).map((x) => ({ name: x.label, value: x.value }));
@@ -105,7 +105,7 @@ export default function ReporterProfile() {
     { value: "overview", label: t("Overview"), icon: BarChart3 },
     { value: "stories", label: t("Stories"), icon: FileText },
     { value: "uploads", label: t("Uploads"), icon: Film },
-    can("logs.view") && { value: "activity", label: t("Activity"), icon: ScrollText },
+    // can("logs.view") && { value: "activity", label: t("Activity"), icon: ScrollText },
     { value: "account", label: "Account", icon: UserCog },
     { value: "access", label: "Access", icon: ShieldCheck },
   ].filter(Boolean);
@@ -183,11 +183,17 @@ export default function ReporterProfile() {
 
       {tab === "uploads" && (can("reporter.performance.all") ? (
         <div className="space-y-4 sm:space-y-5">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {uploads.map((x) => <StatCard key={x.label} label={x.label} value={x.value} icon={x.icon} tone="primary" loading={perf.isLoading} hint={`${num(x.views)} ${t("reads")}`} />)}
           </div>
           <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-            <Block title="Content mix" description="What this person uploads" loading={perf.isLoading} empty={!mix.length ? t("Nothing here yet") : null}><Donut data={mix} height={240} /></Block>
+            <Block
+              title="Content mix"
+              description="What this person uploads"
+              loading={perf.isLoading} empty={!mix.length ? t("Nothing here yet") : null}
+            >
+              <Donut data={mix} height={240} />
+            </Block>
             <Block title="Month by month" description="Stories and reads per month" loading={perf.isLoading} empty={!(r?.trends.monthly || []).length ? t("Nothing here yet") : null}><ColumnChart data={(r?.trends.monthly || []).map((m) => ({ month: m.month, Stories: m.published, Reads: m.views }))} xKey="month" series={[{ key: "Stories", name: "Stories" }, { key: "Reads", name: "Reads", color: "var(--chart-2)" }]} height={240} /></Block>
           </div>
           {r && (

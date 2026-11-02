@@ -53,9 +53,32 @@ export async function getArticle(key) {
 
 export async function searchNews({ search, page = 1, limit = 12 }) {
   const q = String(search || "").trim();
-  if (q.length < 2) return { items: [], total: 0 };
-  const r = await safe(apiGet("/news/search-news", { params: { search: q, page, limit }, revalidate: 30 }), { news: [], total: 0 });
-  return { items: r.news, total: r.total ?? r.news?.length ?? 0 };
+  if (q.length < 2) return { items: [], total: 0, live: [], tags: [] };
+  const r = await safe(
+    apiGet("/news/search-news", { params: { search: q, page, limit }, revalidate: 30 }),
+    { news: [], total: 0, live: [], tags: [] },
+  );
+  return {
+    items: r.news || [],
+    total: r.total ?? r.news?.length ?? 0,
+    live: r.live || [],
+    tags: r.tags || [],
+  };
+}
+
+/** related stories of one article (same tags / category): [card × up to 4]. Does NOT count a view. */
+export async function getRelatedNews(newsId) {
+  const rows = await safe(
+    apiGet(`/news/related-news/${encodeURIComponent(newsId)}`, { revalidate: 60, timeout: 4000 }),
+    [],
+  );
+  return (Array.isArray(rows) ? rows : []).map((r) => ({
+    id: r.news_id,
+    title: r.title,
+    image: r.banner,
+    href: r.path,
+    publishedAt: r.post_time,
+  }));
 }
 
 // ───────────────────────── sections: categories, states, districts, topics ─────────────────────────
@@ -95,6 +118,7 @@ export async function getSection(type, slug, { page = 1 } = {}) {
     items: r.news,
     hasMore: Boolean(r.hasMore),
     page: r.page || page,
+    author: r.author || null,
   };
 }
 

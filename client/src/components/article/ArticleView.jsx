@@ -9,7 +9,7 @@ import JsonLd from "@/components/common/JsonLd";
 import StoryGrid from "@/components/common/StoryGrid";
 import SectionHeading from "@/components/common/SectionHeading";
 import LatestNews from "@/components/LatestNews";
-import { getLatest } from "@/lib/data";
+import { getRelatedNews } from "@/lib/data";
 import { categoryPath, topicPath, jsonLdList } from "@/lib/adapters";
 import { googleSourceUrl } from "@/lib/site";
 import { formatDate } from "@/utils/util";
@@ -18,7 +18,6 @@ import AuthorCard from "./AuthorCard";
 import NewsCard from "../common/NewsCard";
 import HorizontalScroller from "@/components/common/HorizontalScroller";
 
-/** The story page body. `data` = result of getArticle(). Used by the story route and by the old /news/<id> route. */
 export default async function ArticleView({ data }) {
   const { article, seo } = data;
 
@@ -40,12 +39,15 @@ export default async function ArticleView({ data }) {
   const published = article.post_time || article.createdAt;
 
   // more stories of the same section (never the story itself)
-  const more = await getLatest({ limit: 9, ...(route.kind === "state" ? { state: route.slug } : { category: route.slug }) });
-  const moreItems = (more?.items || []).filter((i) => i.id !== article.news_id);
-  const sidebar = moreItems.slice(0, 6);
-  const below = moreItems.slice(6, 9);
+  const [relatedAll] = await Promise.all([
+    getRelatedNews(article.news_id),
+  ]);
+
 
   const readAlso = (article.related || []).map((r) => ({ id: r.news_id, title: r.title, image: r.banner, href: r.path }));
+
+  const readAlsoIds = new Set(readAlso.map((r) => r.id));
+  const related = relatedAll.filter((r) => !readAlsoIds.has(r.id));
 
   // "यह भी पढ़ें" goes in the middle of the story body (after the paragraph nearest the centre)
   const midIndex = middleBlockIndex(article.content);
@@ -60,7 +62,6 @@ export default async function ArticleView({ data }) {
 
   const afterBlocks = [];
   if (readAlsoNode && midIndex >= 0) afterBlocks.push({ index: midIndex, node: readAlsoNode });
-  // add your in-article ad here if you have one, e.g. afterBlocks.push({ index: Math.max(0, midIndex - 2), node: <Ad /> });
 
   return (
     <div className="page-container mt-8 grid max-w-6xl grid-cols-1 gap-4 lg:mt-14 lg:grid-cols-8">
@@ -82,7 +83,7 @@ export default async function ArticleView({ data }) {
                   <div className="flex items-stretch gap-3">
                     <span className="w-1 shrink-0 bg-primary" aria-hidden />
                     <div>
-                      <Link href={article.author.profileUrl || "/"} className="text-xl font-bold leading-normal text-black hover:text-primary lg:text-[22px]">
+                      <Link href={`/author/${article.author.username}`} className="text-xl font-bold leading-normal text-black hover:text-primary lg:text-[22px]">
                         {article.author.fullName}
                       </Link>
                       {article.author.designation && <p className="-mt-1 text-xs font-medium leading-normal text-black">{article.author.designation}</p>}
@@ -110,18 +111,19 @@ export default async function ArticleView({ data }) {
           <AuthorCard author={article?.author} className="mt-4" />
         </div>
 
-        {below.length > 0 && (
-          <section className="mt-8" aria-label={`${sectionName || "और"} की ख़बरें`}>
-            <SectionHeading title={sectionName ? `${sectionName} की और ख़बरें` : "और ख़बरें"} href={route.slug ? categoryPath(route.slug) : undefined} />
-            <StoryGrid items={below} className="mt-4" />
+        {related.length > 0 && (
+          <section className="mt-8" aria-label="संबंधित ख़बरें">
+            <SectionHeading noLink headingTitle="संबंधित ख़बरें" />
+            <StoryGrid items={related} className="mt-4" />
           </section>
         )}
       </section>
-
       <aside className="relative min-h-50 space-y-3.5 pt-3 lg:col-span-2 lg:pt-9">
-        <div className="sticky top-35 space-y-6">
+        <div className="sticky top-3 space-y-6">
           <SideAds />
-          <LatestNews title="ताज़ा खबरें" titleHref={route.slug ? categoryPath(route.slug) : "/latest"} items={sidebar} />
+        </div>
+        <div className="sticky top-70 space-y-6">
+          <LatestNews title="इन्हे भी पढ़े" />
         </div>
       </aside>
     </div>

@@ -79,6 +79,7 @@ const Videos = () => {
       toast.dismiss(loadingToast);
       toast.success("News Deleted Successfully");
       queryClient.invalidateQueries({ queryKey: ["yt-news"] });
+      queryClient.invalidateQueries({ queryKey: ["trash"] });
     } catch (err) {
       toast.dismiss(loadingToast);
       console.log(err);

@@ -25,7 +25,7 @@ export default function ProfileHeader({ name, src, badges, subtitle, about, meta
             {badges}
           </div>
           {subtitle && <p className="hindi-font mt-0.5 text-sm font-medium text-fg-muted">{subtitle}</p>}
-          {about && <p className="hindi-font mt-2 max-w-3xl text-sm leading-relaxed text-fg-subtle">{about}</p>}
+          {about && <p className="hindi-font mt-2 w-full text-sm leading-relaxed text-fg-subtle">{about}</p>}
           {meta?.length > 0 && <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-fg-subtle">{meta}</div>}
         </div>
       </div>

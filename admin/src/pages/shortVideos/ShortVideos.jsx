@@ -51,7 +51,10 @@ export default function ShortVideos() {
       key: "title", header: "Video", primary: true, cell: (v) => (
         <div className="flex min-w-0 items-center gap-3">
           <VideoThumb src={v.thumbnail} portrait={isPortrait(v)} duration={v.duration} />
-          <p className="line-clamp-2 max-w-xs font-medium text-fg lg:text-base">{v.title}</p>
+          <div>
+            <p className="line-clamp-2 max-w-xs font-medium text-fg lg:text-base">{v.title}</p>
+            <p className="mt-0.5 text-xs text-fg-subtle">{v.activity?.total_reads ?? v.views ?? 0} views</p>
+          </div>
         </div>
       ),
     },

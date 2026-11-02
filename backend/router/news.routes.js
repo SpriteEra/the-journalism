@@ -1,4 +1,4 @@
-import { getFeaturedPublic, getLatestNews, fetchOnlyToday, fetchStateNewsDistrictWise, findStateNews, getGoogleNewsXMLData, getHomeNews, getLiteratureNews, getNewses, getNewsInfiniteScroll, getNewsXMLData, getRelatedNews, getSingleNews, searchNews } from '../controller/news.controller.js';
+import { getFeaturedPublic, getLatestNews, fetchOnlyToday, fetchStateNewsDistrictWise, findStateNews, getGoogleNewsXMLData, getHomeNews, getLiteratureNews, getNewses, getNewsInfiniteScroll, getNewsXMLData, getRelatedNews, getSingleNews, searchNews, incrementCountNews } from '../controller/news.controller.js';
 import { getAuthorNews, getAuthorPublic } from '../controller/author.controller.js';
 import { getBreakingNews } from '../controller/breaking.news.controller.js';
 import { getEventNews, getEventNewsByCateogry, getRandomEventNews, incrementEventNewsCount } from '../controller/event.controller.js';
@@ -25,6 +25,7 @@ async function newsRouter(app) {
     app.get('/authors/:username/news', getAuthorNews);
     app.get('/literature', getLiteratureNews);
     app.get('/related-news/:news_id', getRelatedNews);
+    app.get('/increment-count/:news_id', incrementCountNews);
     app.get("/fetch-state-news", fetchStateNewsDistrictWise);
     app.get("/fetch-all-state-news", findStateNews);
     app.get('/get/:news_id', getSingleNews);

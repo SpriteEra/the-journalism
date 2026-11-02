@@ -3,6 +3,7 @@ import ArticleBreadCrumb from '@/components/article/ArticleBreadCrumb';
 import ArticleMedia from '@/components/article/ArticleMedia';
 import ArticleTopics from '@/components/article/ArticleTopics';
 import AuthorCard from '@/components/article/AuthorCard';
+import ReadBeacon from '@/components/article/ReadBeacon';
 import ShareActions, { FollowOnGoogle } from '@/components/article/ShareActions';
 import { formatDate } from '@/utils/util';
 import Link from 'next/link';
@@ -45,7 +46,6 @@ const page = () => {
 
     return (
         <main className='page-container max-w-6xl grid grid-cols-1 lg:grid-cols-8 gap-4 mt-8 lg:mt-14'>
-
             <section className='lg:col-span-6'>
                 <ArticleBreadCrumb
                     breadcrumb={article.breadcrumb}

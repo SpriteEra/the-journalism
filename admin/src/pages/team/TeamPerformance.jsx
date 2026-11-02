@@ -12,7 +12,7 @@ import { Avatar, Badge, Card, CardHeader, DataTable, EmptyState, ErrorState, Pag
 
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
 const SORTS = [["views", "Most reads"], ["published", "Most stories"], ["avgViews", "Best average"], ["activeDays", "Most active days"]];
-const MEDAL = ["bg-gold-300 text-gold-ink", "bg-surface-3 text-fg", "bg-warning-soft text-warning"];
+export const MEDAL = ["bg-gold-300 text-gold-ink", "bg-surface-3 text-fg", "bg-warning-soft text-warning"];
 
 const label = (r) => r.reporter.fullName || r.reporter.username || "—";
 

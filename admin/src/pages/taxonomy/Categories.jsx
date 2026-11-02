@@ -21,7 +21,7 @@ function TaxonomyForm({ kind, item, categories, states, onClose }) {
   const save = useApiMutation(() => {
     const body = { [nameKey]: f[nameKey], isActive: f.isActive, ...(editing ? { slug: f.slug } : {}) };
     if (kind === "category") Object.assign(body, { description: f.description, parent: f.parent || null, order: Number(f.order) || 0, showInMenu: f.showInMenu, showOnHome: f.showOnHome });
-    else Object.assign(body, { displayName: f.displayName, ...(kind === "district" ? { state: f.state } : {}) });
+    else Object.assign(body, { displayName: f.displayName, order: Number(f.order) || 0, ...(kind === "district" ? { state: f.state } : {}) });
     return (editing ? httpClient.put(`/${path}/${item._id}`, body) : httpClient.post(`/${path}`, body)).then((r) => r.data);
   }, { invalidate: ["categories", "states", "districts"], onSuccess: onClose });
 
@@ -35,6 +35,7 @@ function TaxonomyForm({ kind, item, categories, states, onClose }) {
           <Input value={f[nameKey]} onChange={(e) => set({ [nameKey]: e.target.value })} autoFocus data-autofocus />
         </Field>
         {kind !== "category" && <Field label="Display name" hint="Optional – e.g. उत्तर प्रदेश"><Input value={f.displayName} onChange={(e) => set({ displayName: e.target.value })} /></Field>}
+        {kind !== "category" && <Field label="Order" hint="Lower numbers come first. Same number: A–Z"><Input type="number" value={f.order} onChange={(e) => set({ order: e.target.value })} /></Field>}
         {editing && <Field label="URL slug"><Input value={f.slug} onChange={(e) => set({ slug: e.target.value.toLowerCase() })} /></Field>}
         {kind === "district" && <Field label="State" required><Select value={f.state} onChange={(e) => set({ state: e.target.value })} placeholder="Select state" required options={states.map((s) => ({ value: s._id, label: s.displayName || s.state }))} /></Field>}
         {kind === "category" && (
@@ -301,6 +302,7 @@ export default function Categories() {
     { key: "state", header: "State", primary: true, cell: (s) => <span className="font-medium capitalize text-fg">{s.displayName || s.state}</span> },
     { key: "slug", header: "Slug", cell: (s) => <span className="font-mono text-xs">{s.slug}</span> },
     // { key: "districts", header: "Districts", cell: (s) => s.districts?.length ?? 0 },
+    { key: "order", header: "Order", cell: (r) => r.order ?? 0 },
     { key: "status", header: "Status", cell: (s) => <StatusBadge status={s.isActive ? "active" : "inactive"} /> },
     { key: "actions", header: "", align: "right", cell: actions("state") },
   ];
@@ -308,6 +310,7 @@ export default function Categories() {
     { key: "district", header: "District", primary: true, cell: (d) => <span className="font-medium capitalize text-fg">{d.displayName || d.district}</span> },
     { key: "state", header: "State", cell: (d) => <span className="capitalize">{d.state?.state || "—"}</span> },
     { key: "slug", header: "Slug", cell: (d) => <span className="font-mono text-xs">{d.slug}</span> },
+    // { label: "Order", value: d.order ?? 0 },   // use d.order in districtCard
     { key: "status", header: "Status", cell: (d) => <StatusBadge status={d.isActive ? "active" : "inactive"} /> },
     { key: "actions", header: "", align: "right", cell: actions("district") },
   ];

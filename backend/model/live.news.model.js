@@ -18,7 +18,7 @@ const liveNewsSchema = new Schema({
     slug: { type: String, required: true, unique: true, lowercase: true },
     image: { type: String, default: '' },            // cover / banner
     imageAlt: { type: String, default: '' },
-    caption: { type: String, default: '' },          // photo caption + short strap line
+    description: { type: String, default: '' },          // photo caption + short strap line
     content: { type: [], default: [] },              // intro / main body (same format as News.content)
     tags: { type: [String], default: [] },
 

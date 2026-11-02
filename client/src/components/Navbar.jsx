@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Search, Menu, X, Video, ChevronDown } from "lucide-react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
+import { social } from "@/lib/site";
 
 // loaded only when needed – zero cost on first paint
 const loadSearch = () => import("./SearchModal");
@@ -13,54 +14,13 @@ const SearchModal = dynamic(loadSearch, { ssr: false });
 /*  Menu config – edit labels / routes here                            */
 /*  Any item with `children` automatically becomes a dropdown          */
 /* ------------------------------------------------------------------ */
-const NAV_ITEMS = [
-    { label: "होम", href: "/" },
-    // { label: "देश", href: "/desh" },
-    { label: "राजनीति", href: "/rajniti" },
-    {
-        label: "विचार",
-        href: "/vichar",
-        children: [
-            { label: "संपादकीय", href: "/vichar/sampadkiya" },
-            { label: "ओपिनियन", href: "/vichar/opinion" },
-            { label: "कॉलम", href: "/vichar/column" },
-            { label: "ब्लॉग", href: "/vichar/blog" },
-        ],
-    },
-    { label: "विश्लेषण", href: "/vishleshan" },
-    { label: "ग्राउंड रिपोर्ट", href: "/ground-report" },
-    { label: "विदेश", href: "/videsh" },
-    {
-        label: "अन्य",
-        href: "/anya",
-        children: [
-            { label: "मनोरंजन", href: "/anya/manoranjan" },
-            { label: "खेल", href: "/anya/khel" },
-            { label: "तकनीक", href: "/anya/takneek" },
-            { label: "शिक्षा", href: "/anya/shiksha" },
-            { label: "स्वास्थ्य", href: "/anya/swasthya" },
-            { label: "जीवनशैली", href: "/anya/jeevanshaili" },
-        ],
-    },
-];
 
-/* lucide-react no longer ships brand icons, so these are inline SVGs
-   (same outline style as lucide: 24x24, 2px round strokes) */
-const svgProps = {
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    "aria-hidden": true,
-};
 
 const SOCIALS = [
-    { label: "Facebook", href: "https://facebook.com", icon: "/facebook.png", },
-    { label: "Instagram", href: "https://instagram.com", icon: "/instagram.png" },
-    { label: "YouTube", href: "https://youtube.com", icon: "/youtube.png", },
-    { label: "Twitter", href: "https://x.com", icon: "/twitter.png", },
+    { label: "Facebook", href: social.facebook, icon: "/facebook.png", },
+    { label: "Instagram", href: social.instagram, icon: "/instagram.png" },
+    { label: "YouTube", href: social.youtube, icon: "/youtube.png", },
+    { label: "Twitter", href: social.x, icon: "/twitter.png", },
 ];
 
 /* "Sep 24, 2026 | 14:28 IST" – rendered client-side to avoid hydration mismatch */

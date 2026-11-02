@@ -53,7 +53,7 @@ export function Alert({ tone = "info", title, children, className, action }) {
       <Icon className="mt-0.5 size-4.5 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
         {title && <p className="font-semibold">{title}</p>}
-        {children && <div className={cn(title && "mt-0.5", "text-fg-muted")}>{children}</div>}
+        {children && <div className={cn(title && "mt-0.5", "text-fg-muted text-xs")}>{children}</div>}
       </div>
       {action}
     </div>

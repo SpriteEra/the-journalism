@@ -52,7 +52,10 @@ export default function NewsList({ title, description, draft = false, needApprov
   const apply = (f) => { setApplied(f); setSelected(f); go(1); };
   const active = countActive(applied) + (applied.search ? 1 : 0);
 
-  const del = useApiMutation((id) => httpClient.delete(`/delete-news/${id}`).then((r) => r.data), { invalidate: ["news"], success: "News deleted" });
+  const del = useApiMutation(
+    (id) => httpClient.delete(`/delete-news/${id}`).then((r) => r.data),
+    { invalidate: ["news", "trash"], success: "News deleted" }
+  );
   const askDelete = async (n) => {
     if (await confirm({ title: t("Delete this story?"), message: `“${n.title}” moves to the trash.`, tone: "danger", confirmLabel: t("Delete") })) del.mutate(n.news_id);
   };

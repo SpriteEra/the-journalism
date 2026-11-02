@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Calendar, Eye, FileText, Hash, History, MessageSquareWarning, RotateCcw, Trash2, User } from "lucide-react";
+import { Calendar, Eye, FileText, Hash, History, MessageSquareWarning, RefreshCw, RotateCcw, Trash2, User } from "lucide-react";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient.js";
 import { formatDate } from "../../utils/utils";
@@ -12,6 +12,7 @@ import { useFetchTrash } from "../../hooks/trash.js";
 import TrashItemDetailPanel from "../../components/TrashItemDetailPanel.jsx";
 import UpdateStackPanel from "../../components/UpdateStack.jsx";
 import { Button, Card, EmptyState, PageHeader } from "../../components/ui";
+import { useQueryClient } from "@tanstack/react-query";
 
 const RETENTION_DAYS = 30;
 
@@ -47,7 +48,9 @@ const Trash = () => {
   const [page, setPage] = useState(pageFromUrl);
   const scrollRef = useRef(null);
 
-  const { data, isPending, isError, error, refetch } = useFetchTrash({ page, limit: itemsPerPage });
+  const { data, isPending, isError, error, refetch, isFetching } = useFetchTrash({ page, limit: itemsPerPage });
+
+  const qc = useQueryClient();
 
   const handleRestore = async () => {
     if (!id) return;
@@ -57,6 +60,7 @@ const Trash = () => {
       setIsRestore(false);
       toast.dismiss(loadingToast);
       toast.success("Item Restored Successfully");
+      qc.invalidateQueries({ queryKey: ["news"] });
       refetch();
     } catch (err) {
       toast.dismiss(loadingToast);
@@ -79,10 +83,22 @@ const Trash = () => {
           title="Trash"
           description={`Deleted items stay here for ${RETENTION_DAYS} days. Restore them before they are removed for good.`}
           actions={
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs text-fg-muted sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm">
-              <Trash2 className="size-4" aria-hidden />
-              <span className="font-semibold tabular-nums text-fg">{data?.count ?? 0}</span> {data?.count === 1 ? "item" : "items"}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                title="Reload trash"
+                aria-label="Reload trash"
+                className="grid size-8 place-items-center rounded-full border border-line bg-surface text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:size-9"
+              >
+                <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} aria-hidden />
+              </button>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs text-fg-muted sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm">
+                <Trash2 className="size-4" aria-hidden />
+                <span className="font-semibold tabular-nums text-fg">{data?.count ?? 0}</span> {data?.count === 1 ? "item" : "items"}
+              </span>
+            </div>
           }
         />
 

@@ -5,7 +5,15 @@ import EditorJS from "@editorjs/editorjs";
 import imageCompression from "browser-image-compression";
 // @ts-ignore
 import Undo from "editorjs-undo";
-import { ArrowRight, RotateCcw, Undo2, Redo2, Upload } from "lucide-react";
+import {
+  ArrowRight,
+  RotateCcw,
+  Undo2,
+  Redo2,
+  CheckCircle2,
+  Circle,
+  Lightbulb,
+} from "lucide-react";
 import { tools } from "../utils/EditorTools.jsx";
 import { EditorContext } from "../pages/news/CreateNews.jsx";
 import { truncate } from "../utils/utils.js";
@@ -353,23 +361,6 @@ const BlogEditor = () => {
         console.error("Image compression or conversion failed:", error);
       }
     }
-    // if (e.target.files[0]) {
-    //   let loadingToast = toast.loading("Uploading...");
-    //   uploadImage(e.target.files[0])
-    //     .then((url) => {
-    //       toast.dismiss(loadingToast);
-    //       toast.success("Uploaded Successfully");
-
-    //       const updatedBlog = { ...blog, banner: url };
-    //       setBlog(updatedBlog);
-    //       localStorage.setItem("blog", JSON.stringify(updatedBlog));
-    //       setHasChanges(true);
-    //     })
-    //     .catch((err) => {
-    //       toast.dismiss(loadingToast);
-    //       toast.error(err);
-    //     });
-    // }
   };
 
   const handleTitleKeyDown = (e) => {
@@ -472,7 +463,7 @@ const BlogEditor = () => {
             toast.dismiss(loadingToast);
             toast.success("Saved as Draft successfully");
             localStorage.removeItem("blog");
-            navigate("/dashboard/news");
+            navigate("/dashboard/draft-news");
             queryClient.invalidateQueries({
               queryKey: ["news"], // Will match all with prefix ['event-news', ...]
             });
@@ -492,31 +483,54 @@ const BlogEditor = () => {
     window.location.reload();
   };
 
+  // ---- UI-only helpers (no API / handler changes) ----
+  const TITLE_IDEAL_MAX = 100;
+  const titleLength = title?.length || 0;
+  const hasContent = !!content?.blocks?.length;
+  const videoPending = !!videoFile && !isUploading;
+
+  const checklist = [
+    { label: "Banner image", done: !!banner },
+    { label: "News title", done: titleLength > 0 },
+    { label: "Article content", done: hasContent },
+    ...(isVideo
+      ? [{ label: "Video uploaded", done: !!video?.length && !videoPending }]
+      : []),
+  ];
+  const doneCount = checklist.filter((c) => c.done).length;
+
+  const Toggle = (
+    <button
+      type="button"
+      onClick={handleToggleVideo}
+      aria-pressed={!!isVideo}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isVideo
+        ? "bg-primary hover:bg-primary-hover"
+        : "bg-surface-3 hover:bg-line-strong"
+        }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform duration-200 ${isVideo ? "translate-x-6" : "translate-x-1"
+          }`}
+      />
+    </button>
+  );
+
   return (
-    <div className="mx-auto p-0 sm:p-3 sm:bg-surface rounded-md">
-      <nav className="flex sm:px-3 mb-1 sm:mb-4 sticky top-15 md:top-15 shadow z-10  w-full p-2 justify-end md:justify-between bg-surface">
+    <div className="mx-auto w-full p-0 sm:p-3 sm:bg-surface rounded-md">
+      {/* TOP BAR: title always; buttons only on mobile/tablet (desktop buttons live in the right panel) */}
+      <nav className="flex sm:px-3 mb-1 sm:mb-4 sticky top-15 md:top-15 shadow-card z-10  w-full p-2 justify-end md:justify-between bg-surface">
         <p className="max-md:hidden text-fg line-clamp-1 text-xl sm:md:text-xl lg:text-2xl font-medium leading-7 sm:line-clamp-2 ">
           {title?.length ? truncate(title, 60) : "New News"}
         </p>
-        <div className="flex gap-1 sm:gap-3 items-center ">
+        <div className="flex gap-1 sm:gap-3 items-center lg:hidden">
           {/* Video Toggle Button */}
           {user?.role === "admin" && (
             <div className="flex items-center sm:gap-2 ">
               <span className="text-sm text-fg-muted max-sm:hidden">
                 Video
               </span>
-              <button
-                onClick={handleToggleVideo}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isVideo
-                  ? "bg-primary hover:bg-primary-hover"
-                  : "bg-surface-3 hover:bg-line-strong"
-                  }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform duration-200 ${isVideo ? "translate-x-6" : "translate-x-1"
-                    }`}
-                />
-              </button>
+              {Toggle}
             </div>
           )}
 
@@ -560,154 +574,31 @@ const BlogEditor = () => {
           </button>
         </div>
       </nav>
+
       <section>
-        <div className="mx-auto max-w-[800px] w-full sm:p-3">
-
-          {/* feature images  */}
-          <div className="bg-surface rounded-lg sm:rounded-2xl shadow-sm sm:shadow-xl border border-line/50 p-1 sm:p-3 mb-3 sm:mb-8 backdrop-blur-sm">
-            <div className="relative group">
-              <div className="aspect-video bg-gradient-to-br from-surface-2 to-surface-2 rounded-lg sm:rounded-xl overflow-hidden border-2 border-dashed border-line-strong hover:border-primary transition-all duration-300">
-                <label
-                  htmlFor="uploadBanner"
-                  className="cursor-pointer block h-full"
-                >
-                  <img
-                    src={banner || "/news-banner.png"}
-                    alt="Article Banner"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={handleImageError}
-                  />
-                  <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/10 transition-colors duration-300 flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-surface/90 backdrop-blur-sm rounded-xl p-2 sm:px-4 sm:py-2">
-                      <span className="text-sm font-medium text-fg-muted flex items-center space-x-2">
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        <span>Change Image</span>
-                      </span>
-                    </div>
-                  </div>
-                </label>
-                <input
-                  type="file"
-                  id="uploadBanner"
-                  accept=".png, .jpg, .jpeg, .webp"
-                  hidden
-                  onChange={handleChangeBanner}
-                />
-              </div>
-            </div>
-            <div className="mt-2 sm:mt-5">
-              <InputFields
-                LabelTitle={"Image Caption"}
-                placeholder={"Add a caption for your image..."}
-                inputVal={imageRef}
-                name={"imageRef"}
-                handleInputValue={handleImageCaptionChange}
-              />
-            </div>
-          </div>
-
-          <div className="bg-surface rounded-lg sm:rounded-2xl shadow-sm sm:shadow-xl border border-line/50 p-1.5 sm:p-3 mb-2 sm:mb-8">
-            <textarea
-              defaultValue={title}
-              placeholder="News Title"
-              className="text-xl sm:text-2xl font-semibold w-full h-20 bg-transparent border-none outline-none resize-none text-fg placeholder-fg-faint leading-tight"
-              onKeyDown={handleTitleKeyDown}
-              onChange={handleTitleChange}
-            />
-          </div>
-          <hr className="w-full opacity-10 my-2 sm:my-5 max-sm:hidden" />
-
-          {/* Video Input Section - Only show when toggle is enabled */}
-          {isVideo && (
-            <div className="w-full mb-2 sm:mb-6 mt-5">
-              <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                <svg
-                  className="w-5 h-5 text-primary"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M2 6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM5 8a1 1 0 011-1h1a1 1 0 010 2H6a1 1 0 01-1-1zm6 1a1 1 0 100 2h3a1 1 0 100-2H11z" />
-                </svg>
-                <h3 className="text-lg font-semibold text-fg">
-                  Video Content
-                </h3>
-              </div>
-
-              <div className="bg-surface rounded-xl sm:rounded-2xl shadow-xl sm:shadow-xl border border-line/50 p-1 sm:p-3 mb-8 transform transition-all duration-500 animate-in slide-in-from-top-4">
-                {!videoPreview ? (
-                  <div className="relative group">
-                    <label
-                      htmlFor="uploadVideo"
-                      className="cursor-pointer block"
-                    >
-                      <div className="border-2 border-dashed border-primary rounded-xl p-8 text-center hover:border-primary transition-all duration-300 group-hover:bg-primary-soft">
-                        <div className="flex flex-col items-center space-y-4">
-                          <div className="w-16 h-16 bg-primary-soft rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                            <svg
-                              className="w-8 h-8 text-primary"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="text-lg font-medium text-fg-muted mb-1">
-                              Upload Your Video
-                            </p>
-                            <p className="text-sm text-fg-subtle">
-                              Drag and drop your video file here, or click to
-                              browse
-                            </p>
-                            <p className="text-xs text-fg-faint mt-2">
-                              Supports MP4, MOV, AVI, WEBM • Max size: 100MB
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </label>
-                    <input
-                      id="uploadVideo"
-                      type="file"
-                      accept=".mp4, .mov, .avi, .webm"
-                      hidden
-                      onChange={handleVideoChange}
+        {/*
+          Mobile: single column  -> banner, title, video, editor (same as before)
+          Desktop (lg+): left = banner/title/editor, right = sticky panel (actions + video + tips)
+        */}
+        <div className="w-full sm:p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-x-6">
+          {/* ---------- LEFT: banner ---------- */}
+          <div className="lg:col-start-1 lg:row-start-1">
+            <div className="bg-surface rounded-lg sm:rounded-2xl shadow-card border border-line/50 p-1 sm:p-3 mb-3 sm:mb-8 backdrop-blur-sm">
+              <div className="relative group">
+                <div className="aspect-video bg-gradient-to-br from-surface-2 to-surface-2 rounded-lg sm:rounded-xl overflow-hidden border-2 border-dashed border-line-strong hover:border-primary transition-all duration-300">
+                  <label
+                    htmlFor="uploadBanner"
+                    className="cursor-pointer block h-full"
+                  >
+                    <img
+                      src={banner || "/news-banner.png"}
+                      alt="Article Banner"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={handleImageError}
                     />
-                  </div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-4">
-                    <div className="relative rounded-xl overflow-hidden shadow-lg border">
-                      <video
-                        controls
-                        className="w-full max-h-[350px] object-contain bg-ink"
-                        src={videoPreview}
-                      >
-                        Your browser does not support the video tag.
-                      </video>
-                      <div className="absolute top-3 right-3">
-                        <button
-                          className="bg-danger hover:bg-danger text-paper p-2 rounded-full transition-all duration-200 shadow-lg hover:scale-110"
-                          onClick={handleRemoveVideo}
-                          title="Remove Video"
-                        >
+                    <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/10 transition-colors duration-300 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-surface/90 backdrop-blur-sm rounded-xl p-2 sm:px-4 sm:py-2">
+                        <span className="text-sm font-medium text-fg-muted flex items-center space-x-2">
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -718,66 +609,344 @@ const BlogEditor = () => {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth="2"
-                              d="M6 18L18 6M6 6l12 12"
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                             />
                           </svg>
-                        </button>
+                          <span>Change Image</span>
+                        </span>
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between bg-success-soft border border-success/30 rounded-lg p-3">
-                      <div className="flex items-center gap-1 sm:gap-3">
-                        <div className="size-6 sm:size-8 bg-success-soft rounded-full flex items-center justify-center">
-                          <svg
-                            className="w-4 h-4 text-success"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-success">
-                            Video Details
-                          </p>
-                          <p className="text-xs text-success">
-                            {truncate(videoFile?.name, 20)}
-                          </p>
-                        </div>
-                      </div>
-                      {isUploading ? (
-                        <div className="flex items-center gap-2 bg-primary-soft text-primary border border-primary rounded-md px-2 py-1 max-sm:text-sm">
-                          <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                          <span>Uploading...</span>
-                        </div>
-                      ) : videoFile ? (
-                        <button
-                          className="bg-success-soft text-success border border-success rounded-md px-2 py-1 max-sm:text-sm cursor-pointer"
-                          onClick={handleUpload}
-                        >
-                          Upload
-                        </button>
-                      ) : (
-                        <div className="bg-surface-2 text-fg-muted border border-fg-faint rounded-md px-2 py-1 max-sm:text-sm">
-                          Video uploaded
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  </label>
+                  <input
+                    type="file"
+                    id="uploadBanner"
+                    accept=".png, .jpg, .jpeg, .webp"
+                    hidden
+                    onChange={handleChangeBanner}
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-fg-subtle max-sm:hidden">
+                Use a clear 16:9 landscape photo. PNG, JPG or WEBP – it is
+                compressed automatically.
+              </p>
+              <div className="mt-2 sm:mt-4">
+                <InputFields
+                  LabelTitle={"Image Caption"}
+                  placeholder={"Add a caption for your image..."}
+                  inputVal={imageRef}
+                  name={"imageRef"}
+                  handleInputValue={handleImageCaptionChange}
+                />
               </div>
             </div>
-          )}
+          </div>
 
-          {/* <div id="textEditor" className="font-anekdevanagari"></div> */}
-          <div className="bg-surface rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl border border-line/50 p-1 sm:p-3 max-sm:mt-4">
+          {/* ---------- LEFT: title ---------- */}
+          <div className="lg:col-start-1 lg:row-start-2">
+            <div className="bg-surface rounded-lg sm:rounded-2xl shadow-card border border-line/50 p-1.5 sm:p-3 mb-2 sm:mb-8">
+              <textarea
+                defaultValue={title}
+                placeholder="News Title"
+                className="text-xl sm:text-2xl font-semibold w-full h-20 bg-transparent border-none outline-none resize-none text-fg placeholder-fg-faint leading-tight"
+                onKeyDown={handleTitleKeyDown}
+                onChange={handleTitleChange}
+              />
+              <div className="flex items-center justify-between px-1 pb-1 text-xs max-sm:hidden">
+                <span className="text-fg-subtle">
+                  Short, specific headlines work best.
+                </span>
+                <span
+                  className={
+                    titleLength > TITLE_IDEAL_MAX ? "text-danger" : "text-fg-subtle"
+                  }
+                >
+                  {titleLength}/{TITLE_IDEAL_MAX}
+                </span>
+              </div>
+            </div>
+            <hr className="w-full opacity-10 my-2 sm:my-5 max-sm:hidden lg:hidden" />
+          </div>
+
+          {/* ---------- RIGHT (desktop) / inline (mobile): actions + video + tips ---------- */}
+          <aside className="lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:self-start lg:sticky lg:top-32 lg:space-y-4">
+            {/* Desktop action panel */}
+            <div className="hidden lg:block bg-surface rounded-2xl shadow-card border border-line/50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-fg">Actions</h3>
+                <span className="text-xs text-fg-subtle">
+                  {hasChanges ? "Saving locally…" : "Draft saved locally"}
+                </span>
+              </div>
+
+              {user?.role === "admin" && (
+                <div className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 mb-3">
+                  <div>
+                    <p className="text-sm font-medium text-fg">Video news</p>
+                    <p className="text-xs text-fg-subtle">
+                      Turn on to attach a video to this story
+                    </p>
+                  </div>
+                  {Toggle}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 shadow-card">
+                <button
+                  className="btn-blue lg:py-2 bg-gradient-to-r from-success to-success border-success flex items-center justify-center gap-1 w-full"
+                  onClick={handlePublishEvent}
+                >
+                  <ArrowRight size={20} />
+                  Next
+                </button>
+                {mode !== "edit" && (
+                  <button
+                    className="btn-blue-outline lg:py-2 bg-surface hover:bg-surface-2 text-fg-muted border border-line-strong flex gap-1 items-center justify-center w-full"
+                    onClick={handleSaveDraft}
+                  >
+                    <span className="flex items-center">
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                    </span>
+                    Save Draft
+                  </button>
+                )}
+                <button
+                  className="btn-red lg:py-2 flex items-center justify-center gap-1 w-full"
+                  onClick={handleResetEditor}
+                >
+                  <RotateCcw size={20} />
+                  Reset
+                </button>
+              </div>
+            </div>
+
+
+            {/* Video Input Section - Only show when toggle is enabled */}
+            {isVideo && (
+              <div className="w-full mb-2 sm:mb-6 mt-5 lg:mt-0 lg:mb-0">
+                <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                  <svg
+                    className="w-5 h-5 text-primary"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M2 6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM5 8a1 1 0 011-1h1a1 1 0 010 2H6a1 1 0 01-1-1zm6 1a1 1 0 100 2h3a1 1 0 100-2H11z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold text-fg">
+                    Video Content
+                  </h3>
+                </div>
+
+                <div className="bg-surface rounded-xl sm:rounded-2xl shadow-card sm:shadow-card border border-line/50 p-1 sm:p-3 mb-8 lg:mb-0 transform transition-all duration-500 animate-in slide-in-from-top-4">
+                  {!videoPreview ? (
+                    <div className="relative group">
+                      <label
+                        htmlFor="uploadVideo"
+                        className="cursor-pointer block"
+                      >
+                        <div className="border-2 border-dashed border-primary rounded-xl p-8 lg:p-6 text-center hover:border-primary transition-all duration-300 group-hover:bg-primary-soft">
+                          <div className="flex flex-col items-center space-y-4">
+                            <div className="w-16 h-16 bg-primary-soft rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                              <svg
+                                className="w-8 h-8 text-primary"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-lg font-medium text-fg-muted mb-1">
+                                Upload Your Video
+                              </p>
+                              <p className="text-xs text-fg-subtle">
+                                Drag and drop your video file here, or click to
+                                browse
+                              </p>
+                              <p className="text-xs text-fg-faint mt-2">
+                                Supports MP4, MOV, AVI, WEBM • Max size: 100MB
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                      <input
+                        id="uploadVideo"
+                        type="file"
+                        accept=".mp4, .mov, .avi, .webm"
+                        hidden
+                        onChange={handleVideoChange}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 sm:space-y-4">
+                      <div className="relative rounded-xl overflow-hidden shadow-lg border">
+                        <video
+                          controls
+                          className="w-full max-h-[350px] object-contain bg-ink"
+                          src={videoPreview}
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                        <div className="absolute top-3 right-3">
+                          <button
+                            className="bg-danger hover:bg-danger text-paper p-2 rounded-full transition-all duration-200 shadow-lg hover:scale-110"
+                            onClick={handleRemoveVideo}
+                            title="Remove Video"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-success-soft border border-success/30 rounded-lg p-3">
+                        <div className="flex items-center gap-1 sm:gap-3">
+                          <div className="size-6 sm:size-8 bg-success-soft rounded-full flex items-center justify-center">
+                            <svg
+                              className="w-4 h-4 text-success"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-success">
+                              Video Details
+                            </p>
+                            <p className="text-xs text-success">
+                              {truncate(videoFile?.name, 20)}
+                            </p>
+                          </div>
+                        </div>
+                        {isUploading ? (
+                          <div className="flex items-center gap-2 bg-primary-soft text-primary border border-primary rounded-md px-2 py-1 max-sm:text-sm">
+                            <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                            <span>Uploading...</span>
+                          </div>
+                        ) : videoFile ? (
+                          <button
+                            className="bg-success-soft text-success border border-success rounded-md px-2 py-1 max-sm:text-sm cursor-pointer"
+                            onClick={handleUpload}
+                          >
+                            Upload
+                          </button>
+                        ) : (
+                          <div className="bg-surface-2 text-fg-muted border border-fg-faint rounded-md px-2 py-1 max-sm:text-sm">
+                            Video uploaded
+                          </div>
+                        )}
+                      </div>
+
+                      {videoPending && (
+                        <p className="text-xs text-primary px-1">
+                          Selected, not uploaded yet. Press “Upload” so the
+                          video is saved with your news.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Desktop readiness checklist */}
+            <div className="hidden lg:block bg-surface rounded-2xl shadow-card border border-line/50 p-4 mt-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold text-fg">
+                  Ready to continue?
+                </h3>
+                <span className="text-xs text-fg-subtle">
+                  {doneCount}/{checklist.length}
+                </span>
+              </div>
+              <ul className="space-y-1.5">
+                {checklist.map((item) => (
+                  <li
+                    key={item.label}
+                    className={`flex items-center gap-2 text-sm ${item.done ? "text-success" : "text-fg-muted"
+                      }`}
+                  >
+                    {item.done ? (
+                      <CheckCircle2 size={16} />
+                    ) : (
+                      <Circle size={16} />
+                    )}
+                    {item.label}
+                  </li>
+                ))}
+              </ul>
+              {videoPending && (
+                <p className="mt-2 text-xs text-primary">
+                  You picked a video – press “Upload” below before continuing.
+                </p>
+              )}
+            </div>
+
+            {/* Desktop tips */}
+            <div className="hidden lg:block rounded-2xl border border-line/50 bg-surface-2/50 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Lightbulb size={16} className="text-primary" />
+                <h3 className="text-sm font-semibold text-fg">Writing tips</h3>
+              </div>
+              <ul className="space-y-1.5 text-xs text-fg-muted list-disc pl-4">
+                <li>Your work is auto-saved in this browser every few seconds.</li>
+                <li>
+                  Undo / Redo: <b>Ctrl+Z</b>, <b>Ctrl+Y</b> or{" "}
+                  <b>Ctrl+Shift+Z</b> (⌘ on Mac).
+                </li>
+
+                <li>
+                  Lead with the key fact in the first paragraph, then add
+                  details.
+                </li>
+                <li>
+                  <b>Reset</b> clears the local draft, so use <b>Save Draft</b>{" "}
+                  first if you want to keep it.
+                </li>
+              </ul>
+            </div>
+          </aside>
+
+          {/* ---------- LEFT: editor ---------- */}
+          <div className="lg:col-start-1 lg:row-start-3 bg-surface rounded-xl sm:rounded-2xl shadow-card border border-line/50 p-1 sm:p-3 max-sm:mt-4 lg:mt-0">
             <div className="flex items-center justify-between space-x-3 mb-2 sm:mb-6">
               <div className="flex items-center gap-2 md:gap-3 max-sm:px-1">
-                <div className="size-8 sm:size-10 bg-gradient-to-br from-primary to-primary rounded-md sm:rounded-xl flex items-center justify-center shadow-lg">
+                <div className="size-8 sm:size-10 bg-gradient-to-br from-primary to-primary rounded-md sm:rounded-lg flex items-center justify-center shadow-lg">
                   <svg
                     className="size-4 sm:size-5 text-paper"
                     fill="none"
@@ -797,7 +966,7 @@ const BlogEditor = () => {
                   <h3 className="text-lg sm:text-xl font-bold text-fg">
                     Article Content
                   </h3>
-                  <p className="text-[10px] sm:text-sm text-fg-subtle max-sm:-mt-1">
+                  <p className="text-[10px] sm:text-sm text-fg-subtle -mt-1">
                     Write your news with our rich text editor
                   </p>
                 </div>
@@ -806,7 +975,7 @@ const BlogEditor = () => {
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  title="Undo"
+                  title="Undo (Ctrl+Z)"
                   onClick={() => undoRef.current?.undo()}
                   className="p-1.5 rounded text-fg-muted hover:bg-surface-2"
                 >
@@ -814,14 +983,13 @@ const BlogEditor = () => {
                 </button>
                 <button
                   type="button"
-                  title="Redo"
+                  title="Redo (Ctrl+Y)"
                   onClick={() => undoRef.current?.redo()}
                   className="p-1.5 rounded text-fg-muted hover:bg-surface-2"
                 >
                   <Redo2 size={18} />
                 </button>
               </div>
-
             </div>
 
             <div

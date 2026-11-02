@@ -16,7 +16,7 @@ import { cached, clearCache, setPublicCache } from '../utils/cache.js';
 const invalidateTaxonomy = () => { clearCache('tax:'); clearCache('home:'); clearCache('analytics:'); };
 
 const isId = (v) => mongoose.Types.ObjectId.isValid(v);
-const NEWS_LIST_FIELDS = 'news_id slug primaryRoute.slug title description banner location post_time isVideo tags -_id';
+const NEWS_LIST_FIELDS = 'news_id slug primaryRoute.slug title description banner location post_time isVideo tags -_id author';
 
 /** Shared: build the { seo: { meta, jsonLd } } block for a taxonomy page. */
 const taxonomySeoBlock = ({ doc, name, type, slug, breadcrumbs }) => {
@@ -39,7 +39,12 @@ const paging = (req, max = 50) => {
 const listNews = async (filter, req) => {
     const { page, limit, skip } = paging(req);
     const rows = await News.find({ draft: false, isPublished: true, isDeleted: false, ...filter })
-        .sort({ post_time: -1, _id: -1 }).skip(skip).limit(limit + 1).select(NEWS_LIST_FIELDS).populate({ path: 'tags', select: 'title slug -_id' }).lean();
+        .sort({ post_time: -1, _id: -1 })
+        .skip(skip).limit(limit + 1)
+        .select(NEWS_LIST_FIELDS)
+        .populate({ path: 'tags', select: 'title slug -_id' })
+        .populate('author', 'fullName')
+        .lean();
     return { news: rows.slice(0, limit).map(toCard), hasMore: rows.length > limit, page, limit };
 };
 
@@ -149,6 +154,7 @@ const toCard = (n) => ({
     location: n.location || '',
     publishedAt: n.post_time,
     tags: n.tags || [],
+    author: n.author || null,
 });
 
 /** Latest-first list (post_time desc, _id tie-break) using the "limit + 1" trick, so no slow count(). */
@@ -185,8 +191,8 @@ const readLocationBody = async (req, Model, existing, nameField) => {
     if (b[nameField] !== undefined) data[nameField] = String(b[nameField]).trim().toLowerCase();
     if (b.displayName !== undefined) data.displayName = String(b.displayName).trim();
     if (b.description !== undefined) data.description = b.description;
-    if (b.isActive !== undefined) data.isActive = toBool(b.isActive);
-    const seo = sanitizeSeo(b.seo);
+    if (b.order !== undefined) data.order = Number(b.order) || 0;   // ← add this
+    if (b.isActive !== undefined) data.isActive = toBool(b.isActive); const seo = sanitizeSeo(b.seo);
     if (seo) data.seo = seo;
     if (req.files?.image) {
         if (existing?.image) await deleteImage(existing.image);
@@ -229,15 +235,16 @@ export const deleteState = tryCatch(async (req, res) => {
 });
 
 export const getStatesAdmin = tryCatch(async (req, res) => {
-    const states = await State.find().sort({ state: 1 }).lean();
+    const states = await State.find().sort({ order: 1, state: 1 }).lean();
+
     res.status(200).json({ success: true, states });
 });
 
 export const getStatesPublic = tryCatch(async (req, res) => {
     const states = await cached('tax:states', 300, async () => {
         const [st, ds] = await Promise.all([
-            State.find({ isActive: true }).sort({ state: 1 }).select('state slug displayName image').lean(),
-            District.find({ isActive: true }).sort({ district: 1 }).select('district slug displayName state').lean(),
+            State.find({ isActive: true }).sort({ order: 1, state: 1 }).select('state slug displayName image order').lean(),
+            District.find({ isActive: true }).sort({ order: 1, district: 1 }).select('district slug displayName state order').lean(),
         ]);
         return st.map((s) => ({ ...s, districts: ds.filter((d) => String(d.state) === String(s._id)) }));
     });
@@ -248,7 +255,7 @@ export const getStatesPublic = tryCatch(async (req, res) => {
 export const getStateBySlug = tryCatch(async (req, res) => {
     const state = await State.findOne({ slug: req.params.slug.toLowerCase(), isActive: true }).lean();
     if (!state) throw new ErrorHandler(404, 'State not found');
-    const districts = await District.find({ state: state._id, isActive: true }).sort({ district: 1 }).select('district slug displayName image').lean();
+    const districts = await District.find({ state: state._id, isActive: true }).sort({ order: 1, district: 1 }).select('district slug displayName image').lean();
     const name = state.displayName || state.state;
     const breadcrumbs = [
         { name: 'Home', url: seoConfig.siteUrl() || '/' },
@@ -309,7 +316,8 @@ export const deleteDistrict = tryCatch(async (req, res) => {
 
 export const getDistrictsAdmin = tryCatch(async (req, res) => {
     const filter = isId(req.query.state) ? { state: req.query.state } : {};
-    const districts = await District.find(filter).sort({ district: 1 }).populate('state', 'state slug').lean();
+    const districts = await District.find(filter).sort({ order: 1, district: 1 }).populate('state', 'state slug').lean();
+
     res.status(200).json({ success: true, districts });
 });
 

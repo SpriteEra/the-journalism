@@ -7,7 +7,6 @@ const ArticleCard = ({ item, divider = true, priority = false, className = "" })
     if (!item) return null;
     const { title, description, image, href = "#", author } = item;
 
-
     return (
         <article
             className={`w-full py-2.5 max-lg:pb-2 sm:py-3 first:pt-0 ${divider ? "border-b border-black/10" : ""} ${className}`}
@@ -38,7 +37,7 @@ const ArticleCard = ({ item, divider = true, priority = false, className = "" })
                     {author && (
                         <p className="mt-1 lg:mt-2 flex items-center gap-1.5 text-xs font-medium text-primary lg:mt-3 lg:text-lg">
                             <UserRound className="size-3.5 lg:size-5" aria-hidden />
-                            <span>{author}</span>
+                            <span>{author.fullName}</span>
                         </p>
                     )}
                 </div>

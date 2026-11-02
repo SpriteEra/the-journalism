@@ -17,6 +17,12 @@ export const socials = () => [
   ["youtube", process.env.NEXT_PUBLIC_SOCIAL_YOUTUBE],
 ].filter(([, url]) => Boolean(url)).map(([name, url]) => ({ name, url }));
 
+export const social = {
+  facebook: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK || "",
+  x: process.env.NEXT_PUBLIC_SOCIAL_X || "",
+  instagram: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM || "",
+  youtube: process.env.NEXT_PUBLIC_SOCIAL_YOUTUBE || "",
+};
 const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : d; };
 /** cache lifetimes in seconds */
 export const TTL = {

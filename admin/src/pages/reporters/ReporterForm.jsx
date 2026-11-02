@@ -185,7 +185,7 @@ export default function ReporterForm() {
                 </div>
               </div>
               <p className="hindi-font line-clamp-5 text-sm text-fg-muted">{f.about || "About text appears here."}</p>
-              <div className="rounded-xl border border-line bg-surface-2/50 p-3"><p className="text-[11px] text-fg-subtle">Search result</p><p className="hindi-font line-clamp-1 text-base text-info">{preview.title}</p><p className="hindi-font line-clamp-2 text-xs text-fg-muted">{preview.desc}</p></div>
+              <div className="rounded-lg border border-line bg-surface-2/50 p-3"><p className="text-[11px] text-fg-subtle">Search result</p><p className="hindi-font line-clamp-1 text-base text-info">{preview.title}</p><p className="hindi-font line-clamp-2 text-xs text-fg-muted">{preview.desc}</p></div>
               <div>
                 <div className="mb-1 flex justify-between text-xs text-fg-subtle"><span>Required fields</span><span>{done}/3</span></div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-surface-3"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / 3) * 100}%` }} /></div>
@@ -195,8 +195,21 @@ export default function ReporterForm() {
           </Card>
           {!editing && <Alert tone="info"><ShieldCheck className="mr-1 inline size-4" />New members start with the permissions of the chosen role.</Alert>}
           <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-surface/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:static lg:z-auto lg:flex-col lg:border-0 lg:bg-transparent lg:p-0">
-            <Button as={Link} to={editing ? `/dashboard/reporters/${id}` : "/dashboard/reporters"} variant="outline" size="lg" className="flex-1 lg:w-full">Cancel</Button>
-            <Button type="submit" size="lg" loading={busy} className="flex-[2] lg:w-full">{editing ? "Save changes" : "Create team member"}</Button>
+            <Button
+              as={Link}
+              to={editing ? `/dashboard/reporters/${id}` : "/dashboard/reporters"}
+              variant="outline"
+              size="lg"
+              className="flex-1 lg:py-2.5 lg:w-full">
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="lg"
+              loading={busy}
+              className="flex-[2] lg:py-2.5 lg:w-full"
+            >{editing ? "Save changes" : "Create team member"}
+            </Button>
           </div>
         </aside>
       </form>

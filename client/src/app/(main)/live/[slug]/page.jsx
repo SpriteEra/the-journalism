@@ -7,6 +7,7 @@ import LiveFeed from "@/components/live/LiveFeed";
 import { getLive } from "@/lib/data";
 import { jsonLdList, toMetadata } from "@/lib/adapters";
 import { abs } from "@/lib/site";
+import LatestNews from "@/components/LatestNews";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -37,7 +38,13 @@ export default async function LivePage({ params }) {
       </section>
 
       <aside className="relative min-h-50 space-y-3.5 pt-3 lg:col-span-2 lg:pt-9">
-        <div className="sticky top-35 space-y-6"><SideAds /></div>
+        <div className="sticky top-3 space-y-6">
+          <SideAds />
+
+        </div>
+        <div className="sticky top-70 space-y-6">
+          <LatestNews />
+        </div>
       </aside>
     </div>
   );

@@ -55,7 +55,6 @@ export default function VideoCard({ thumbnail, portrait, duration, title, titleC
                     </p>
                     <button
                         type="button"
-                        onClick={toggle}
                         aria-expanded={open}
                         aria-controls={id}
                         className="w-full pt-0.5 text-start text-[10px] italic text-red-500 transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 flex items-center gap-1"
@@ -65,12 +64,12 @@ export default function VideoCard({ thumbnail, portrait, duration, title, titleC
                     </button>
                 </div>
             </button>
-
             <div id={id} className={`grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                 <div className="overflow-hidden" inert={open ? undefined : ""}>
                     <div className="space-y-3 border-t border-line p-3">{children}</div>
                 </div>
             </div>
+
 
 
         </div>

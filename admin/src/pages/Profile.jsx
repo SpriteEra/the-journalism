@@ -141,7 +141,11 @@ export default function Profile() {
     <>
       <PageHeader title={t("My profile")} description="Your details, numbers and preferences" />
 
-      <ProfileHeader className="mb-4 sm:mb-5" name={data?.fullName || data?.username} src={data?.profile}
+      <ProfileHeader
+        className="mb-4 sm:mb-5"
+        name={data?.fullName || data?.username}
+        src={data?.profile}
+
         badges={user?.role && <Badge tone={user.role === "admin" ? "accent" : "primary"} className="capitalize">{user.role}</Badge>}
         subtitle={data?.designation ? `${data.designation}${data.location ? ` · ${data.location}` : ""}` : data?.location}
         about={data?.about}
@@ -168,7 +172,12 @@ export default function Profile() {
         <div className="min-w-0 space-y-4 sm:space-y-5 lg:col-span-3">
           {editing && data ? <ProfileEditor profile={data} onDone={() => setEditing(false)} /> : (
             <Card padded={false}>
-              <CardHeader icon={User} title="Account information" />
+              <CardHeader
+                icon={User}
+                title="Account information"
+                actions={<>
+                  {!editing && <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setEditing(true)}>Edit profile</Button>}</>}
+              />
               <div className="grid gap-2.5 p-3 sm:grid-cols-2 sm:gap-3 sm:p-5">
                 <Row icon={User} label="Username" value={data?.username} />
                 <Row icon={FileText} label="Full name" value={data?.fullName} />

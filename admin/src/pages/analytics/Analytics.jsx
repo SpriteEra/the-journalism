@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Clock, Eye, FileText, Film, Layers, Users } from "lucide-react";
+import { BarChart3, Clock, Eye, FileText, Film, Flame, Layers, Users } from "lucide-react";
 import usePermission from "../../hooks/usePermission";
 import { useAnalyticsDashboard, useReporterPerformance } from "../../hooks/admin";
 import { fmtDate } from "../../lib/api";
 import RangePicker, { rangeFromDays } from "../../components/analytics/RangePicker";
 import { ColumnChart, Donut, Gauge, Heatmap, LinesChart, RankBars, TrendChart } from "../../components/charts/Charts";
 import { Alert, Avatar, Badge, Card, CardHeader, DataTable, EmptyState, ErrorState, PageHeader, Skeleton, StatCard, Tabs } from "../../components/ui";
+import cn from "../../lib/cn";
+import { handleImageError } from "../../utils/imageError";
+import { MEDAL } from "../team/TeamPerformance";
 
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
 const WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -24,6 +27,7 @@ function AdminAnalytics() {
   const [tab, setTab] = useState("overview");
   const [dim, setDim] = useState("categories");
   const { data, isLoading, isFetching, error, refetch } = useAnalyticsDashboard(range);
+  const week = useAnalyticsDashboard(useMemo(() => rangeFromDays(7), []), true);
   const d = data?.data; const o = d?.overview;
   const cache = data?.cache;
   const grid = d?.heatmap?.grid;
@@ -31,9 +35,18 @@ function AdminAnalytics() {
   const byWeekday = useMemo(() => (grid ? grid.map((row, i) => ({ day: WEEKDAY[i], Reads: row.reduce((a, c) => a + c.views, 0), Stories: row.reduce((a, c) => a + c.articles, 0) })) : []), [grid]);
   const repBars = useMemo(() => (d?.reporters || []).slice(0, 8).map((r) => ({ name: r.reporter.username, Stories: r.published, Reads: r.views })), [d]);
 
+
+  const trending = week.data?.data?.topArticles || [];
+  const trendTags = (week.data?.data?.tags || []).slice(0, 8);
+
   const dimRows = useMemo(() => {
     if (!d) return [];
-    const rows = { categories: d.categories, states: d.states, districts: d.districts, tags: d.tags }[dim] || [];
+    const rows = {
+      categories: d.categories,
+      states: d.states,
+      // districts: d.districts, 
+      tags: d.tags
+    }[dim] || [];
     return rows.map((r) => ({ name: r.name, value: r.articles, views: r.views, avgViews: r.avgViews }));
   }, [d, dim]);
 
@@ -97,7 +110,11 @@ function AdminAnalytics() {
 
           {tab === "content" && (
             <>
-              <Tabs variant="pill" value={dim} onChange={setDim} items={[{ value: "categories", label: "Categories" }, { value: "states", label: "States" }, { value: "districts", label: "Districts" }, { value: "tags", label: "Tags" }]} />
+              <Tabs variant="pill" value={dim} onChange={setDim} items={[{ value: "categories", label: "Categories" },
+              { value: "states", label: "States" },
+              // { value: "districts", label: "Districts" },
+              { value: "tags", label: "Tags" }]}
+              />
               <div className="grid gap-5 lg:grid-cols-2">
                 <Block title="Stories" loading={isLoading} height="h-80">{dimRows.length ? <RankBars data={dimRows} label="Stories" /> : <EmptyState title="No data in this range" />}</Block>
                 <Block title="Reads" loading={isLoading} height="h-80">{dimRows.length ? <RankBars data={[...dimRows].sort((a, b) => b.views - a.views)} valueKey="views" label="Reads" color="var(--chart-2)" /> : <EmptyState title="No data in this range" />}</Block>
@@ -107,6 +124,23 @@ function AdminAnalytics() {
                   <div className="mt-1 flex flex-wrap gap-1.5">{d.quietCategories.map((c) => <Badge key={c._id} tone="warning">{c.name}</Badge>)}</div>
                 </Alert>
               )}
+              <Card padded={false} className="lg:col-span-2">
+                <CardHeader icon={Flame} title="Trending this week" description="Most read stories published in the last 7 days" actions={<Badge tone="warning" size="sm">7 days</Badge>} />
+                {week.isLoading ? <div className="space-y-3 p-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}</div> : trending.length ? (
+                  <ol className="divide-y divide-line">
+                    {trending.slice(0, 8).map((a, i) => (
+                      <li key={a.news_id}>
+                        <Link to={`/dashboard/news/${a.news_id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-surface-2/60 sm:gap-4 sm:px-5">
+                          <span className={cn("grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold sm:size-8 sm:text-sm", MEDAL[i] || "bg-surface-2 text-fg-muted")}>{i + 1}</span>
+                          <img src={`${a.banner}?q=60&w=160`} alt="" loading="lazy" onError={handleImageError} className="h-12 w-16 shrink-0 rounded-lg bg-surface-3 object-cover sm:w-20" />
+                          <span className="min-w-0 flex-1"><span className="hindi-font line-clamp-2 text-sm font-medium text-fg">{a.title}</span><span className="line-clamp-1 text-xs text-fg-subtle">{a.category?.[0]?.name} · {a.author?.username} · {fmtDate(a.post_time)}</span></span>
+                          <Badge tone="primary" size="sm"><Eye className="size-3" />{num(a.activity?.total_reads)}</Badge>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <EmptyState icon={Flame} title="Nothing trending yet" description="Stories published in the last 7 days will appear here." />}
+              </Card>
             </>
           )}
 

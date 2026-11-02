@@ -31,9 +31,12 @@ import { makeNewsSlug, needsRedirect, newsPath, newsUrl, parsePrimaryInput, pick
 import HomeSection from "../model/homesection.model.js";
 import { resolveFilter } from "./homesection.controller.js";
 import { attachPrimaryName } from "../utils/primaryRoutes.js";
+import { trackNewsView } from "../utils/newsViewTracker.js";
+import liveNewsModel from "../model/live.news.model.js";
+import tagModel from "../model/tag.model.js";
 
 const PUBLIC_Q = { draft: false, isPublished: true, isDeleted: false };
-const CARD_FIELDS = 'news_id slug primaryRoute.slug title description location post_time banner isVideo -_id';
+const CARD_FIELDS = 'news_id slug primaryRoute.slug title description location post_time banner isVideo -_id author';
 
 /** One story -> the card shape the website uses */
 const toCard = (n) => ({
@@ -45,6 +48,18 @@ const toCard = (n) => ({
     isVideo: Boolean(n.isVideo),
     location: n.location || '',
     publishedAt: n.post_time,
+    author: n.author,
+});
+const toLiveCard = (n) => ({
+    id: String(n._id),
+    title: n.title,
+    description: n.caption || '',
+    image: n.image || '',
+    href: `/live/${n.slug}`,            // change to your real live-blog route
+    isVideo: false,
+    isLive: n.status === 'live',
+    location: '',
+    publishedAt: n.post_time || n.startTime,
 });
 const toCards = (rows) => rows.map(toCard);
 const clampInt = (v, def, min, max) => Math.min(Math.max(parseInt(v) || def, min), max);
@@ -168,23 +183,36 @@ export const getNewses = tryCatch(async (req, res) => {
     if (body.location) query.location = String(body.location).trim().toLowerCase();
 
     const [rows, total] = await Promise.all([
-        News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
+        News.find(query)
+            .sort({ post_time: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .populate('author', 'fullName about designation profile profileUrl username')
+            .select(CARD_FIELDS)
+            .lean(),
         body.iscount ? News.countDocuments(query) : Promise.resolve(undefined),
     ]);
     const news = toCards(rows);
     return res.status(200).json(body.iscount ? { news, total } : news);
 });
 
-export const getRelatedNews = tryCatch(async (req, res, next) => {
-    let { incrementVal, is_literature = false } = req.query;
+export const incrementCountNews = tryCatch(async (req, res, next) => {
     const { news_id } = req.params;
 
-    incrementVal = parseInt(incrementVal) ? 1 : 0;
-    if (incrementVal) {
-        await News.collection.updateOne({ news_id }, { $inc: { "activity.total_reads": 1, "activity.total_today_count": 1 } });
-    }
+    const exists = await News.exists({ news_id });
+    if (!exists) return next(new ErrorHandler(404, "News not found"));
+
+    trackNewsView(req, news_id);   // no await: the reader doesn't wait for counting
+
+    return res.status(200).json({ success: true });
+});
+
+export const getRelatedNews = tryCatch(async (req, res, next) => {
+    let { is_literature = false } = req.query;      // incrementVal removed
+    const { news_id } = req.params;
 
     const news = await News.findOne({ news_id }).select('tags category subCategory').lean();
+
     if (!news) return next(new ErrorHandler(404, "News not found"));
 
     const or = [];
@@ -195,16 +223,17 @@ export const getRelatedNews = tryCatch(async (req, res, next) => {
     const query = { ...PUBLIC_Q, is_literature: toBool(is_literature), news_id: { $ne: news_id } };
     if (or.length) query.$or = or;
 
-    let relatedNews = await News.find(query).limit(4).sort({ post_time: -1 }).select('news_id title banner -_id post_time updatedAt').lean();
+    let relatedNews = await News.find(query).limit(6).sort({ post_time: -1 })
+        .select('news_id slug primaryRoute.slug title banner -_id post_time updatedAt').lean();
 
     if (relatedNews.length === 0) {
         relatedNews = await News.aggregate([
-            { $match: { isPublished: true, isDeleted: false, draft: false } },
-            { $sample: { size: 4 } },
-            { $project: { _id: 0, news_id: 1, title: 1, banner: 1, post_time: 1, updatedAt: 1 } },
+            { $match: { isPublished: true, isDeleted: false, draft: false, news_id: { $ne: news_id } } },
+            { $sample: { size: 6 } },
+            { $project: { _id: 0, news_id: 1, slug: 1, 'primaryRoute.slug': 1, title: 1, banner: 1, post_time: 1, updatedAt: 1 } },
         ]);
     }
-    return res.status(200).json(relatedNews);
+    return res.status(200).json(relatedNews.map((n) => ({ ...n, path: newsPath(n) })));
 });
 
 /** Latest news by date (post_time desc). GET /news/latest?page=&limit=&state=&district=&category=&subCategory=  (id or slug) */
@@ -350,7 +379,8 @@ export const fetchStateNewsDistrictWise = tryCatch(async (req, res) => {
             latestFor({ state: state._id }, 5),
             News.distinct('district', { ...PUBLIC_Q, state: state._id }),
         ]);
-        const districts = await District.find({ _id: { $in: districtIds }, state: state._id, isActive: true }).sort({ district: 1 }).select('district slug displayName').lean();
+        const districts = await District.find({ _id: { $in: districtIds }, state: state._id, isActive: true }).sort({ order: 1, district: 1 }).select('district slug displayName').lean();
+
         const rows = await Promise.all(districts.map(async (d) => ({ d, news: await latestFor({ district: d._id }, 5) })));
         return [
             { label: stateName, slug: state.slug, id: state._id, data: stateNews },
@@ -364,7 +394,7 @@ export const fetchStateNewsDistrictWise = tryCatch(async (req, res) => {
 /** GET /news/fetch-all-state-news — latest 5 for every active state that has news. */
 export const findStateNews = tryCatch(async (req, res) => {
     const data = await cached('home:all-states', 60, async () => {
-        const states = await State.find({ isActive: true }).sort({ state: 1 }).select('state slug displayName').lean();
+        const states = await State.find({ isActive: true }).sort({ order: 1, state: 1 }).select('state slug displayName').lean();
         const rows = await Promise.all(states.map(async (s) => ({ s, news: await latestFor({ state: s._id }, 5) })));
         return rows.filter((r) => r.news.length).map(({ s, news }) => ({ state: s.displayName || s.state, slug: s.slug, id: s._id, data: news }));
     }, { stale: 120 });
@@ -385,15 +415,23 @@ export const searchNews = tryCatch(async (req, res) => {
     const search = String(req.query.search || '').trim().slice(0, 150);
     const page = clampInt(req.query.page, 1, 1, 100000);
     const limit = clampInt(req.query.limit, 20, 1, 50);
+    const TAG_LIMIT = 5;
 
     const query = { ...PUBLIC_Q };
+    let tokenRx = [];
+    let phraseRx = null;
+
     if (search) {
         const tokens = search.split(/\s+/).filter(Boolean).slice(0, 8);           // every word must appear, in any order
-        const tokenRx = tokens.map((t) => new RegExp(tolerantPattern(t), 'i'));
-        const phraseRx = new RegExp(tolerantPattern(search), 'i');
+        tokenRx = tokens.map((t) => new RegExp(tolerantPattern(t), 'i'));
+        phraseRx = new RegExp(tolerantPattern(search), 'i');
 
         const tax = await findTaxonomyByName(phraseRx);
-        const or = [{ $and: tokenRx.map((rx) => ({ $or: [{ title: rx }, { location: rx }, ...keywordClauses(rx)] })) }];
+
+        // each word may match title, location, news_id (English slug) or keywords
+        const tokenClause = (rx) => ({ $or: [{ title: rx }, { location: rx }, { news_id: rx }, ...keywordClauses(rx)] });
+        const or = [{ $and: tokenRx.map(tokenClause) }];
+
         if (tax.tags.length) or.push({ tags: { $in: tax.tags } });
         if (tax.category.length) or.push({ category: { $in: tax.category } });
         if (tax.subCategory.length) or.push({ subCategory: { $in: tax.subCategory } });
@@ -401,11 +439,58 @@ export const searchNews = tryCatch(async (req, res) => {
         if (tax.district.length) or.push({ district: { $in: tax.district } });
         query.$or = or;
     }
-    const [rows, total] = await Promise.all([
+
+    // live blogs + topic tags: only on page 1 and only when searching, so paging of normal news stays correct
+    const wantExtras = Boolean(search) && page === 1;
+
+    const [rows, total, liveRows, tagRows] = await Promise.all([
         News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
         News.countDocuments(query),
+        wantExtras
+            ? liveNewsModel.find({
+                isDeleted: false,
+                status: { $in: ['live', 'ended'] },
+                $and: tokenRx.map((rx) => ({ $or: [{ title: rx }, { slug: rx }, { tags: rx }] })),
+            }).sort({ post_time: -1 }).limit(5).select('title slug image caption status post_time startTime').lean()
+            : Promise.resolve([]),
+        wantExtras && phraseRx
+            ? tagModel.find({
+                isDeleted: false, isActive: true, mergedInto: null,
+                $or: [{ title: phraseRx }, { aliases: phraseRx }],
+            }).sort({ isFeatured: -1, title: 1 }).limit(TAG_LIMIT).select('title slug image').lean()
+            : Promise.resolve([]),
     ]);
-    return res.status(200).json({ news: toCards(rows), total });
+
+    // tags: direct matches first, then fill up to 5 from the most used tags of the top matching stories
+    let tags = tagRows;
+    if (wantExtras && tags.length < TAG_LIMIT) {
+        const top = await News.find(query).sort({ post_time: -1 }).limit(30).select('tags -_id').lean();
+
+        const freq = new Map();
+        for (const n of top) for (const id of n.tags || []) freq.set(String(id), (freq.get(String(id)) || 0) + 1);
+
+        const have = new Set(tags.map((t) => String(t._id)));
+        const ids = [...freq.entries()]
+            .filter(([id]) => !have.has(id))
+            .sort((a, b) => b[1] - a[1])                 // most used first
+            .slice(0, TAG_LIMIT * 2)                     // spare ones, in case some are inactive / merged
+            .map(([id]) => id);
+
+        if (ids.length) {
+            const extra = await tagModel.find({ _id: { $in: ids }, isDeleted: false, isActive: true, mergedInto: null })
+                .select('title slug image').lean();
+            const order = new Map(ids.map((id, i) => [id, i]));
+            extra.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+            tags = [...tags, ...extra];
+        }
+    }
+
+    return res.status(200).json({
+        news: toCards(rows),
+        total,
+        live: liveRows.map(toLiveCard),
+        tags: tags.slice(0, TAG_LIMIT).map((t) => ({ id: String(t._id), title: t.title, slug: t.slug, image: t.image || '' })),
+    });
 });
 
 export const getNewsInfiniteScroll = tryCatch(async (req, res, next) => {
@@ -575,7 +660,13 @@ export const createNewsByReporter = tryCatch(async (req, res) => {
 
     // category >= 1 for every non-draft news; sub-category / state / district optional (empty arrays are fine)
     const tax = await resolveNewsTaxonomy(b, { requireCategory: false, requireRoute: !draft });
-    const primaryRoute = await pickPrimary({ input: parsePrimaryInput(b.primaryRoute), categoryIds: tax.category, stateIds: tax.state });
+    const primaryRoute = await pickPrimary({
+        input: parsePrimaryInput(b.primaryRoute),
+        categoryIds: tax.category,
+        subCategoryIds: tax.subCategory,
+        stateIds: tax.state,
+    });
+    if (!draft && !primaryRoute) throw new ErrorHandler(400, 'Choose a category, sub-category or state for the story URL');
     if (!draft && !primaryRoute) throw new ErrorHandler(400, 'Choose a category or a state for the story URL');
     if (!draft) assertPublishable({ description, content, tags: tagItems, hasBanner: Boolean(bannerFile), isVideo, video: b.video });
 
@@ -678,14 +769,19 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
         tax = await resolveNewsTaxonomy(input, { requireCategory: false, requireRoute: !isDraft, existing: stored });
     }
     const finalCategory = tax ? tax.category : news.category;
+    const finalSubCategory = tax ? tax.subCategory : news.subCategory;
     const finalState = tax ? tax.state : news.state;
     if (!isDraft && !(finalCategory?.length || finalState?.length)) throw new ErrorHandler(400, 'Choose at least a category or a state — it forms the first part of the story URL');
     // primary section of the URL: the editor's choice, else keep the stored one while it is still selected, else the default
     const primaryIn = parsePrimaryInput(b.primaryRoute);
     const keepStored = news.primaryRoute?.ref && !primaryIn ? { kind: news.primaryRoute.kind, id: String(news.primaryRoute.ref) } : undefined;
     let primaryNext = null;
-    try { primaryNext = await pickPrimary({ input: primaryIn || keepStored, categoryIds: finalCategory, stateIds: finalState }); }
-    catch (e) { if (primaryIn) throw e; primaryNext = await pickPrimary({ categoryIds: finalCategory, stateIds: finalState }); }
+    try {
+        primaryNext = await pickPrimary({ input: primaryIn || keepStored, categoryIds: finalCategory, subCategoryIds: finalSubCategory, stateIds: finalState });
+    } catch (e) {
+        if (primaryIn) throw e;
+        primaryNext = await pickPrimary({ categoryIds: finalCategory, subCategoryIds: finalSubCategory, stateIds: finalState });
+    }
 
     if (!isDraft) {
         assertPublishable({
