@@ -1,8 +1,7 @@
 import crypto from "crypto";
 import News from "../model/news.models.js";
-import NewsView from "../model/newsView.model.js";
+import NewsView from '../model/NewsView.model.js'
 import NewsViewAnalytics from "../model/newsView.analytics.modal.js";
-// import NewsViewAnalytics from "../model/newsViewAnalytics.model.js";
 
 const BLOCKED_BOTS = ["bot", "spider", "crawler", "curl", "postman", "wget", "python", "axios"];
 const isDuplicateKey = (e) => e?.code === 11000;
