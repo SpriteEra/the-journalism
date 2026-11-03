@@ -45,7 +45,7 @@ const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 
 const run = async () => {
     await mongoose.connect(process.env.MONGO_URL);
-    console.log(`\n${APPLY ? 'APPLY' : 'DRY RUN'} ${CREATE ? '(+create-missing)' : ''} — database: ${mongoose.connection.name}\n`);
+    console.log(`\n${APPLY ? 'APPLY' : 'DRY RUN'} ${CREATE ? '(+create-missing)' : ''} -database: ${mongoose.connection.name}\n`);
 
     const [states, districts, cats] = await Promise.all([State.find().lean(), District.find().lean(), Category.find({ isDeleted: false }).lean()]);
     const stateMap = new Map(); const districtMap = new Map(); const catMap = new Map();
@@ -170,7 +170,7 @@ const run = async () => {
     console.log(`\nTags: ${report.tagsCreated} ${APPLY ? 'created' : 'would be created'} from old string tags (${report.tagsDropped} too-short values dropped)`);
     console.log(`\nPublished news that will have NO category after migration: ${report.noCategoryAfter}`);
     if (!CREATE && (report.missing.state.size || report.missing.district.size || report.missing.category.size)) console.log('\nRe-run with --create-missing to create those documents, or create/rename them in the admin panel first.');
-    if (!APPLY) console.log('\nDry run only — nothing was written. Add --apply to write.');
+    if (!APPLY) console.log('\nDry run only -nothing was written. Add --apply to write.');
     else await Promise.all([News.syncIndexes().catch(() => { }), ScheduleNews.syncIndexes().catch(() => { }), Tag.syncIndexes().catch(() => { })]);
     await mongoose.disconnect();
 };

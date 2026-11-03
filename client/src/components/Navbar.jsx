@@ -43,9 +43,7 @@ const formatIST = (d) => {
 /* Height of the top bar (date + socials). Must match `h-8` below (32px). */
 const TOP_BAR_H = 32;
 
-const Navbar = ({ items = [], socials = [], popular = [] }) => {
-    // "राज्य" (/state) goes INSIDE the "देश-विदेश" dropdown, as its last link, not as a menu item of its own.
-    // (If there is no "देश-विदेश" item, it is shown as a plain item second from last so it never disappears.)
+const Navbar = ({ items = [], topics = [] }) => {
     const STATE_LINK = { label: "राज्य", href: "/state" };
     let statePlaced = false;
     const menuItems = items.map((it) => {
@@ -55,6 +53,7 @@ const Navbar = ({ items = [], socials = [], popular = [] }) => {
         }
         return it;
     });
+
     const navItems = [{ label: "होम", href: "/" }, ...menuItems];
     if (!statePlaced) navItems.splice(Math.max(navItems.length - 1, 1), 0, STATE_LINK);
     const pathname = usePathname();
@@ -380,7 +379,7 @@ const Navbar = ({ items = [], socials = [], popular = [] }) => {
                     </aside>
                 </div>
             )}
-            {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
+            {searchOpen && <SearchModal topics={topics} onClose={() => setSearchOpen(false)} />}
         </header>
     );
 };

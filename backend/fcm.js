@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 
 /**
  * Firebase push. Credentials come from FIREBASE_SERVICE_ACCOUNT (the JSON itself) or ./serviceAccountKey.json.
- * Without either the server still starts (push is simply disabled) — useful for local work and tests.
+ * Without either the server still starts (push is simply disabled) -useful for local work and tests.
  */
 const loadServiceAccount = () => {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) return JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8'));
@@ -15,7 +15,7 @@ const loadServiceAccount = () => {
 const serviceAccount = loadServiceAccount();
 export const pushEnabled = Boolean(serviceAccount);
 if (serviceAccount) admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-else console.warn('[fcm] no Firebase credentials found — push notifications are disabled');
+else console.warn('[fcm] no Firebase credentials found -push notifications are disabled');
 
 export const sendNotification = async (fcmToken, title, body, link, image = null) => {
     if (!pushEnabled) return null;

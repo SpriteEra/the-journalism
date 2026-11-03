@@ -14,11 +14,25 @@ import * as A from '../service/analytics.service.js';
 const TTL = 120;
 const STALE = 600;
 const MAX_LIMIT = 100;
+const CONTENT_TYPES = ['news', 'yt', 'short', 'live'];
+
+// ?type=all (default) | ?type=news | ?type=yt,short,live
+const parseTypes = (raw) => {
+    if (!raw || raw === 'all') return [...CONTENT_TYPES];
+    const types = [...new Set(String(raw).split(',').map((t) => t.trim()).filter(Boolean))];
+    const invalid = types.filter((t) => !CONTENT_TYPES.includes(t));
+    if (invalid.length || !types.length) {
+        throw new ErrorHandler(400, `type must be "all" or a comma list of: ${CONTENT_TYPES.join(', ')}`);
+    }
+    return types.sort(); // stable cache key regardless of order
+};
 
 const serve = (name, producer, { params = '', maxDays = 366, defaultDays = 30 } = {}) => tryCatch(async (req, res) => {
-    const range = parseRange(req.query, { defaultDays, maxDays });
+    const base = parseRange(req.query, { defaultDays, maxDays });
+    const types = parseTypes(req.query.type);
+    const range = { ...base, types };                      // service receives range.types
     const extra = typeof params === 'function' ? params(req) : params;
-    const key = `analytics:${name}:${range.fromDay}:${range.toDay}:${extra}`;
+    const key = `analytics:${name}:${range.fromDay}:${range.toDay}:${types.join(',')}:${extra}`;
 
     if (req.query.refresh === 'true') {
         if (!req.can('analytics.refresh')) throw new ErrorHandler(403, 'Missing permission: analytics.refresh');
@@ -30,6 +44,7 @@ const serve = (name, producer, { params = '', maxDays = 366, defaultDays = 30 } 
     res.status(200).json({
         success: true, cache: { status, ageSeconds, ttlSeconds: TTL },
         range: { from: range.fromDay, to: range.toDay, days: range.days, timezone: 'Asia/Kolkata' },
+        types,
         meta: { definitions: A.DEFINITIONS }, data: value,
     });
 });

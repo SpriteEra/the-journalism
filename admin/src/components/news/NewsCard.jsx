@@ -24,7 +24,7 @@ function ShareMenu({ item }) {
 /**
  * One story.
  *  layout="list": a compact row. The picture is flush with the card edges and as tall as the card, and the actions sit in the
- *                 right-hand column — so the card is only as tall as its text (about the height of the picture), with no footer row.
+ *                 right-hand column -so the card is only as tall as its text (about the height of the picture), with no footer row.
  *  layout="grid": a card with a big banner. Actions never hide behind hover (touch friendly).
  */
 export default function NewsCard({ item: n, layout = "grid", draft, needApproval, canEdit, canDelete, onEdit, onPreview, onHistory, onDelete }) {

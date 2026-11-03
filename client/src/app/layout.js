@@ -12,16 +12,42 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "sw
 const mukta = Mukta({ variable: "--font-mukta", subsets: ["latin", "devanagari"], weight: ["200", "300", "400", "500", "600", "700", "800"], display: "swap" });
 const khand = Khand({ variable: "--font-khand", subsets: ["latin", "devanagari"], weight: ["300", "400", "500", "600", "700"], display: "swap" });
 
-// every page gets "<page title> | Site name"; pages that have their own SEO title use `title.absolute`
+const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE || "";
+const OG_IMAGE = { url: "/og-default.png", width: 1200, height: 630, alt: siteName() };
+const AGENCY = { name: "SpriteEra IT Solutions Pvt Ltd", url: "https://spriteera.com" };
+
+// Site-wide defaults only. Page-specific values (canonical, OG title/url, RSS) belong in each route.
 export const metadata = {
   metadataBase: new URL(siteUrl()),
   title: { default: siteName(), template: `%s | ${siteName()}` },
   description: siteDescription(),
   applicationName: siteName(),
-  alternates: { canonical: "/" },
-  openGraph: { type: "website", siteName: siteName(), locale: "hi_IN", title: siteName(), description: siteDescription() },
-  twitter: { card: "summary_large_image" },
-  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
+  authors: [{ name: siteName(), url: siteUrl() }],
+  creator: siteName(),
+  publisher: siteName(),
+  category: "news",
+  formatDetection: { email: false, address: false, telephone: false },
+
+  openGraph: {
+    type: "website",
+    siteName: siteName(),
+    locale: "hi_IN",
+    images: [OG_IMAGE],
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    images: [OG_IMAGE.url],
+    ...(TWITTER_HANDLE ? { site: TWITTER_HANDLE, creator: TWITTER_HANDLE } : {}),
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+  },
+
+  other: { designer: AGENCY.name, developer: AGENCY.name },
 };
 
 const ICONS = { facebook: "/facebook.png", instagram: "/instagram.png", youtube: "/youtube.png", x: "/twitter.png" };
@@ -32,24 +58,43 @@ export default async function RootLayout({ children }) {
   const items = menu.map((c) => ({
     label: c.name,
     href: categoryPath(c.slug),
-    ...(c.children.length ? { children: c.children.map((k) => ({ label: k.name, href: subCategoryPath(c.slug, k.slug) })) } : {}),
+    ...(c.children.length
+      ? { children: c.children.map((k) => ({ label: k.name, href: subCategoryPath(c.slug, k.slug) })) }
+      : {}),
   }));
-  const links = socials().map(({ name, url }) => ({ label: LABELS[name], href: url, icon: ICONS[name] }));
+  const socialList = socials();
+  const links = socialList.map(({ name, url }) => ({ label: LABELS[name], href: url, icon: ICONS[name] }));
+  const topics = (popular || []).map((t) => ({ label: t.label ?? t.name, href: `/topic/${t.slug}` }));
 
   const site = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: siteName(),
     url: siteUrl(),
-    potentialAction: { "@type": "SearchAction", target: `${abs("/search")}?q={search_term_string}`, "query-input": "required name=search_term_string" },
+    inLanguage: "hi-IN",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${abs("/search")}?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
+  const org = {
+    "@context": "https://schema.org",
+    "@type": "NewsMediaOrganization",
+    name: siteName(),
+    url: siteUrl(),
+    logo: { "@type": "ImageObject", url: abs("/logo.png") },
+    sameAs: socialList.map((s) => s.url).filter(Boolean),
   };
 
   return (
     <html lang="hi" className={`${inter.variable} ${mukta.variable} ${khand.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <JsonLd data={site} />
+        <JsonLd data={org} />
         <UnderConstruction logo="/logo.png" name={siteName()} socials={links} />
-        <Navbar items={items} socials={links} popular={popular.map((t) => t.label)} />
+        <Navbar items={items} topics={topics} />
         {children}
         <Footer />
       </body>

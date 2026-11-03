@@ -52,7 +52,7 @@ export default function AccountActions({ user: u }) {
           </Row>
         )}
         {can("user.block") && !self && (
-          <Row icon={u.is_blocked ? Unlock : Ban} title="Access" description={u.is_blocked ? `Blocked${u.blockReason ? ` — ${u.blockReason}` : ""}${u.blockedUntil ? ` until ${fmtDate(u.blockedUntil)}` : ""}.` : "They can sign in and use the panel."}>
+          <Row icon={u.is_blocked ? Unlock : Ban} title="Access" description={u.is_blocked ? `Blocked${u.blockReason ? ` -${u.blockReason}` : ""}${u.blockedUntil ? ` until ${fmtDate(u.blockedUntil)}` : ""}.` : "They can sign in and use the panel."}>
             {u.is_blocked ? <Button variant="outline" leftIcon={Unlock} loading={unblock.isPending} onClick={() => unblock.mutate()}>Unblock</Button> : <Button variant="outline" leftIcon={Ban} onClick={() => setDialog("block")}>Block…</Button>}
             <Badge tone={u.is_blocked ? "danger" : "success"} dot>{u.is_blocked ? "Blocked" : "Active"}</Badge>
           </Row>

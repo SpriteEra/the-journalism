@@ -123,7 +123,7 @@ export const resolveNewsTaxonomy = async (input = {}, { requireCategory = true, 
     }
 
     // the URL of a story starts with a category OR a state, so one of them is compulsory (requireRoute)
-    if (requireRoute && catIds.length === 0 && stateIds.length === 0) throw new ErrorHandler(400, 'Choose at least a category or a state — it forms the first part of the story URL');
+    if (requireRoute && catIds.length === 0 && stateIds.length === 0) throw new ErrorHandler(400, 'Choose at least a category or a state -it forms the first part of the story URL');
 
     return {
         category: catIds, subCategory: subIds, state: stateIds, district: distIds,
@@ -192,7 +192,7 @@ const looseList = (v) => {
 /**
  * Builds the mongo filter for public / dashboard queries.
  *   { category, subCategory, state, district }  each = id | slug | array | "a,b" | JSON array
- * Returns { filter, empty } — `empty:true` means a value was given but matches nothing (answer with an empty list,
+ * Returns { filter, empty } -`empty:true` means a value was given but matches nothing (answer with an empty list,
  * do NOT fall back to "everything").
  * Legacy shortcuts kept: state "rajya" = news that has any state, district "zila" = news that has any district.
  */

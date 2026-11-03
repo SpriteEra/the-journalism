@@ -171,7 +171,7 @@ newsSchema.index(
 
 // fetchOnlyToday: range query on post_time + isPublished/isDeleted equality
 // (covered by the base index above too, but this puts post_time as a pure
-// range lookup with no draft field in between — slightly tighter for that route)
+// range lookup with no draft field in between -slightly tighter for that route)
 newsSchema.index(
     { isPublished: 1, isDeleted: 1, post_time: 1 }
 );

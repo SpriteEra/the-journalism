@@ -109,7 +109,7 @@ export default function TeamPerformance() {
   return (
     <>
       {/* compact = small calendar menu on phones, full picker from sm up */}
-      <PageHeader title="Team performance" description="Stories published, reads and activity of every reporter — and what readers liked this week." actions={<RangePicker compact value={range} onChange={setRange} />} />
+      <PageHeader title="Team performance" description="Stories published, reads and activity of every reporter -and what readers liked this week." actions={<RangePicker compact value={range} onChange={setRange} />} />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Team stories" value={totals.published} icon={FileText} tone="black" loading={board.isLoading} />

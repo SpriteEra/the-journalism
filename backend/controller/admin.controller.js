@@ -272,7 +272,7 @@ export const blockUnblockUser = tryCatch(async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     const detail = action === 'block'
-        ? `User blocked${user.blockedUntil ? ` until ${user.blockedUntil.toISOString()}` : ' permanently'}${user.blockReason ? ` — ${user.blockReason}` : ''}`
+        ? `User blocked${user.blockedUntil ? ` until ${user.blockedUntil.toISOString()}` : ' permanently'}${user.blockReason ? ` -${user.blockReason}` : ''}`
         : 'User unblocked';
     await pushStack(user, req, detail);
 
@@ -499,7 +499,7 @@ export const markAllAdminNotificationsAsRead = async (req, res) => {
 };
 
 
-/** PATCH /notifications/:notificationId/archive — hides one notification from the signed-in person's list (others keep theirs). */
+/** PATCH /notifications/:notificationId/archive -hides one notification from the signed-in person's list (others keep theirs). */
 export const archiveAdminNotification = async (req, res) => {
     try {
         const r = await AdminNotification.updateOne({ _id: req.params.notificationId, recipients: req.user._id }, { $addToSet: { archivedBy: req.user._id } });

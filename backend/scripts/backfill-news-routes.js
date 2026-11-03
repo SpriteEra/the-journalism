@@ -12,7 +12,7 @@ import { makeNewsSlug, pickPrimary } from '../utils/newsRoute.js';
 const APPLY = process.argv.includes('--apply');
 
 await mongoose.connect(process.env.MONGO_URL);
-console.log(`\n${APPLY ? 'APPLY' : 'DRY RUN'} — database: ${mongoose.connection.name}\n`);
+console.log(`\n${APPLY ? 'APPLY' : 'DRY RUN'} -database: ${mongoose.connection.name}\n`);
 
 const cursor = News.find({ isDeleted: false, $or: [{ slug: { $exists: false } }, { slug: null }, { 'primaryRoute.slug': { $exists: false } }] })
     .select('news_id title slug primaryRoute category state').lean().cursor();

@@ -15,6 +15,7 @@ export default analyticsRouter;
 async function analyticsRouter(app) {
     // ── dedicated admin analytics (cached, IST, range = ?from=YYYY-MM-DD&to=YYYY-MM-DD, default last 30 days) ──
     app.get('/analytics/dashboard', { onRequest: [...view] }, getDashboard);
+    app.get('/analytics/today-view', { onRequest: [...view] }, getNewsViewCountToday);
     app.get('/analytics/overview', { onRequest: [...view] }, getOverview);
     app.get('/analytics/timeseries', { onRequest: [...view] }, getTimeseries);
     app.get('/analytics/taxonomy', { onRequest: [...view] }, getTaxonomy);

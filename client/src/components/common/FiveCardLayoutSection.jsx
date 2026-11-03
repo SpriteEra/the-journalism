@@ -5,27 +5,10 @@ import NewsCard from "./NewsCard";
 import SectionHeading from "./SectionHeading";
 import { UserRound } from "lucide-react";
 
-/**
- * Three-column story section on a tinted background:
- *   [ left cards ]  [ big featured story ]  [ right cards ]
- *
- * Props
- *  - title / titleHref   section heading
- *  - items         single array of { id, title, description?, image, href, isVideo? }
- *                  items[0]                      -> centre (featured)
- *                  next `perColumn` items        -> left column
- *                  next `perColumn` items        -> right column
- *  - perColumn     cards per side column (default 2)
- *  - bgClassName   background of the whole strip, e.g. "bg-[#FFF5F3]"
- *  - className     extra classes for the <section>
- *
- * Mobile: featured story first, then the other cards in a 1 / 2 column grid.
- * Missing data is simply left out; no data at all renders nothing.
- */
 
 const FeaturedNewsCard = ({ item, className = "", priority = false }) => {
     if (!item) return null;
-    const { title, description, image, href = "#", isVideo = false } = item;
+    const { title, description, image, href = "#", isVideo = false, author } = item;
 
     return (
         <article className={`w-full ${className}`}>
@@ -60,10 +43,14 @@ const FeaturedNewsCard = ({ item, className = "", priority = false }) => {
                     </p>
                 )}
 
-                <div className="flex items-center gap-1.5 mt-2">
-                    <UserRound className="size-5 " strokeWidth={1.7} />
-                    <p className="text-[15px]">Jayanti Mishra</p>
-                </div>
+                {
+                    author &&
+                    <div className="flex items-center gap-1.5 mt-2">
+                        <UserRound className="size-5 " strokeWidth={1.7} />
+                        <p className="text-[15px]">{author.fullName}</p>
+                    </div>
+
+                }
             </Link>
         </article>
     );

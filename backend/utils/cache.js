@@ -4,7 +4,7 @@
  *  - Default store: in-process LRU (fast, zero setup, single node).
  *  - Set REDIS_URL (+ `pnpm add ioredis`) and the SAME api transparently uses Redis, so several
  *    instances share one cache and invalidation reaches all of them. Any Redis error falls back
- *    to "compute it" — the cache can slow nothing down and can never take the API down.
+ *    to "compute it" -the cache can slow nothing down and can never take the API down.
  *  - Request coalescing: 100 simultaneous misses on one key run the producer ONCE.
  *  - Stale-while-revalidate: with { stale: N } an expired value is served for N more seconds while a
  *    single background refresh runs (dashboards stay instant, users never wait on the heavy query).
@@ -37,7 +37,7 @@ if (process.env.REDIS_URL) {
         redis.on('ready', () => { redisReady = true; console.log('[cache] redis connected'); });
         redis.on('error', () => { redisReady = false; });
         redis.on('close', () => { redisReady = false; });
-    }).catch(() => console.warn('[cache] REDIS_URL is set but "ioredis" is not installed — using the in-memory cache'));
+    }).catch(() => console.warn('[cache] REDIS_URL is set but "ioredis" is not installed -using the in-memory cache'));
 }
 const useRedis = () => redis && redisReady;
 

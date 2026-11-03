@@ -156,7 +156,7 @@ export default function Profile() {
 
       {missing && !editing && (
         <Card className="mb-4 border-warning/40 bg-warning-soft/50 sm:mb-5">
-          <p className="text-sm text-fg-muted"><b className="text-fg">Complete your profile.</b> Add a photo, your full name and a short about text — they appear on your public author page.</p>
+          <p className="text-sm text-fg-muted"><b className="text-fg">Complete your profile.</b> Add a photo, your full name and a short about text -they appear on your public author page.</p>
         </Card>
       )}
 
@@ -208,7 +208,7 @@ export default function Profile() {
           </Card>
 
           <Card padded={false}>
-            <CardHeader icon={Palette} title="Appearance & language" description="Only the panel's own text changes — what you write stays as you write it." />
+            <CardHeader icon={Palette} title="Appearance & language" description="Only the panel's own text changes -what you write stays as you write it." />
             <div className="space-y-4 p-3 sm:p-5">
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t("Theme")}</p>

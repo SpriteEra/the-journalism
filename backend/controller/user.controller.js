@@ -137,7 +137,7 @@ export const getMyProfile = tryCatch(async (req, res) => {
 });
 
 /**
- * PUT /admin/profile — people edit THEIR OWN public profile (name, about, photo, designation, location, phone, links).
+ * PUT /admin/profile -people edit THEIR OWN public profile (name, about, photo, designation, location, phone, links).
  * Only those fields: role, email, username and permissions can never be changed from here.
  */
 export const updateMyProfile = tryCatch(async (req, res) => {

@@ -2,23 +2,23 @@
 import { useEffect } from "react";
 
 /**
- * Counts ONE read for a real visitor. The server counts a read each time its related-news endpoint is called, so it is called
- * here (in the browser, through our own /api/view route) and not while the page is being built — bots and page rebuilds do not count.
- * Once per tab per story.
+ * Counts ONE read for a real visitor, for any content type:
+ *   <ReadBeacon id={news.news_id} />            news (default)
+ *   <ReadBeacon type="short" id={v.slug} />     short / custom video (ShortVideo)
+ *   <ReadBeacon type="yt" id={v.id} />          legacy YtNews video (news_id)
+ * It runs in the browser and posts to our own /api/view/<type>/<id> route, so bots and page rebuilds do not count.
+ * Once per tab per item, and only after the visitor stayed 3 seconds.
  */
-export default function ReadBeacon({ id }) {
+export default function ReadBeacon({ type = "news", id }) {
   useEffect(() => {
     if (!id) return;
-    const key = `read:${id}`;
-    try {
-      if (sessionStorage.getItem(key))
-        return; sessionStorage.setItem(key, "1");
-    }
-    catch { /* private mode: count anyway */ }
+    const key = `read:${type}:${id}`;
+    try { if (sessionStorage.getItem(key)) return; } catch { }
     const t = setTimeout(() => {
-      fetch(`/api/view/${encodeURIComponent(id)}`, { method: "POST", keepalive: true }).catch(() => { });
-    }, 3000);   // a visit shorter than 3 s is not a read
+      try { sessionStorage.setItem(key, "1"); } catch { }
+      fetch(`/api/view/${encodeURIComponent(id)}?type=${encodeURIComponent(type)}`, { method: "POST", keepalive: true }).catch(() => { });
+    }, 3000); // a visit shorter than 3 s is not a read
     return () => clearTimeout(t);
-  }, [id]);
+  }, [type, id]);
   return null;
 }

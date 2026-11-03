@@ -639,7 +639,7 @@ export const EventsendOtp = tryCatch(async (req, res, next) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000);
     EventOtp = otp.toString();
-    console.log(EventOtp)
+    // console.log(EventOtp)
     const mailData = {
         data: {
             otp: otp

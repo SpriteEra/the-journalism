@@ -82,7 +82,7 @@ export async function getRelatedNews(newsId) {
 }
 
 // ───────────────────────── sections: categories, states, districts, topics ─────────────────────────
-/** menu tree: [{ _id, name, slug, children:[{name, slug}] }] — only items marked "show in menu" */
+/** menu tree: [{ _id, name, slug, children:[{name, slug}] }] -only items marked "show in menu" */
 export async function getMenu() {
   const r = await safe(apiGet("/taxonomy/categories", { revalidate: TTL.menu() }), { categories: [] });
   return (r.categories || []).filter((c) => c.showInMenu !== false).map((c) => ({ id: String(c._id), name: c.name, slug: c.slug, children: (c.children || []).filter((k) => k.showInMenu !== false).map((k) => ({ id: String(k._id), name: k.name, slug: k.slug })) }));
@@ -141,6 +141,17 @@ export async function getTopic(slug, { page = 1 } = {}) {
 export async function getPopularTopics({ limit = 12, days = 7 } = {}) {
   const r = await safe(apiGet("/tags/popular", { params: { limit, days }, revalidate: 300 }), { tags: [] });
   return (r.tags || []).map((t) => ({ id: String(t.id || t.slug), label: t.title, slug: t.slug }));
+}
+
+/** ONE api call: every active state (for the chips) + the states that have stories, each with its latest 5 */
+export async function getStateSections() {
+  const r = await safe(apiGet("/news/fetch-all-state-news", { params: { states: "true" }, revalidate: 60 }), { states: [], sections: [] });
+  return {
+    states: (r.states || []).map((s) => ({ id: String(s.id), name: s.name, slug: s.slug, districts: [] })),
+    sections: (r.sections || [])
+      .map((s) => ({ id: String(s.id || s.slug), slug: s.slug, name: s.state, href: `/state/${s.slug}`, items: s.data || [] }))
+      .filter((s) => s.items.length > 0),
+  };
 }
 
 // ───────────────────────── authors ─────────────────────────

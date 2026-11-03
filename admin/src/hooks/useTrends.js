@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { readOra, writeOra } from "../lib/oraCache";
 
 /**
- * OraAI data — cached three times over so the upstream API is called as rarely as possible:
+ * OraAI data -cached three times over so the upstream API is called as rarely as possible:
  *   1. server cache (6 h trends / 10 min RSS / 24 h keywords per article)
- *   2. browser cache (localStorage, same limits) — instant on reload
+ *   2. browser cache (localStorage, same limits) -instant on reload
  *   3. react-query memory cache for the session
  */
 const HOUR = 3600_000;

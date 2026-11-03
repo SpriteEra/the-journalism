@@ -6,7 +6,7 @@ import { cachedMeta } from '../utils/cache.js';
  * Every call is cached on the server so the paid upstream API is hit once, not once per editor:
  *   - trends        6 hours   (served stale for 12 more hours while ONE background refresh runs)
  *   - 24h RSS       10 minutes
- *   - keywords      24 hours per (title + content) fingerprint — the same article never costs twice
+ *   - keywords      24 hours per (title + content) fingerprint -the same article never costs twice
  * Failed upstream calls are never cached. `X-Cache: HIT | STALE | MISS` and `X-Cache-Age` tell the UI how fresh the answer is.
  */
 const TTL = { trends: 6 * 3600, rss: 600, keywords: 24 * 3600 };

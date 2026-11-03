@@ -34,7 +34,7 @@ const presets = () => {
 /**
  * Date range filter (react-date-range inside a popup: a bottom sheet on phones).
  *   <DateRangeFilter value={{ from: "2026-10-01", to: "2026-10-14" }} onChange={({ from, to }) => …} />
- * Values are plain "YYYY-MM-DD" strings (IST days) — exactly what the API's ?from= & ?to= expect. Empty strings = no filter.
+ * Values are plain "YYYY-MM-DD" strings (IST days) -exactly what the API's ?from= & ?to= expect. Empty strings = no filter.
  */
 export default function DateRangeFilter({ value, onChange, className, maxDate, placeholder, compact }) {
   const { t, i18n } = useTranslation();

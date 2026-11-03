@@ -13,7 +13,7 @@ export default function ListingLayout({ title, eyebrow, description, breadcrumb 
         {breadcrumb.length > 0 && <ArticleBreadCrumb breadcrumb={breadcrumb} title={title} />}
         <header className="border-b-2 border-primary pb-3">
           {eyebrow && <p className="text-sm font-medium uppercase tracking-wide text-primary">{eyebrow}</p>}
-          <h1 className="font-khand text-[32px] font-bold leading-tight lg:text-[44px]">{title}{page > 1 ? <span className="text-black/50"> — पेज {page}</span> : null}</h1>
+          <h1 className="font-khand text-[32px] font-bold leading-tight lg:text-[44px]">{title}{page > 1 ? <span className="text-black/50"> -पेज {page}</span> : null}</h1>
           {description && page === 1 && <p className="mt-2 max-w-3xl text-lg leading-relaxed text-black/75">{description}</p>}
         </header>
 

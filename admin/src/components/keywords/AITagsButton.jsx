@@ -49,7 +49,7 @@ export function AITagsButton({
                         : undefined
                 }
             >
-                {/* ── Shimmer sweep — active only ── */}
+                {/* ── Shimmer sweep -active only ── */}
                 {hasAITags && !aiTagsLoading && (
                     <span
                         aria-hidden

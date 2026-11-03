@@ -9,17 +9,46 @@ import VideoCard from "@/components/common/VideoCard";
 import { getVideo } from "@/lib/data";
 import { abs, googleSourceUrl, siteName } from "@/lib/site";
 import { formatDate } from "@/utils/util";
+import ReadBeacon from "@/components/article/ReadBeacon";
+
+const OG_FALLBACK = "/og-default.png";
+
+const clean = (s, n = 155) => {
+  const t = (s || "").replace(/\s+/g, " ").trim();
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+};
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const data = await getVideo(decodeURIComponent(id));
-  if (!data) return { title: "वीडियो नहीं मिला", robots: { index: false } };
+  if (!data) return { title: "वीडियो नहीं मिला", robots: { index: false, follow: false } };
+
   const v = data.video;
-  const description = v.description || v.title;
+  const description = clean(v.description) || `${v.title}: ${siteName()} पर देखें यह वीडियो।`;
+  const url = abs(v.href);
+  const image = v.image || OG_FALLBACK;
+
   return {
-    title: v.title, description, alternates: { canonical: abs(v.href) },
-    openGraph: { type: "video.other", url: abs(v.href), title: v.title, description, images: [{ url: v.image, alt: v.title }], locale: "hi_IN" },
-    twitter: { card: "summary_large_image", title: v.title, description, images: [v.image] },
+    title: v.title, // the layout's template adds "| siteName"
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "video.other",
+      siteName: siteName(),
+      locale: "hi_IN",
+      url,
+      title: `${v.title} | ${siteName()}`,
+      description,
+      images: [{ url: image, alt: v.title }],
+      ...(v.publishedAt ? { releaseDate: new Date(v.publishedAt).toISOString() } : {}),
+      ...(v.tags?.length ? { tags: v.tags } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${v.title} | ${siteName()}`,
+      description,
+      images: [image],
+    },
   };
 }
 
@@ -29,13 +58,40 @@ export default async function VideoPage({ params }) {
   if (!data) notFound();
   const { video: v, more } = data;
   const ld = {
-    "@context": "https://schema.org", "@type": "VideoObject", name: v.title, description: v.description || v.title, thumbnailUrl: [v.image],
-    uploadDate: v.publishedAt, inLanguage: "hi", url: abs(v.href), embedUrl: `https://www.youtube.com/embed/${v.youtubeId}`,
-    publisher: { "@type": "Organization", name: siteName() },
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: v.title,
+    description: v.description || v.title,
+    thumbnailUrl: [v.image ? abs(v.image) : abs("/og-default.png")],
+    ...(v.publishedAt ? { uploadDate: new Date(v.publishedAt).toISOString() } : {}),
+    ...(v.updatedAt ? { dateModified: new Date(v.updatedAt).toISOString() } : {}),
+    ...(v.duration ? { duration: v.duration } : {}), // ISO 8601, e.g. "PT2M30S"
+    ...(v.youtubeId ? { embedUrl: `https://www.youtube.com/embed/${v.youtubeId}` } : {}),
+    ...(v.videoUrl ? { contentUrl: v.videoUrl } : {}),
+    ...(v.tags?.length ? { keywords: v.tags.join(", ") } : {}),
+    inLanguage: "hi-IN",
+    url: abs(v.href),
+    mainEntityOfPage: abs(v.href),
+    publisher: {
+      "@type": "NewsMediaOrganization",
+      name: siteName(),
+      logo: { "@type": "ImageObject", url: abs("/logo.png") },
+    },
   };
+
+
   return (
     <div className="page-container mt-8 grid max-w-6xl grid-cols-1 gap-4 lg:mt-14 lg:grid-cols-8">
-      <JsonLd data={ld} />
+      <JsonLd data={[ld, {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "होम", item: abs("/") },
+          { "@type": "ListItem", position: 2, name: "वीडियो", item: abs("/videos") },
+          { "@type": "ListItem", position: 3, name: v.title, item: abs(v.href) },
+        ],
+      }]} />
+      <ReadBeacon type={"yt"} id={v.sourceType ? v.slug : v.id} />
       <section className="lg:col-span-6">
         <ArticleBreadCrumb breadcrumb={[{ label: "होम", href: "/" }, { label: "वीडियो", href: "/videos" }]} title={v.title} />
         <article>

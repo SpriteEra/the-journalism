@@ -10,7 +10,7 @@ const pageOf = (sp) => Math.max(parseInt(sp?.page, 10) || 1, 1);
 
 export async function generateMetadata({ searchParams }) {
     const page = pageOf(await searchParams);
-    return { title: page > 1 ? `शॉर्ट वीडियो — पेज ${page}` : "शॉर्ट वीडियो", description: "देश-दुनिया की ताज़ा खबरें, छोटे वीडियो में।", alternates: { canonical: abs("/shorts") }, ...(page > 1 ? { robots: { index: false, follow: true } } : {}) };
+    return { title: page > 1 ? `शॉर्ट वीडियो -पेज ${page}` : "शॉर्ट वीडियो", description: "देश-दुनिया की ताज़ा खबरें, छोटे वीडियो में।", alternates: { canonical: abs("/shorts") }, ...(page > 1 ? { robots: { index: false, follow: true } } : {}) };
 }
 
 export default async function ShortsPage({ searchParams }) {

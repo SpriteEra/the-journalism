@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 
 /**
- * Top-bar entry to Ora AI — one compact pill: dark body, fine gold edge, a sparkle and a PRO tag, with a light that sweeps across it
+ * Top-bar entry to Ora AI -one compact pill: dark body, fine gold edge, a sparkle and a PRO tag, with a light that sweeps across it
  * every few seconds (shimmer). It keeps its height / padding in every theme and shows only the icon + PRO on phones.
  */
 export default function OraAiButton() {

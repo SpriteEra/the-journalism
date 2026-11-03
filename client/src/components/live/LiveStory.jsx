@@ -4,6 +4,7 @@ import ShareActions, { FollowOnGoogle } from "@/components/article/ShareActions"
 import { googleSourceUrl, abs } from "@/lib/site";
 import { formatDate } from "@/utils/util";
 import Link from "next/link";
+import LiveReadBeacon from "./LiveReadBeacon";
 function NextStoryDivider({ label = "अगली खबर" }) {
   return (
     <div className="my-8 flex items-center gap-3 lg:my-6" role="separator" aria-label={label}>
@@ -31,6 +32,7 @@ export default function LiveStory({ live, first = false }) {
     <>
       {!first && <NextStoryDivider />}
       <article className={first ? "" : "pt-4"} data-live-slug={live.slug}>
+        <LiveReadBeacon slug={live.slug} first={first} />
         <div className="mb-2 flex items-center gap-2">
           {isLive ? (
             <span className="inline-flex items-center gap-1.5 rounded bg-primary px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">

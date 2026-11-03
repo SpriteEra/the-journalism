@@ -118,7 +118,7 @@ export function TaxonomyFields({ value, onChange, categoryRequired = false, erro
   };
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Field label="Categories" required={categoryRequired} error={errors.category} hint="Category or state — at least one" info="The sections of the website the story appears in (Politics, Sports …). One of them can be the primary section used in the story link.">
+      <Field label="Categories" required={categoryRequired} error={errors.category} hint="Category or state -at least one" info="The sections of the website the story appears in (Politics, Sports …). One of them can be the primary section used in the story link.">
         <MultiSelect
           options={tops.map((c) => ({ value: c._id, label: c.name }))}
           value={v.category}
@@ -130,7 +130,7 @@ export function TaxonomyFields({ value, onChange, categoryRequired = false, erro
       <Field label="Sub-categories" hint={v.category.length ? "Optional" : "Choose a category first"}>
         <MultiSelect options={subOptions.map((c) => ({ value: c._id, label: c.name }))} value={v.subCategory} onChange={(subCategory) => onChange({ ...v, subCategory })} disabled={!v.category.length} placeholder="Choose sub-categories" emptyText="This category has no sub-categories" max={30} />
       </Field>
-      <Field label="States" hint="Category or state — at least one" info="Use for local news. A story can also use a state as the first part of its link.">
+      <Field label="States" hint="Category or state -at least one" info="Use for local news. A story can also use a state as the first part of its link.">
         <MultiSelect options={stateOptions.map((s) => ({ value: s._id, label: s.displayName || s.state }))} value={v.state} onChange={setState} placeholder="Choose states" max={30} />
       </Field>
       {/* <Field label="Districts" hint={v.state.length ? "From the chosen states" : "Optional – choose a state to narrow the list"}>

@@ -31,7 +31,7 @@ const StackedFeaturedCard = ({ item, priority = false }) => {
             {author && (
                 <p className="mt-1 flex items-center gap-1.5 text-xs lg:text-[15px] font-inter">
                     <UserRound className="size-4" aria-hidden />
-                    <span>{author}</span>
+                    <span>{author.fullName}</span>
                 </p>
             )}
         </article>

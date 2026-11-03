@@ -1,8 +1,9 @@
 import { isAuthenticated, requirePermission } from '../middleware/Authentication.js';
 import { P } from '../config/permissions.js';
 import {
-    createTagAdmin, deleteTagAdmin, getPopularTags, getTagAdmin, getTagBySlug, getTagNews, getTags, getTagsAdmin, mergeTagAdmin, suggestTags, updateTagAdmin,
+    createTagAdmin, deleteTagAdmin, getTagAdmin, getTagBySlug, getTagNews, getTags, getTagsAdmin, mergeTagAdmin, suggestTags, updateTagAdmin,
 } from '../controller/tag.controller.js';
+import { getPopularTags } from '../controller/public.controller.js';
 
 
 // /api/v1/admin/tags

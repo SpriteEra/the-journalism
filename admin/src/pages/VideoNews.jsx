@@ -49,7 +49,7 @@ const VideoUpload = () => {
           method: "POST",
           body: formData,
           headers: {
-            // Note: Don't manually set Content-Type for FormData — browser sets it with proper boundary
+            // Note: Don't manually set Content-Type for FormData -browser sets it with proper boundary
             // "Content-Type": "multipart/form-data", ❌ omit this
           },
           // credentials: 'include', // if using cookies and backend allows it
@@ -120,10 +120,9 @@ const VideoUpload = () => {
       <button
         onClick={handleUpload}
         className={`w-full py-2 px-4 rounded-md text-paper font-medium
-          ${
-            !file || isProcessing
-              ? "bg-line-strong cursor-not-allowed"
-              : "bg-primary hover:bg-primary-hover"
+          ${!file || isProcessing
+            ? "bg-line-strong cursor-not-allowed"
+            : "bg-primary hover:bg-primary-hover"
           }
           transition-colors`}
         disabled={!file || isProcessing}

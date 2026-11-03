@@ -4,7 +4,7 @@ import { LANGUAGES } from "../../i18n";
 import { IconButton } from "../ui/Button";
 import Menu, { MenuItem, MenuLabel } from "../ui/Menu";
 
-/** Interface language (Hindi / English). Only fixed UI text changes — what people write stays as written. */
+/** Interface language (Hindi / English). Only fixed UI text changes -what people write stays as written. */
 export default function LanguageSwitch() {
   const { i18n, t } = useTranslation();
   return (

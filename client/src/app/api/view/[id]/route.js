@@ -1,11 +1,11 @@
 import { apiGet } from "@/lib/api";
 
-/**
- * POST /api/view/<news_id> — counts one read. The server counts a read each time its related-news endpoint is called,
- * so this is the single place that calls it (the browser calls this route once per visit, see ReadBeacon).
- */
-export async function POST(request, { params }) {   // was _request
+const TYPES = new Set(["news", "yt", "short", "live"]);
+
+export async function POST(request, { params }) {
   const { id } = await params;
+  const type = new URL(request.url).searchParams.get("type") || "news";
+  if (!TYPES.has(type)) return new Response(null, { status: 404 });
 
   const h = request.headers;
   const forwarded = {
@@ -19,7 +19,14 @@ export async function POST(request, { params }) {   // was _request
   };
 
   try {
-    await apiGet(`/news/increment-count/${id}`, { revalidate: 0, timeout: 4000, headers: forwarded });
-  } catch { /* ... */ }
+    console.log(`[ReadBeacon:${type}] ${id} from ${forwarded["x-forwarded-for"] || forwarded["x-real-ip"] || "unknown"} / ${forwarded["user-agent"]}`);
+    try {
+      const data = await apiGet(`/news/increment-count/${type}/${encodeURIComponent(id)}`, { revalidate: 0, timeout: 4000, headers: forwarded });
+      console.log(`[ReadBeacon:${type}] ${id} result:`, data);
+    } catch (e) {
+      console.error(`[ReadBeacon:${type}] ${id} FAILED:`, e?.status ?? "", e?.message ?? e);
+    }
+  } catch { /* never break the page because of counting */ }
+
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }

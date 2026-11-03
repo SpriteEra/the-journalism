@@ -15,7 +15,7 @@ import Link from "next/link";
 
 /**
  * ONE story: breadcrumb, headline, byline, media, body, topics, author card.
- * A SERVER component on purpose (EditorContent sanitises the editor HTML with sanitize-html) — the first story of the page renders it
+ * A SERVER component on purpose (EditorContent sanitises the editor HTML with sanitize-html) -the first story of the page renders it
  * during the request, and the infinite scroll gets the next ones from a Server Action that returns this same component (see lib/actions.jsx).
  *
  *   data    = result of getArticle() / getOlderArticle()

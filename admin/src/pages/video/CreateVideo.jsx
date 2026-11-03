@@ -22,7 +22,7 @@ export const parseYouTubeId = (input = "") => {
 const isShortsLink = (v = "") => /youtube\.com\/shorts\//i.test(v);
 
 /**
- * YouTube news: a long, LANDSCAPE video added by its link. Title / description are optional here — when left empty the server
+ * YouTube news: a long, LANDSCAPE video added by its link. Title / description are optional here -when left empty the server
  * fills them from YouTube. Portrait shorts belong to "Shorts & videos".
  */
 export default function CreateVideo() {
@@ -84,7 +84,7 @@ export default function CreateVideo() {
             Only long landscape videos are accepted here. Short portrait videos go to <b>Shorts &amp; videos</b>.
           </p>
 
-          <Field label="Title" hint="Optional — taken from YouTube when empty">
+          <Field label="Title" hint="Optional -taken from YouTube when empty">
             <Input value={f.title} onChange={set("title")} className="hindi-font" maxLength={300} placeholder="Enter the title of the video" />
           </Field>
 

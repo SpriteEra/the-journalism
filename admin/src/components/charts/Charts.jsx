@@ -96,7 +96,7 @@ export function Heatmap({ grid }) {
   );
 }
 
-/** Vertical columns. series = [{ key, name }], data = [{ [xKey]: label, key1: n }] — stacked when `stacked`. */
+/** Vertical columns. series = [{ key, name }], data = [{ [xKey]: label, key1: n }] -stacked when `stacked`. */
 export function ColumnChart({ data, series, xKey = "name", height = 240, stacked, tickFormatter }) {
   return (
     <ResponsiveContainer width="100%" height={height}>

@@ -18,7 +18,7 @@ export default async function ArticlePage({ params }) {
   const { category, slug } = await params;
   const data = await getArticle(decodeURIComponent(slug));
   if (!data) notFound();
-  // wrong section in the link (or an old link): the story opens at its real address — a permanent redirect, so Google follows it
+  // wrong section in the link (or an old link): the story opens at its real address -a permanent redirect, so Google follows it
   if (data.canonicalPath && data.canonicalPath !== requestedPath(category, slug)) permanentRedirect(data.canonicalPath);
   return <ArticleView data={data} />;
 }

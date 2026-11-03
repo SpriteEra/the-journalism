@@ -6,7 +6,7 @@ import { cached, setPublicCache } from '../utils/cache.js';
 import { seoConfig } from '../config/seo.config.js';
 
 /**
- * GET /api/v1/authors/:username — public author page data + ready-made SEO (title, description, image, Person JSON-LD).
+ * GET /api/v1/authors/:username -public author page data + ready-made SEO (title, description, image, Person JSON-LD).
  * Only public fields are returned; blocked / deleted people are not listed.
  */
 export const getAuthorPublic = tryCatch(async (req, res) => {
@@ -39,7 +39,7 @@ const PUBLIC_Q = { draft: false, isPublished: true, isDeleted: false };
 const clampInt = (v, def, min, max) => Math.min(Math.max(parseInt(v) || def, min), max);
 
 /**
- * GET /api/v1/news/authors/:username/news?page=1&limit=12 — the stories this author published, newest first.
+ * GET /api/v1/news/authors/:username/news?page=1&limit=12 -the stories this author published, newest first.
  * Same shape as /news/latest ({ news, hasMore, page, limit }) so the website turns it into cards the same way.
  * Only people who have a public author page (see getAuthorPublic) are listed; drafts, unpublished and deleted stories never are.
  */

@@ -21,7 +21,7 @@ const makePassword = () => {
 };
 
 /**
- * Add / edit a team member — a full page, not a popup.
+ * Add / edit a team member -a full page, not a popup.
  * Required: photo (cropped square), full name, about (they become the public author page and its SEO).
  * Everything else is optional. Route: /dashboard/reporters/new  and  /dashboard/reporters/:id/edit
  */
@@ -90,7 +90,7 @@ export default function ReporterForm() {
   };
 
   const aboutLen = f.about.trim().length;
-  const preview = useMemo(() => ({ title: `${f.fullName || "Full name"}${f.designation ? ` — ${f.designation}` : ""}`, desc: f.about.slice(0, 160) || "The about text becomes the description in search results." }), [f.fullName, f.designation, f.about]);
+  const preview = useMemo(() => ({ title: `${f.fullName || "Full name"}${f.designation ? ` -${f.designation}` : ""}`, desc: f.about.slice(0, 160) || "The about text becomes the description in search results." }), [f.fullName, f.designation, f.about]);
   const bad = (k) => (errors[k] ? { "data-invalid": true } : {});
   const done = [Boolean(photo.url), f.fullName.trim().length >= 2, aboutLen >= ABOUT_MIN].filter(Boolean).length;
 
@@ -99,7 +99,7 @@ export default function ReporterForm() {
 
   return (
     <>
-      <PageHeader title={editing ? "Edit team member" : "Add team member"} description="The photo, name and about text become the public author page — and its SEO."
+      <PageHeader title={editing ? "Edit team member" : "Add team member"} description="The photo, name and about text become the public author page -and its SEO."
         breadcrumbs={[{ label: "Reporters", to: "/dashboard/reporters" }, { label: editing ? "Edit" : "New" }]} />
       <form onSubmit={submit} noValidate className="grid gap-4 pb-28 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:pb-6">
         <div className="space-y-4 sm:space-y-5">
@@ -124,7 +124,7 @@ export default function ReporterForm() {
               </div>
               <Field label="Full name" required error={errors.fullName} {...bad("fullName")}><Input value={f.fullName} onChange={set("fullName")} maxLength={60} className="hindi-font" placeholder="e.g. Ravi Kumar / रवि कुमार" /></Field>
               <Field label="About" required error={errors.about} hint={`${aboutLen}/${ABOUT_MAX}`} {...bad("about")}>
-                <Textarea rows={5} value={f.about} maxLength={ABOUT_MAX} onChange={set("about")} className="hindi-font" placeholder="Beat, experience and areas covered — written for readers and search engines." />
+                <Textarea rows={5} value={f.about} maxLength={ABOUT_MAX} onChange={set("about")} className="hindi-font" placeholder="Beat, experience and areas covered -written for readers and search engines." />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Designation" hint="Optional"><Input value={f.designation} onChange={set("designation")} maxLength={80} icon={Briefcase} placeholder="e.g. Bureau Chief" className="hindi-font" /></Field>

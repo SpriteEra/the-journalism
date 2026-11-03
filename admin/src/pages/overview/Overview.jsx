@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { BarChart3, CalendarClock, Clapperboard, Eye, FileText, Hourglass, Images, MapPin, MoreVertical, PlaySquare, Plus, Radio, Sparkles, Users, Video } from "lucide-react";
+import { Clapperboard, Eye, FileText, Hourglass, MoreVertical, PlaySquare, Plus, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import usePermission from "../../hooks/usePermission";
-import { useAnalyticsDashboard } from "../../hooks/admin";
+import { useQuery } from "@tanstack/react-query";
+import { useAnalyticsDashboard, useTodayReads } from "../../hooks/admin";
 import { fmtDate } from "../../lib/api";
 import { rangeFromDays } from "../../components/analytics/RangePicker";
 import { ColumnChart, Donut, Gauge, RankBars, TrendChart } from "../../components/charts/Charts";
 import { buttonStyles } from "../../components/ui/Button";
-import { Avatar, Badge, Card, CardHeader, EmptyState, ErrorState, Skeleton, StatCard, Tabs } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, ErrorState, Skeleton, StatCard } from "../../components/ui";
 
 const greetingKey = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
-const RANGES = [["7", 7], ["14", 14], ["30", 30]];
+const RANGES = [["1", "Today"], ["7", "7d"], ["14", "14d"], ["30", "30d"]];
+
 
 function Block({ title, description, loading, children, className, actions, height = "h-60", empty }) {
   return (
@@ -124,11 +126,26 @@ function QuickActions({ can, inline = false }) {
 export default function Overview() {
   const { t } = useTranslation();
   const { user, can } = usePermission();
-  const [days, setDays] = useState("14");
+  const [days, setDays] = useState("1"); // default: today
+  const isToday = days === "1";
   const range = useMemo(() => rangeFromDays(Number(days)), [days]);
   const canSee = can("analytics.view");
+
+  // dashboard data must be read BEFORE anything below uses isLoading / o
   const { data, isLoading, error, refetch } = useAnalyticsDashboard(range, canSee);
   const d = data?.data; const o = d?.overview;
+
+  // today's real reads (news + yt + short + live) from the live counters
+  const { data: today, isLoading: todayLoading } = useTodayReads(canSee && isToday);
+  const todayReads = today ? (today.Newscount || 0) + (today.Ytcount || 0) + (today.Shortcount || 0) + (today.Livecount || 0) : 0;
+  const heroLoading = isLoading || (isToday && todayLoading);
+
+  const viewsChange = Number(o?.news.change.viewsPercent);
+  const hasComparison = !isToday && Number.isFinite(viewsChange) && (o?.news.views || 0) > 0;
+
+  const heroStats = isToday
+    ? [["Published today", o?.news.published], ["Reads today", todayReads], ["Reporters active", o?.news.activeReporters]]
+    : [["Stories", o?.news.published], ["Reads", o?.news.views], ["Reporters", o?.news.activeReporters]];
 
   // reads per hour of day, summed over the weekday x hour heat map
   const byHour = useMemo(() => {
@@ -146,6 +163,7 @@ export default function Overview() {
   ].filter((x) => x.value > 0) : [];
   const pending = d?.approval?.pending ?? 0;
   const aging = d?.approval?.aging;
+  const periodLabel = isToday ? "today" : "in this period";
 
   return (
     <div className="space-y-4">
@@ -156,7 +174,7 @@ export default function Overview() {
         <div className="relative flex flex-col gap-3 sm:gap-6">
           <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-4">
             <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><Sparkles className="size-3.5" />Insights · last {days} days</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><Sparkles className="size-3.5" />Insights · {isToday ? "today" : `last ${days} days`}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><span className="size-1.5 rounded-full bg-success" />Live</span>
             </div>
             <div className="flex flex-col items-end gap-2 sm:gap-3">
@@ -166,17 +184,21 @@ export default function Overview() {
           </div>
           <div className="max-w-2xl">
             <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{t(greetingKey())}, {user?.fullName || user?.username}</h1>
-            {canSee && !isLoading
-              ? <p className="mt-3 text-sm sm:text-base leading-relaxed text-fg-subtle sm:text-lg">Here is how the newsroom is doing - reads are {Number(o?.news.change.viewsPercent) >= 0 ? "up" : "down"} <b className="text-fg">{Math.abs(o?.news.change.viewsPercent || 0)}%</b> on the previous period, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</p>
-              : <p className="mt-3 text-base text-fg-subtle sm:text-lg">Pick a section from the menu to get started.</p>}
+            {canSee && !heroLoading
+              ? <p className="mt-3 text-sm sm:text-base leading-relaxed text-fg-subtle sm:text-lg">
+                {isToday
+                  ? <>So far today: <b className="text-fg">{num(o?.news.published)}</b> {o?.news.published === 1 ? "story" : "stories"} published and <b className="text-fg">{num(todayReads)}</b> reads, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>
+                  : <>Here is how the newsroom is doing{hasComparison && <> - reads are {viewsChange >= 0 ? "up" : "down"} <b className="text-fg">{Math.abs(viewsChange)}%</b> on the previous period</>}, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>}
+              </p>
+              : <p className="mt-3 text-base text-fg-subtle sm:text-lg">{canSee ? "Loading your numbers…" : "Pick a section from the menu to get started."}</p>}
           </div>
           {canSee && (
             <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-              {[["Stories", o?.news.published], ["Reads", o?.news.views], ["Reporters", o?.news.activeReporters]].map(([l, v]) => (
-                <div key={l} className="border-l border-line pl-4 first:border-0 first:pl-0"><p className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{l}</p><p className="text-2xl font-semibold text-fg">{isLoading ? "—" : num(v)}</p></div>
+              {heroStats.map(([l, v]) => (
+                <div key={l} className="border-l border-line pl-4 first:border-0 first:pl-0"><p className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{l}</p><p className="text-2xl font-semibold text-fg">{heroLoading ? "—" : num(v)}</p></div>
               ))}
               <div className="ml-auto inline-flex rounded-full bg-surface-3 p-1" role="tablist" aria-label="Range">
-                {RANGES.map(([id]) => <button key={id} role="tab" aria-selected={days === id} onClick={() => setDays(id)} className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${days === id ? "bg-surface text-fg shadow-sm" : "text-fg-subtle hover:text-fg"}`}>{id}d</button>)}
+                {RANGES.map(([id, label]) => <button key={id} role="tab" aria-selected={days === id} onClick={() => setDays(id)} className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${days === id ? "bg-surface text-fg shadow-sm" : "text-fg-subtle hover:text-fg"}`}>{label}</button>)}
               </div>
             </div>
           )}
@@ -188,18 +210,25 @@ export default function Overview() {
       ) : error ? <ErrorState error={error} onRetry={refetch} /> : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label={t("Stories published")} value={o?.news.published ?? 0} icon={FileText} tone="black" change={o?.news.change.publishedPercent} loading={isLoading} spark={seriesOf("published")} rows={[["Avg reads / story", num(o?.news.avgViews)], ["Reporters active", num(o?.news.activeReporters)]]} />
-            <StatCard label={t("Reads on those stories")} value={o?.news.views ?? 0} icon={Eye} tone="info" change={o?.news.change.viewsPercent} loading={isLoading} spark={seriesOf("views")} rows={[["Best hour", bestHour?.reads ? `${bestHour.hour}:00` : "—"], ["Top story", num(d?.topArticles?.[0]?.activity?.total_reads)]]} />
+            <StatCard label={isToday ? t("Stories published today") : t("Stories published")} value={o?.news.published ?? 0} icon={FileText} tone="black" change={isToday ? undefined : o?.news.change.publishedPercent} loading={isLoading} spark={isToday ? undefined : seriesOf("published")} rows={[["Avg reads / story", num(o?.news.avgViews)], ["Reporters active", num(o?.news.activeReporters)]]} />
+            <StatCard label={isToday ? t("Reads today") : t("Reads on those stories")} value={isToday ? todayReads : (o?.news.views ?? 0)} icon={Eye} tone="info" change={isToday ? undefined : o?.news.change.viewsPercent} loading={heroLoading} spark={isToday ? undefined : seriesOf("views")} rows={[["Best hour", bestHour?.reads ? `${bestHour.hour}:00` : "—"], ["Top story", num(d?.topArticles?.[0]?.activity?.total_reads)]]} />
             <StatCard label={t("Waiting for review")} value={pending} icon={Hourglass} tone="warning" loading={isLoading} hint={aging ? `${aging.over24h} waiting over 24h` : undefined} invert rows={[["Avg approval", `${d?.approval?.avgApprovalHours ?? 0}h`], ["Approved in range", num(d?.approval?.approvedInRange)]]} />
             <StatCard label={t("Shorts & videos")} value={content?.shortVideos?.total?.published ?? 0} icon={Clapperboard} tone="violet" loading={isLoading} rows={[["YouTube news", num(content?.youtubeVideos?.published)], ["Photo galleries", num(content?.gallery?.published)]]} />
           </div>
 
           <div className="grid gap-3 xl:grid-cols-3">
-            <Block className="xl:col-span-2" title={t("Publishing & reads")} description="Stories published per day and their reads" loading={isLoading} height="h-72"
-              actions={<Link to="/dashboard/analytics" className="text-sm font-medium text-primary hover:underline">{t("Full analytics →")}</Link>}>
-              <TrendChart data={d?.timeseries.series || []} series={[{ key: "published", name: "Stories" }, { key: "views", name: "Reads" }]} height={290} />
-            </Block>
-            <Block title={t("Category mix")} description="Stories per category" loading={isLoading} height="h-72" empty={!(d?.categories || []).length ? "No categories in this period" : null}>
+            {isToday ? (
+              <Block className="xl:col-span-2" title={t("Today by hour")} description="Stories published and reads for each hour of today (IST)" loading={isLoading} height="h-72" empty={!byHour.some((h) => h.reads || h.stories) ? "Nothing yet today" : null}
+                actions={<Link to="/dashboard/analytics" className="text-sm font-medium text-primary hover:underline">{t("Full analytics →")}</Link>}>
+                <ColumnChart data={byHour} xKey="hour" series={[{ key: "stories", name: "Stories" }, { key: "reads", name: "Reads" }]} height={290} tickFormatter={(v) => (Number(v) % 3 === 0 ? v : "")} />
+              </Block>
+            ) : (
+              <Block className="xl:col-span-2" title={t("Publishing & reads")} description="Stories published per day and their reads" loading={isLoading} height="h-72"
+                actions={<Link to="/dashboard/analytics" className="text-sm font-medium text-primary hover:underline">{t("Full analytics →")}</Link>}>
+                <TrendChart data={d?.timeseries.series || []} series={[{ key: "published", name: "Stories" }, { key: "views", name: "Reads" }]} height={290} />
+              </Block>
+            )}
+            <Block title={t("Category mix")} description="Stories per category" loading={isLoading} height="h-72" empty={!(d?.categories || []).length ? `No categories ${periodLabel}` : null}>
               <Donut data={(d?.categories || []).slice(0, 6).map((c) => ({ name: c.name, value: c.articles }))} height={290} />
             </Block>
           </div>
@@ -208,7 +237,7 @@ export default function Overview() {
             <Block title={t("Best publishing hours")} description={bestHour?.reads ? `Readers peak around ${bestHour.hour}:00 IST` : "Reads by hour of day (IST)"} loading={isLoading} empty={!byHour.some((h) => h.reads || h.stories) ? "Not enough data yet" : null}>
               <ColumnChart data={byHour} xKey="hour" series={[{ key: "reads", name: "Reads" }]} height={230} tickFormatter={(v) => (Number(v) % 3 === 0 ? v : "")} />
             </Block>
-            <Block title={t("Top reporters")} description="By reads in this period" loading={isLoading} empty={!(d?.reporters || []).length ? "No published stories yet" : null}>
+            <Block title={t("Top reporters")} description={`By reads ${periodLabel}`} loading={isLoading} empty={!(d?.reporters || []).length ? "No published stories yet" : null}>
               <RankBars data={(d?.reporters || []).slice(0, 6).map((r) => ({ name: r.reporter.username, value: r.views }))} label="Reads" color="var(--chart-2)" />
             </Block>
             <Block title={t("Content by state")} description="Stories per state" loading={isLoading} empty={!(d?.states || []).length ? "No state data yet" : null}>
@@ -228,11 +257,11 @@ export default function Overview() {
                 </ul>
               </div>
             </Block>
-            <Block title="Content mix" description="Everything published in this period" loading={isLoading} empty={!contentMix.length ? "Nothing published yet" : null}>
+            <Block title="Content mix" description={isToday ? "Everything published today" : "Everything published in this period"} loading={isLoading} empty={!contentMix.length ? "Nothing published yet" : null}>
               <Donut data={contentMix} height={230} />
             </Block>
             <Card padded={false}>
-              <CardHeader title={t("Top stories")} description={t("Most read in this period")} />
+              <CardHeader title={t("Top stories")} description={isToday ? t("Most read today") : t("Most read in this period")} />
               <ol className="divide-y divide-line">
                 {isLoading ? [0, 1, 2, 3, 4].map((i) => <li key={i} className="p-4"><Skeleton className="h-4 w-full" /></li>) : (d?.topArticles || []).length ? d.topArticles.slice(0, 6).map((a, i) => (
                   <li key={a.news_id}>

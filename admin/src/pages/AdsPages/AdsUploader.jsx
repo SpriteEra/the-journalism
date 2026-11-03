@@ -48,7 +48,7 @@ function SitePreview({ addType, src, device }) {
 }
 
 /**
- * Ad creator: upload the picture, add the link, and see the ad on a mock of the real page — desktop or phone — before saving.
+ * Ad creator: upload the picture, add the link, and see the ad on a mock of the real page -desktop or phone -before saving.
  * Warns (does not block) when the picture's shape is far from the size the slot is designed for.
  */
 const AdsUploader = ({ onClose, refetch, addType = 1, ad }) => {
@@ -132,7 +132,7 @@ const AdsUploader = ({ onClose, refetch, addType = 1, ad }) => {
         {fit && (
           <p className={cn("flex items-start gap-2 rounded-xl p-3 text-sm", fit.ok ? "bg-success-soft text-success" : "bg-warning-soft text-fg-muted")}>
             {fit.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />}
-            {fit.ok ? `Great — ${dims.w} × ${dims.h} fits this slot.` : `This picture is ${dims.w} × ${dims.h}. The slot is ${spec.w} × ${spec.h}, so the ad will be cropped or stretched.`}
+            {fit.ok ? `Great -${dims.w} × ${dims.h} fits this slot.` : `This picture is ${dims.w} × ${dims.h}. The slot is ${spec.w} × ${spec.h}, so the ad will be cropped or stretched.`}
           </p>
         )}
 
@@ -155,7 +155,7 @@ const AdsUploader = ({ onClose, refetch, addType = 1, ad }) => {
           </div>
         </div>
         <div className="rounded-2xl bg-surface-2 p-3 sm:p-4"><SitePreview addType={addType} src={src} device={device} /></div>
-        <p className="text-center text-xs text-fg-faint">Illustration of the page — the real layout may differ slightly.</p>
+        <p className="text-center text-xs text-fg-faint">Illustration of the page -the real layout may differ slightly.</p>
       </div>
     </div>
   );

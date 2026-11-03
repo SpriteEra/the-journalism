@@ -146,8 +146,10 @@ const SkeletonRow = () => (
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
-const SearchModal = ({ onClose }) => {
+const SearchModal = ({ onClose, topics = [] }) => {
     const router = useRouter();
+    const popular = topics.length ? topics : POPULAR.map((label) => ({ label }));
+
     const inputRef = useRef(null);
     const cache = useRef(new Map());
 
@@ -418,15 +420,15 @@ const SearchModal = ({ onClose }) => {
                                 </h3>
 
                                 <ul className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
-                                    {POPULAR.map((tag) => (
-                                        <li key={tag} className="shrink-0">
+                                    {popular.map((t) => (
+                                        <li key={t.href || t.label} className="shrink-0">
                                             <button
                                                 type="button"
-                                                onClick={() => setQuery(tag)}
+                                                onClick={() => (t.href ? openTag(t) : setQuery(t.label))}
                                                 className="flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-3 py-1.5 text-[13px] text-black transition-colors hover:border-primary hover:text-primary"
                                             >
                                                 <TrendingUp className="size-3.5 text-primary" aria-hidden />
-                                                {tag}
+                                                {t.label}
                                             </button>
                                         </li>
                                     ))}

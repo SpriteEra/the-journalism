@@ -28,7 +28,7 @@ export const addKeywords = (current, incoming) => {
 
 /**
  * SEO keywords: ONE box for Hindi and English. Each keyword is added with Enter (a comma is part of the keyword, not a separator).
- * The language of a keyword is read from its script, so people type once, in whichever language they need — search finds it either way.
+ * The language of a keyword is read from its script, so people type once, in whichever language they need -search finds it either way.
  */
 export default function KeywordsField({ value, onChange, onSuggest, suggesting, error }) {
   const { t } = useTranslation();

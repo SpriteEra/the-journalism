@@ -8,7 +8,7 @@ import { actionLabel } from '../utils/activityLabels.js';
  *  - every state-changing request (POST / PUT / PATCH / DELETE) is written AFTER the response is sent, so it can never slow
  *    down or break an API call; a failing log write is swallowed
  *  - source "admin" = this admin panel (/api/v1/admin/*), source "user" = the public website / app
- *  - only the route PATTERN, the target id and the NAMES of the sent fields are stored — never bodies, tokens, passwords or query strings
+ *  - only the route PATTERN, the target id and the NAMES of the sent fields are stored -never bodies, tokens, passwords or query strings
  *  - old rows are deleted by a TTL index (LOG_RETENTION_DAYS, default 10) and a nightly sweep (see index.js)
  */
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);

@@ -71,7 +71,9 @@ export const getTags = tryCatch(async (req, res) => {
 
 // GET /tags/popular?days=7&limit=20   (most used on published news in the last N days; featured tags first)
 export const getPopularTags = tryCatch(async (req, res) => {
-    const days = clamp(req.query.days, 7, 1, 90); const limit = clamp(req.query.limit, 20, 1, 100);
+    const days = clamp(req.query.days, 7, 1, 90);
+    const limit = clamp(req.query.limit, 20, 1, 100);
+
     const data = await cached(`tags:popular:${days}:${limit}`, 300, async () => {
         const since = new Date(Date.now() - days * 86400000);
         const rows = await News.aggregate([
@@ -90,6 +92,8 @@ export const getPopularTags = tryCatch(async (req, res) => {
     setPublicCache(res, 300);
     res.status(200).json({ success: true, ...data });
 });
+
+
 
 /** slug -> live tag; a merged tag answers with the tag it was merged into (old links keep working). */
 const resolveSlug = async (slug) => {

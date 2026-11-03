@@ -250,8 +250,6 @@ export const getLiveNewsBySlug = tryCatch(async (req, res) => {
         .select(`${MAIN_FIELDS} seo`).lean();
     if (!live) throw new ErrorHandler(404, 'Live news not found');
 
-    LiveNews.updateOne({ _id: live._id }, { $inc: { 'activity.total_reads': 1, 'activity.total_today_count': 1 } }).catch(() => { });
-
     const url = buildUrl('live', { slug: live.slug });
     const description = live.seo?.metaDescription || live.description || '';
     const breadcrumbs = [
@@ -297,9 +295,7 @@ export const getLiveNewsNext = tryCatch(async (req, res) => {
         .limit(limit + 1).select(MAIN_FIELDS).lean();
 
     const items = rows.slice(0, limit).map((l) => ({ ...l, isLive: l.status === 'live' }));
-    if (items.length) {
-        LiveNews.updateMany({ _id: { $in: items.map((i) => i._id) } }, { $inc: { 'activity.total_reads': 1, 'activity.total_today_count': 1 } }).catch(() => { });
-    }
+
     setPublicCache(res, 15);
     res.status(200).json({ success: true, items, hasMore: rows.length > limit });
 });

@@ -1,7 +1,7 @@
 import InfoTip from "./InfoTip";
 import { cn } from "../../lib/cn";
 
-/** Surface container. <Card><CardHeader title actions/><CardBody/></Card>  — padded={false} for tables / lists. */
+/** Surface container. <Card><CardHeader title actions/><CardBody/></Card>  -padded={false} for tables / lists. */
 export default function Card({ className, padded = true, as: Comp = "section", children, ...props }) {
   return (
     <Comp className={cn("surface-card", padded && "p-4 sm:p-5", className)} {...props}>

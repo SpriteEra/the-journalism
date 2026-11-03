@@ -4,6 +4,7 @@ const newsViewSchema = new mongoose.Schema({
     news_id: { type: String, required: true, index: true },
     ipHash: { type: String, required: true },
     userAgent: String,
+    type: { type: String, enum: ["news", "live", "yt", "short"], default: "news", index: true },
     createdAt: {
         type: Date,
         default: Date.now,

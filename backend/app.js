@@ -35,6 +35,9 @@ import { seoRootRouter, seoApiRouter } from './router/seo.routes.js';
 import activityLog from './plugins/activityLog.js';
 import activityLogRouter from './router/activitylog.routes.js';
 import rateLimit from '@fastify/rate-limit';
+import { logger as appLogger } from './utils/logger.js';
+
+import { loggerOptions } from './utils/logger.js';
 // the allowed browser origins. Outside production the usual local dev servers are allowed too, so a missing .env value never shows up
 // as a mysterious "CORS error".
 const DEV_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'];
@@ -49,14 +52,12 @@ export const origins = () => [...new Set([
  */
 export async function buildApp({ logger, sockets = true } = {}) {
     const app = Fastify({
-        logger: logger ?? {
-            level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'warn'),
-            redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
-        },
+        ...(logger !== undefined ? { logger } : { loggerInstance: appLogger }),
+        disableRequestLogging: true,   // no more "incoming request" / "request completed" lines
         trustProxy: process.env.TRUST_PROXY === 'true',
-        bodyLimit: 1024 * 1024,                                  // JSON bodies (uploads have their own limits)
+        bodyLimit: 1024 * 1024,
         requestIdHeader: 'x-request-id',
-        routerOptions: { ignoreTrailingSlash: true, maxParamLength: 500 },   // news ids are long slugs
+        routerOptions: { ignoreTrailingSlash: true, maxParamLength: 500 },
     });
 
     // every registered route, for scripts/export-routes.js (the admin panel's contract test checks its API calls against this list)

@@ -17,7 +17,7 @@ const copy = async (text, label = "Copied") => {
   try { await navigator.clipboard.writeText(text); toast.success(label); } catch { toast.error("Could not copy"); }
 };
 
-/** Dark ink panel with a fine gold edge and a light that sweeps across it — the same look as the Ora AI button in the top bar. */
+/** Dark ink panel with a fine gold edge and a light that sweeps across it -the same look as the Ora AI button in the top bar. */
 function Hero({ updatedAt, fetching, onRefresh, count }) {
   return (
     <section className="relative mb-5 overflow-hidden rounded-[1.75rem] bg-linear-to-br from-gold-300 via-gold-500 to-gold-300 p-px shadow-card">

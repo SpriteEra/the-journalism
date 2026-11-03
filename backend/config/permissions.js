@@ -99,7 +99,7 @@ export const PERMISSIONS = {
 
 export const P = PERMISSIONS;
 
-/** Human readable catalogue (grouped) — served by GET /admin/permissions so the UI can render checkboxes. */
+/** Human readable catalogue (grouped) -served by GET /admin/permissions so the UI can render checkboxes. */
 export const PERMISSION_CATALOG = [
     {
         group: 'News', items: [

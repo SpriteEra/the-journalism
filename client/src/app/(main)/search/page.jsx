@@ -1,14 +1,45 @@
 import ListingLayout from "@/components/common/ListingLayout";
 import { getPopularTopics, searchNews } from "@/lib/data";
 import { topicPath } from "@/lib/adapters";
+import { abs, siteName } from "@/lib/site";
 
 const LIMIT = 12;
 const pageOf = (sp) => Math.max(parseInt(sp?.page, 10) || 1, 1);
 
+
+const OG_IMAGE = { url: "/og-default.png", width: 1200, height: 630, alt: siteName() };
+
 // search result pages are never put in Google's index
 export async function generateMetadata({ searchParams }) {
-  const q = String((await searchParams)?.q || "").trim();
-  return { title: q ? `“${q}” की खोज` : "खोज", robots: { index: false, follow: true } };
+  const q = String((await searchParams)?.q || "").trim().slice(0, 80);
+
+  const title = q ? `“${q}” की खोज` : "खोज";
+  const description = q
+    ? `${siteName()} पर “${q}” से जुड़ी ताज़ा खबरें और परिणाम।`
+    : `${siteName()} पर खबर, जगह या विषय लिखकर खोजें।`;
+  const url = abs("/search"); // never self-reference the ?q= URL, so no query variants get picked up
+
+  return {
+    title, // the layout's template adds "| siteName"
+    description,
+    alternates: { canonical: url },
+    robots: { index: false, follow: true },
+    openGraph: {
+      type: "website",
+      siteName: siteName(),
+      locale: "hi_IN",
+      title: `${title} | ${siteName()}`,
+      description,
+      url,
+      images: [OG_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} | ${siteName()}`,
+      description,
+      images: [OG_IMAGE.url],
+    },
+  };
 }
 
 export default async function SearchPage({ searchParams }) {

@@ -192,7 +192,7 @@ const AdsList = ({ ads = [], setAds, refetch, adType = 2, onAdd }) => {
       </Reorder.Group>
       {changed && (
         <div className="sticky bottom-3 z-10 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3 shadow-pop">
-          <p className="text-sm text-fg-muted">Order changed — the first ad is shown first.</p>
+          <p className="text-sm text-fg-muted">Order changed -the first ad is shown first.</p>
           <Button leftIcon={Save} loading={saving} onClick={saveOrder}>Save order</Button>
         </div>
       )}

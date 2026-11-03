@@ -3,7 +3,7 @@ import tryCatch from "../utils/asyncFunction.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import User from "../model/user.model.js";
 import { sendNewsNotification, } from "./pushnotification.controller.js";
-import { deleteImage, uploadImage, uploadVideo } from "../utils/uploadImage.js";
+import { deleteImage, uploadImage } from "../utils/uploadImage.js";
 import UpdateStack from "../model/updatedstack.model.js";
 import { NotificationService } from "../service/NotificationService.js";
 import Trash from "../model/trash.model.js";
@@ -21,7 +21,7 @@ import { makeSlug } from "../utils/slug.js";
 import { P } from "../config/permissions.js";
 import { assertOwnOrAny, assertPermission } from "../middleware/Authentication.js";
 import { rolesWithPermission } from "../service/access.service.js";
-import { buildTaxonomyFilter, escapeRegex, findTaxonomyByName, lookupTaxonomy, resolveNewsTaxonomy, toIdList } from "../utils/newsTaxonomy.js";
+import { buildTaxonomyFilter, escapeRegex, findTaxonomyByName, lookupTaxonomy, resolveNewsTaxonomy } from "../utils/newsTaxonomy.js";
 import { parseTagInput, resolveNewsTags } from "../utils/newsTags.js";
 import { onNewsChanged } from "../utils/newsCache.js";
 import { keywordClauses, parseKeywords, sameKeywords } from "../utils/newsKeywords.js";
@@ -31,7 +31,7 @@ import { makeNewsSlug, needsRedirect, newsPath, newsUrl, parsePrimaryInput, pick
 import HomeSection from "../model/homesection.model.js";
 import { resolveFilter } from "./homesection.controller.js";
 import { attachPrimaryName } from "../utils/primaryRoutes.js";
-import { trackNewsView } from "../utils/newsViewTracker.js";
+import { trackView, VIEW_TYPES } from "../utils/newsViewTracker.js";
 import liveNewsModel from "../model/live.news.model.js";
 import tagModel from "../model/tag.model.js";
 
@@ -50,6 +50,7 @@ const toCard = (n) => ({
     publishedAt: n.post_time,
     author: n.author,
 });
+
 const toLiveCard = (n) => ({
     id: String(n._id),
     title: n.title,
@@ -195,15 +196,15 @@ export const getNewses = tryCatch(async (req, res) => {
     const news = toCards(rows);
     return res.status(200).json(body.iscount ? { news, total } : news);
 });
+export const incrementCount = tryCatch(async (req, res, next) => {
+    const { type, id } = req.params;
+    console.log("incrementCount", type, id);
+    const cfg = VIEW_TYPES[type];
+    if (!cfg) return next(new ErrorHandler(400, "Invalid type"));
+    const doc = await cfg.Model.findOne(cfg.where(id)).select("_id").lean();
+    if (!doc) return next(new ErrorHandler(404, "Not found"));
 
-export const incrementCountNews = tryCatch(async (req, res, next) => {
-    const { news_id } = req.params;
-
-    const exists = await News.exists({ news_id });
-    if (!exists) return next(new ErrorHandler(404, "News not found"));
-
-    trackNewsView(req, news_id);   // no await: the reader doesn't wait for counting
-
+    trackView(req, type, doc, id);   // no await: the reader doesn't wait for counting
     return res.status(200).json({ success: true });
 });
 
@@ -248,19 +249,19 @@ export const getLatestNews = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, news: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
 });
 
-const FEATURED_SELECT = 'news_id slug primaryRoute.kind primaryRoute.ref primaryRoute.slug title description banner post_time featured isVideo author -_id ';
+const FEATURED_SELECT = 'news_id slug primaryRoute.kind primaryRoute.ref primaryRoute.slug primaryRoute.name title description banner post_time featured isVideo author -_id ';
 
-/** GET /api/v1/featured — the ONE story for the top of the site: the featured story while its time lasts, otherwise the latest story. */
+/** GET /api/v1/featured -the ONE story for the top of the site: the featured story while its time lasts, otherwise the latest story. */
 export const getFeaturedPublic = tryCatch(async (req, res) => {
     const data = await cached('home:featured', 30, async () => {
         const now = new Date();
-        const tagPopulate = { path: 'tags', select: 'title slug -_id' };
 
         let doc = await News.findOne({ ...PUBLIC_Q, 'featured.isFeatured': true, 'featured.until': { $gt: now } })
             .sort({ 'featured.startedAt': -1 })
             .select(FEATURED_SELECT)
-            .populate('author', 'fullName profile profileUrl designation')
+            .populate('author', 'fullName')
             .lean();
+
 
         let isFallback = false;
         if (!doc) {
@@ -268,25 +269,25 @@ export const getFeaturedPublic = tryCatch(async (req, res) => {
             doc = await News.findOne(PUBLIC_Q)
                 .sort({ post_time: -1, _id: -1 })
                 .select(FEATURED_SELECT)
-                .populate(tagPopulate)
-                .populate('author', 'fullName profile profileUrl designation')
+                .populate('author', 'fullName')
                 .lean();
         }
         await attachPrimaryName(doc);
+
         return { news: doc || null, isFallback, until: isFallback ? null : doc.featured.until };
     });
     setPublicCache(res, 30);
     return res.status(200).json({ success: true, ...data });
 });
 
-/** GET /admin/featured-news — what is featured right now (for the "replace it?" question and the dashboard). */
+/** GET /admin/featured-news -what is featured right now (for the "replace it?" question and the dashboard). */
 export const getFeaturedAdmin = tryCatch(async (req, res) => {
     const current = await currentFeatured();
     res.set('Cache-Control', 'no-store');
     return res.status(200).json({ success: true, current: current ? { news_id: current.news_id, title: current.title, banner: current.banner, until: current.featured?.until, startedAt: current.featured?.startedAt } : null });
 });
 
-/** DELETE /admin/featured-news — take the story off the top now (the latest story takes its place). */
+/** DELETE /admin/featured-news -take the story off the top now (the latest story takes its place). */
 export const clearFeatured = tryCatch(async (req, res) => {
     const r = await News.updateMany({ 'featured.isFeatured': true }, { $set: { 'featured.isFeatured': false } });
     onNewsChanged();
@@ -391,7 +392,7 @@ export const fetchStateNewsDistrictWise = tryCatch(async (req, res) => {
     return res.status(200).json({ success: true, data });
 });
 
-/** GET /news/fetch-all-state-news — latest 5 for every active state that has news. */
+/** GET /news/fetch-all-state-news -latest 5 for every active state that has news. */
 export const findStateNews = tryCatch(async (req, res) => {
     const data = await cached('home:all-states', 60, async () => {
         const states = await State.find({ isActive: true }).sort({ order: 1, state: 1 }).select('state slug displayName').lean();
@@ -771,7 +772,7 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     const finalCategory = tax ? tax.category : news.category;
     const finalSubCategory = tax ? tax.subCategory : news.subCategory;
     const finalState = tax ? tax.state : news.state;
-    if (!isDraft && !(finalCategory?.length || finalState?.length)) throw new ErrorHandler(400, 'Choose at least a category or a state — it forms the first part of the story URL');
+    if (!isDraft && !(finalCategory?.length || finalState?.length)) throw new ErrorHandler(400, 'Choose at least a category or a state -it forms the first part of the story URL');
     // primary section of the URL: the editor's choice, else keep the stored one while it is still selected, else the default
     const primaryIn = parsePrimaryInput(b.primaryRoute);
     const keepStored = news.primaryRoute?.ref && !primaryIn ? { kind: news.primaryRoute.kind, id: String(news.primaryRoute.ref) } : undefined;
@@ -859,7 +860,7 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     updateData.updatedBy = actorId;
     const oldBanner = news.banner;
     const becameLive = updateData.isPublished === true && !news.post_time;    // first time this news goes live
-    // full document validation (category rule etc.) — assign + save instead of findOneAndUpdate so hooks run
+    // full document validation (category rule etc.) -assign + save instead of findOneAndUpdate so hooks run
     news.set(updateData);
     await news.save();
     if (featureNow) await unfeatureOthers(news._id);
@@ -924,7 +925,7 @@ export const getNewsByReporter = tryCatch(async (req, res) => {
         if (!d.isValid()) throw new ErrorHandler(400, 'createdAt is not a valid date');
         query.post_time = { $gte: d.clone().startOf('day').toDate(), $lte: d.clone().endOf('day').toDate() };
     }
-    // date range (IST days, inclusive): ?from=YYYY-MM-DD&to=YYYY-MM-DD  — on the day the story was written (createdAt)
+    // date range (IST days, inclusive): ?from=YYYY-MM-DD&to=YYYY-MM-DD  -on the day the story was written (createdAt)
     if (q.from || q.to) {
         const day = /^\d{4}-\d{2}-\d{2}$/;
         if ((q.from && !day.test(q.from)) || (q.to && !day.test(q.to))) throw new ErrorHandler(400, 'from / to must look like YYYY-MM-DD');
@@ -962,7 +963,7 @@ export const getNewsByReporter = tryCatch(async (req, res) => {
     return res.status(200).json({ news, total, page, limit });
 });
 
-/** GET /admin/news-authors — people who wrote news (for the "Created by" filter). Needs news.view.all. */
+/** GET /admin/news-authors -people who wrote news (for the "Created by" filter). Needs news.view.all. */
 export const getNewsAuthors = tryCatch(async (req, res) => {
     const rows = await News.aggregate([
         { $match: { isDeleted: false } },
@@ -979,7 +980,7 @@ export const getNewsAuthors = tryCatch(async (req, res) => {
 });
 
 /**
- * GET /admin/news-link-search?q=&exclude=  — find PUBLISHED stories to link under another story (max 10, only what the picker shows).
+ * GET /admin/news-link-search?q=&exclude=  -find PUBLISHED stories to link under another story (max 10, only what the picker shows).
  * Open to everyone who can write news (no need to see the whole news list).
  */
 export const searchNewsForLinking = tryCatch(async (req, res) => {
@@ -1265,20 +1266,20 @@ export const incrementLatestNewsReadCount = async () => {
 
 // Runs every night at 3:00 AM server time.
 // Cron format: minute hour day-of-month month day-of-week
-cron.schedule(
-    "0 3 * * *",
-    async () => {
-        console.log(
-            `[news-read-boost] Running nightly job at ${new Date().toISOString()}`
-        );
+// cron.schedule(
+//     "0 3 * * *",
+//     async () => {
+//         console.log(
+//             `[news-read-boost] Running nightly job at ${new Date().toISOString()}`
+//         );
 
-        await incrementLatestNewsReadCount();
-    },
-    {
-        timezone: "Asia/Kolkata",
-    }
-);
+//         await incrementLatestNewsReadCount();
+//     },
+//     {
+//         timezone: "Asia/Kolkata",
+//     }
+// );
 
-console.log(
-    "[news-read-boost] Cron initialized — scheduled for 3:00 AM IST"
-);
+// console.log(
+//     "[news-read-boost] Cron initialized -scheduled for 3:00 AM IST"
+// );

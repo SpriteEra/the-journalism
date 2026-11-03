@@ -153,7 +153,7 @@ export const useFetchGalleryNews = ({ page, limit, draft = false, filters }) => 
 };
 
 
-/** People who wrote news — for the "Created by" filter (needs news.view.all). */
+/** People who wrote news -for the "Created by" filter (needs news.view.all). */
 export const useNewsAuthors = (enabled = true) =>
   useQuery({
     queryKey: ['news-authors'],
@@ -165,7 +165,7 @@ export const useNewsAuthors = (enabled = true) =>
 /** One story with its full body (preview from the list). */
 export const fetchSingleNews = async (news_id) => (await httpClient.get('/get-single-news', { params: { news_id } })).data.news;
 
-/** The story featured at the top of the site right now (null when none) — needs news.feature. */
+/** The story featured at the top of the site right now (null when none) -needs news.feature. */
 export const useFeaturedCurrent = (enabled = true) =>
   useQuery({
     queryKey: ['featured-current'],

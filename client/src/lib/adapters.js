@@ -2,7 +2,7 @@
  * Turns server records into the small objects the UI components use, and builds every link of the site in ONE place.
  *
  *   story link   /{section}/news/{slug}      (section = the story's primary category or state slug)
- *   old link     /news/{news_id}             (used while a record has no slug yet — the page redirects to the new link)
+ *   old link     /news/{news_id}             (used while a record has no slug yet -the page redirects to the new link)
  */
 export const ytThumb = (id) => (id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "");
 export const ytWatchUrl = (id) => (id ? `https://www.youtube.com/watch?v=${id}` : "");
@@ -70,8 +70,6 @@ export function toVideo(y) {
     videoUrl: ytWatchUrl(y.videoLinkId),
     youtubeId: y.videoLinkId,
     href: `/videos/${y.news_id}`,
-    location: y.location || "",
-    description: y.description || "",
     publishedAt: y.createdAt || null,
     isVideo: true,
   };
@@ -85,10 +83,7 @@ export function toLive(l) {
     title: l.title,
     image: l.image,
     href: `/live/${l.slug}`,
-    caption: l.caption || "",
-    isLive: l.status === "live",
-    updatesCount: l.updatesCount || 0,
-    publishedAt: l.lastUpdateAt || l.post_time || null,
+    publishedAt: l.post_time || null,
   };
 }
 

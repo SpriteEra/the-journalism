@@ -19,7 +19,7 @@ export async function generateMetadata({ params, searchParams }) {
     if (!sec) return { title: "पेज नहीं मिला", robots: { index: false } };
     const canonical = abs(categoryPath(category));          // page 2, 3 … point to the first page's address
     const meta = toMetadata(sec.seo.meta, { canonical, fallback: { title: sec.name, description: sec.description } });
-    return page > 1 ? { ...meta, title: { absolute: `${sec.name} — पेज ${page}` }, robots: { index: false, follow: true } } : meta;
+    return page > 1 ? { ...meta, title: { absolute: `${sec.name} -पेज ${page}` }, robots: { index: false, follow: true } } : meta;
 }
 
 export default async function page({ params, searchParams }) {

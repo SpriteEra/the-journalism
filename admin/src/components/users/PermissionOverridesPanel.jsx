@@ -47,7 +47,7 @@ export default function PermissionOverridesPanel({ userId, role }) {
         actions={<>{extras > 0 && <Badge tone="info" size="sm">{extras} custom</Badge>}
           {canEdit && <><Button size="sm" variant="ghost" leftIcon={RotateCcw} disabled={!changed} onClick={() => { setGrant(null); setDeny(null); }}>Reset</Button><Button size="sm" onClick={() => save.mutate()} loading={save.isPending} disabled={!changed}>Save</Button></>}</>} />
       <div className="space-y-4 p-4 sm:p-5">
-        {role === "admin" && <Alert tone="info">Admins always have full access — overrides don't apply.</Alert>}
+        {role === "admin" && <Alert tone="info">Admins always have full access -overrides don't apply.</Alert>}
         {!canEdit && role !== "admin" && <Alert tone="info">You can see the permissions but you need “change permissions of a user” to edit them.</Alert>}
         {isLoading ? <Skeleton className="h-64 w-full" /> : groups.map((grp) => (
           <fieldset key={grp.group} className="overflow-hidden rounded-2xl border border-line">

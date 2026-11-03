@@ -21,7 +21,7 @@ const KINDS = Object.keys(KIND_LABEL);
 const byOrderThenName = (a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.name).localeCompare(String(b.name));
 
 /* ───────────────────────── searchable list (replaces the native dropdown) ───────────────────────── */
-/** items: { key, value, label, depth?, hint?, disabled?, header? } — header rows are group titles, not selectable. */
+/** items: { key, value, label, depth?, hint?, disabled?, header? } -header rows are group titles, not selectable. */
 function Picker({ items, value, onChange, placeholder }) {
     const [q, setQ] = useState("");
     const term = q.trim().toLowerCase();

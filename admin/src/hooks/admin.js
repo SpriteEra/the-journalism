@@ -62,3 +62,12 @@ export const useActivityLogStats = (source, enabled = true) =>
 // team performance: ranked reporters for a date range (reporter.performance.all)
 export const useReportersLeaderboard = (range, sort = "views", enabled = true) =>
   useQuery({ queryKey: ["team-leaderboard", range, sort], queryFn: () => get("/reporters-performance", { ...range, sort, limit: 100 }), enabled, select: (d) => d.leaderboard, placeholderData: (p) => p, staleTime: 60_000 });
+
+
+export const useTodayReads = (enabled = true) => useQuery({
+  queryKey: ["analytics", "today-view"],
+  queryFn: () => get("/analytics/today-view"),
+  enabled,
+  refetchInterval: 60_000, // the backend caches for 60s
+  staleTime: 30_000,
+});

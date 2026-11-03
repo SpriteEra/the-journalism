@@ -49,7 +49,7 @@ export const listLogs = tryCatch(async (req, res) => {
     return res.status(200).json({ success: true, logs, total, page, limit, retentionDays: LOG_RETENTION_DAYS });
 });
 
-// GET /admin/logs/stats?source=  — per-day counts (success / failed), top people and top actions for the retained window
+// GET /admin/logs/stats?source=  -per-day counts (success / failed), top people and top actions for the retained window
 export const logStats = tryCatch(async (req, res) => {
     const source = sourceOf(req);
     const since = new Date(Date.now() - LOG_RETENTION_DAYS * 86400000);
@@ -74,5 +74,5 @@ export const logStats = tryCatch(async (req, res) => {
     });
 });
 
-/** nightly sweep — the TTL index already does this, the sweep makes the 10-day rule hold even if the index is missing */
+/** nightly sweep -the TTL index already does this, the sweep makes the 10-day rule hold even if the index is missing */
 export const purgeOldLogs = () => ActivityLog.deleteMany({ createdAt: { $lt: new Date(Date.now() - LOG_RETENTION_DAYS * 86400000) } });

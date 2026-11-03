@@ -10,7 +10,7 @@ const readCookie = (header = '', name) => {
 
 /**
  * Every /admin socket must belong to a signed-in, active user. The token comes from `auth.token` (or the accessToken cookie the
- * browser already holds). The user id is taken from the TOKEN — never from what the client says — so nobody can listen to, or mark
+ * browser already holds). The user id is taken from the TOKEN -never from what the client says -so nobody can listen to, or mark
  * as read, somebody else's notifications.
  */
 export const authenticateSocket = async (socket, next) => {

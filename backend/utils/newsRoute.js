@@ -57,7 +57,7 @@ export const pickPrimary = async ({ input, categoryIds = [], subCategoryIds = []
         id = pools[kind][0];
     }
     const doc = await modelFor(kind).findById(id).select('slug').lean();
-    if (!doc?.slug) throw new ErrorHandler(400, `The ${kind} has no slug yet — open it in Categories & locations and save it once`);
+    if (!doc?.slug) throw new ErrorHandler(400, `The ${kind} has no slug yet -open it in Categories & locations and save it once`);
     return { kind, ref: id, slug: doc.slug };
 };
 

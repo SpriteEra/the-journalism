@@ -33,7 +33,7 @@ export const parseAuthorFields = (b = {}, { require = false } = {}) => {
     }
     if (b.about !== undefined || require) {
         const v = String(b.about ?? '').replace(/\r/g, '').trim();
-        if (v.length < ABOUT_MIN) throw new ErrorHandler(400, `About is required — write at least ${ABOUT_MIN} characters (it is used for the author's SEO)`);
+        if (v.length < ABOUT_MIN) throw new ErrorHandler(400, `About is required -write at least ${ABOUT_MIN} characters (it is used for the author's SEO)`);
         if (v.length > ABOUT_MAX) throw new ErrorHandler(400, `About cannot exceed ${ABOUT_MAX} characters`);
         out.about = v;
     }

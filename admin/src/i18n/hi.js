@@ -1,6 +1,6 @@
 /**
  * Hindi UI text. The English sentence itself is the key (t("Write news")), so a missing line simply shows English.
- * Only the fixed interface is translated — whatever an editor types (titles, keywords, descriptions ...) stays as written.
+ * Only the fixed interface is translated -whatever an editor types (titles, keywords, descriptions ...) stays as written.
  */
 export const hi = {
   // ── navigation ──

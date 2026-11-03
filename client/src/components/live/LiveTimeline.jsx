@@ -9,7 +9,7 @@ const NO_ID = "0".repeat(24);
  * The timeline of a live blog.
  *
  *  - `children` = the first page of entries, rendered on the server (pinned ones first, then the newest).
- *  - Scrolling down loads OLDER entries (Server Action -> /live/:slug/updates?before=<nextCursor>) — each call continues where the last one stopped.
+ *  - Scrolling down loads OLDER entries (Server Action -> /live/:slug/updates?before=<nextCursor>) -each call continues where the last one stopped.
  *  - While the coverage is live, the page asks every 20 s for entries newer than the newest it has. They are NOT pushed into the
  *    page under the reader's eyes: a "N नए अपडेट" button appears and shows them on tap. When the coverage ends, polling stops.
  */

@@ -37,7 +37,7 @@ const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
 const run = async () => {
     await mongoose.connect(process.env.MONGO_URL);
     const db = mongoose.connection.db;
-    console.log(`\n${APPLY ? 'APPLY' : 'DRY RUN'} — database: ${mongoose.connection.name}\n`);
+    console.log(`\n${APPLY ? 'APPLY' : 'DRY RUN'} -database: ${mongoose.connection.name}\n`);
 
     const [states, districts] = await Promise.all([State.find().lean(), District.find().lean()]);
     const stateMap = new Map(); const districtMap = new Map();
@@ -140,7 +140,7 @@ const run = async () => {
         if (!APPLY) console.log('\n--drop-old is ignored in a dry run');
         else for (const name of ['ytshorts', 'customvideos']) { await db.collection(name).drop().catch(() => { }); console.log(`dropped ${name}`); }
     } else if (APPLY) console.log('\nOld collections were kept. After checking the app, run again with --apply --drop-old to remove them.');
-    if (!APPLY) console.log('\nDry run only — nothing was written. Add --apply to write.');
+    if (!APPLY) console.log('\nDry run only -nothing was written. Add --apply to write.');
     await mongoose.disconnect();
 };
 

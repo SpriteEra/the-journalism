@@ -1,6 +1,6 @@
 # Testing the admin panel
 
-`npm run verify` — runs every test and a production build. Nothing needs checking by hand if it is green.
+`npm run verify` -runs every test and a production build. Nothing needs checking by hand if it is green.
 
 What the tests cover
 - **API contract** (`src/test/api-contract.test.js`): every request the panel can send must exist on the server with that method.

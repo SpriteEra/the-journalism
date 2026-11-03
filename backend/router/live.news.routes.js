@@ -2,9 +2,10 @@ import { isAuthenticated, requireAnyPermission, requirePermission } from '../mid
 import { P } from '../config/permissions.js';
 import {
     createLiveNews, updateLiveNews, endLiveNews, deleteLiveNews, getLiveNewsAdmin, getLiveNewsAdminSingle,
-    addLiveUpdate, editLiveUpdate, deleteLiveUpdate, getLiveNewsList, getLiveNewsBySlug,
+    addLiveUpdate, editLiveUpdate, deleteLiveUpdate, getLiveNewsBySlug,
     getLiveNewsNext,
 } from '../controller/live.news.controller.js';
+import { getLiveNewsList } from '../controller/public.controller.js';
 
 
 // /api/v1/admin/live

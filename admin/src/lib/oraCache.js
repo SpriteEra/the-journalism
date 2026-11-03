@@ -1,6 +1,6 @@
 /**
  * OraAI response cache in the browser (localStorage, per key, with a time limit).
- * Together with the server cache this means an editor opening the trends panel again — or after a refresh — never waits for
+ * Together with the server cache this means an editor opening the trends panel again -or after a refresh -never waits for
  * (or pays for) a second upstream call. Values are served instantly; react-query refreshes them in the background once stale.
  */
 const PREFIX = "ora:v1:";

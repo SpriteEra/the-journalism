@@ -2,7 +2,7 @@ import ErrorHandler from './errorHandler.js';
 import News from '../model/news.models.js';
 import mongoose from 'mongoose';
 /**
- * Related stories: the editor can link up to 5 other PUBLISHED stories under a story (internal linking — helps readers and SEO).
+ * Related stories: the editor can link up to 5 other PUBLISHED stories under a story (internal linking -helps readers and SEO).
  * The body carries news_ids; the database stores references.
  */
 export const RELATED_MAX = 5;
@@ -42,7 +42,7 @@ export const resolveRelated = async (ids, selfNewsId) => {
     for (const d of docs) { found.set(d.news_id, d._id); found.set(String(d._id), d._id); }
 
     const missing = ids.filter((id) => !found.has(id));
-    if (missing.length) throw new ErrorHandler(400, 'Only published stories can be linked — one of the chosen stories is not available');
+    if (missing.length) throw new ErrorHandler(400, 'Only published stories can be linked -one of the chosen stories is not available');
 
     // a story linked by its own _id (when selfNewsId is a slug) is also rejected
     const result = ids.map((id) => found.get(id));

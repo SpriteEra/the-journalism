@@ -13,8 +13,7 @@ export default function ListingLayout({ title, description, items = [], page = 1
       <JsonLd data={jsonLd} />
       <section className="lg:col-span-5">
         <header className="border-b-2 border-primary pb-3">
-          <h1 className="font-khand text-[32px] font-bold leading-tight lg:text-[44px]">{title}{page > 1 ? <span className="text-black/50"> — पेज {page}</span> : null}</h1>
-          {description && page === 1 && <p className="mt-2 max-w-3xl text-lg leading-relaxed text-black/75">{description}</p>}
+          <h1 className="font-khand text-[32px] font-bold leading-tight lg:text-[44px]">{title}{page > 1 ? <span className="text-black/50"> -पेज {page}</span> : null}</h1>
         </header>
         {children}
 

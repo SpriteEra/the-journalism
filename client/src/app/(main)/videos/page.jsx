@@ -4,14 +4,46 @@ import SectionHeading from "@/components/common/SectionHeading";
 import VideoCard from "@/components/common/VideoCard";
 import LatestNews from "@/components/LatestNews";
 import { getLatest, getVideos } from "@/lib/data";
-import { abs } from "@/lib/site";
+import { abs, siteName } from "@/lib/site";
 
 const LIMIT = 12;
 const pageOf = (sp) => Math.max(parseInt(sp?.page, 10) || 1, 1);
 
+
+const OG_IMAGE = { url: "/og-default.png", width: 1200, height: 630, alt: siteName() };
+
 export async function generateMetadata({ searchParams }) {
     const page = pageOf(await searchParams);
-    return { title: page > 1 ? `वीडियो — पेज ${page}` : "वीडियो", description: "ताज़ा खबरों के वीडियो।", alternates: { canonical: abs("/videos") }, ...(page > 1 ? { robots: { index: false, follow: true } } : {}) };
+
+    const heading = "वीडियो";
+    const title = page > 1 ? `${heading} - पेज ${page}` : `${heading}: ताज़ा खबरों के न्यूज़ वीडियो और लाइव क्लिप्स`;
+    const description =
+        page > 1
+            ? `ताज़ा खबरों के वीडियो, पेज ${page}। ${siteName()} पर देखें देश-दुनिया की हर बड़ी खबर के वीडियो।`
+            : `देश-दुनिया, राजनीति, खेल और मनोरंजन की ताज़ा खबरों के न्यूज़ वीडियो ${siteName()} पर देखें, हर बड़ी खबर का वीडियो एक जगह।`;
+    const url = abs("/videos"); // every page points to the main listing
+
+    return {
+        title, // the layout's template adds "| siteName"
+        description,
+        alternates: { canonical: url },
+        ...(page > 1 ? { robots: { index: false, follow: true } } : {}),
+        openGraph: {
+            type: "website",
+            siteName: siteName(),
+            locale: "hi_IN",
+            title: `${title} | ${siteName()}`,
+            description,
+            url,
+            images: [OG_IMAGE],
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: `${title} | ${siteName()}`,
+            description,
+            images: [OG_IMAGE.url],
+        },
+    };
 }
 
 export default async function VideosPage({ searchParams }) {

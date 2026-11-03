@@ -41,7 +41,7 @@ function TaxonomyForm({ kind, item, categories, states, onClose }) {
         {kind === "category" && (
           <>
             <Field label="Parent category" hint="Leave empty for a top-level category (sub-categories go one level down)">
-              <Select value={f.parent || ""} onChange={(e) => set({ parent: e.target.value })} options={[{ value: "", label: "— None (top level) —" }, ...topLevel.map((c) => ({ value: c._id, label: c.name }))]} />
+              <Select value={f.parent || ""} onChange={(e) => set({ parent: e.target.value })} options={[{ value: "", label: "-None (top level) —" }, ...topLevel.map((c) => ({ value: c._id, label: c.name }))]} />
             </Field>
             <Field label="Description"><Textarea rows={2} value={f.description} onChange={(e) => set({ description: e.target.value })} /></Field>
             <div className="grid gap-4 sm:grid-cols-2">

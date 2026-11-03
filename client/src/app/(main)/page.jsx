@@ -10,15 +10,37 @@ import Image from 'next/image';
 import Link from 'next/link';
 import React from 'react'
 
-import { getFeatured, getHomeSections, getLatest, getLiveList, getShorts, getVideos } from "@/lib/data";
+import { getFeatured, getHomeSections, getLiveList, getShorts, getVideos } from "@/lib/data";
 import { siteDescription, siteName, abs } from "@/lib/site";
+import JsonLd from '@/components/common/JsonLd';
 
 
-export const metadata = { title: { absolute: `${siteName()} — ${siteDescription()}` }, description: siteDescription(), alternates: { canonical: abs("/") } };
+const OG_IMAGE = { url: "/og-default.png", width: 1200, height: 630, alt: siteName() };
 
-/** Your layout, top to bottom. Backend section 1 -> 'four', section 2 -> 'five', and so on. */
+export const metadata = {
+    title: { absolute: `${siteName()} | आज की ताज़ा खबरें, ब्रेकिंग न्यूज़ और लाइव अपडेट` },
+    description: siteDescription(),
+    alternates: { canonical: abs("/") },
+    openGraph: {
+        type: "website",
+        url: abs("/"),
+        siteName: siteName(),
+        title: `${siteName()} - ${siteDescription()}`,
+        description: siteDescription(),
+        locale: "hi_IN",
+        images: [OG_IMAGE],
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: `${siteName()} - ${siteDescription()}`,
+        description: siteDescription(),
+        images: [OG_IMAGE.url],
+    },
+};
 const PATTERN = ['four', 'five', 'four', 'five', 'four', 'five', 'three', 'three', 'four'];
+
 const FIVE_BG = ['bg-[#FF3D000D]', 'bg-[#E56C0F0D]'];   // five-card sections alternate these
+
 const SHORTS_AFTER = 2;                                   // shorts carousel goes after this many sections
 const LIMIT = { four: 4, five: 5, three: 3 };
 
@@ -59,7 +81,8 @@ function HeroStory({ story }) {
         <article className='order-1 lg:order-2 lg:col-span-4 px-0 sm:px-3 max-lg:page-container'>
             <SectionHeading
                 noLink
-                headingTitle={headingLable} className="text-[15px]!"
+                headingTitle={headingLable}
+                className="text-[15px]!"
             />
 
             {/* 16:9 media */}
@@ -105,16 +128,38 @@ function HeroStory({ story }) {
 }
 
 const page = async () => {
-    const [featured, sections, live, latest, videos, shorts] = await Promise.all([
+    const [featured, sections, live, videos, shorts] = await Promise.all([
         getFeatured(),
         getHomeSections(),
         getLiveList({ limit: 8 }),
-        getLatest({ limit: 9 }),
-        getVideos({ limit: 5 }),
+        getVideos({ limit: 2 }),
         getShorts({ limit: 14 }),
     ]);
-    const hero = featured || latest.items[0] || null;
+
+    const hero = featured || null;
     const blocks = buildBlocks(Array.isArray(sections) ? sections : []);
+    const listItems = [hero, ...blocks.flatMap((b) => (b.cols ? b.cols.flatMap((c) => c.items) : b.items || []))]
+        .filter((s) => s?.href && s?.title)
+        .slice(0, 20);
+
+    const pageLd = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: `${siteName()} - ${siteDescription()}`,
+        description: siteDescription(),
+        url: abs("/"),
+        inLanguage: "hi-IN",
+        mainEntity: {
+            "@type": "ItemList",
+            itemListElement: listItems.map((s, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                url: abs(s.href),
+                name: s.title,
+            })),
+        },
+    };
+
     const renderBlock = (b) => {
         if (b.layout === 'four') return <FourCardLayoutSection key={b.key} items={b.items} title={b.title} titleHref={b.titleHref} />;
         if (b.layout === 'five') return <FiveCardLayoutSection key={b.key} items={b.items} title={b.title} titleHref={b.titleHref} perColumn={2} bgClassName={b.bg} />;
@@ -129,6 +174,7 @@ const page = async () => {
 
     return (
         <div>
+            <JsonLd data={pageLd} />
             <section className='grid grid-cols-1 lg:grid-cols-8 gap-2 lg:page-container py-5'>
                 <div className='order-3 lg:order-1 lg:col-span-2  lg:px-2'>
                     <LiveNews items={live.items} />
@@ -147,104 +193,4 @@ const page = async () => {
         </div>
     )
 }
-
-// const page = async () => {
-//     const [featured, sections, live, latest, videos, shorts] = await Promise.all([
-//         getFeatured(),
-//         getHomeSections(),
-//         getLiveList({ limit: 8 }),
-//         getLatest({ limit: 9 }),
-//         getVideos({ limit: 5 }),
-//         getShorts({ limit: 14 }),
-//     ]);
-
-//     const hero = featured || latest.items[0] || null;
-//     return (
-//         <div>
-//             <section className='grid grid-cols-1 lg:grid-cols-8 gap-2 lg:page-container py-5'>
-//                 <div className='order-3 lg:order-1 lg:col-span-2  lg:px-2'>
-//                     <LiveNews />
-//                 </div>
-//                 <HeroStory story={hero} />
-//                 <div className='order-2 lg:order-3 lg:col-span-2 max-lg:page-container'>
-//                     <VideoSection />
-//                 </div>
-//             </section>
-//             <section className='min-h-screen'>
-
-//                 <FourCardLayoutSection
-//                     items={vicharItems}
-//                     title={'विचार'}
-//                     titleHref={'/vichar'}
-
-//                 />
-
-//                 <FiveCardLayoutSection
-//                     title="ग्राउंड रिपोर्ट"
-//                     titleHref="/ground-report"
-//                     items={groundReportItems}      // plain array
-//                     perColumn={2}             // optional, default 2
-//                     bgClassName="bg-[#FF3D000D]"
-//                 />
-
-//                 <ShortVideoCarousel
-//                     title="शॉर्ट वीडियो"
-//                     titleHref="/shorts"
-//                     items={shortVideoItems}
-//                 />
-
-//                 <FourCardLayoutSection
-//                     items={vicharItems}
-//                     title={'विश्लेषण'}
-//                     titleHref={'/analysis'}
-
-//                 />
-
-//                 <FiveCardLayoutSection
-//                     title="राजनीति"
-//                     titleHref="/politics"
-//                     items={groundReportItems}      // plain array
-//                     perColumn={2}             // optional, default 2
-//                     bgClassName="bg-[#E56C0F0D]"
-//                 />
-
-//                 <FourCardLayoutSection
-//                     items={vicharItems}
-//                     title={'देश-विदेश'}
-//                     titleHref={'/analysis'}
-
-//                 />
-
-//                 <FiveCardLayoutSection
-//                     title="धर्म-संस्कृति"
-//                     titleHref="/politics"
-//                     items={groundReportItems}      // plain array
-//                     perColumn={2}             // optional, default 2
-//                     bgClassName="bg-[#E56C0F0D]"
-//                 />
-
-//                 <div className='grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-20 page-container'>
-//                     <ThreeCardLayoutSection
-//                         title="इतिहास"
-//                         titleHref="/itihas"
-//                         items={itihasItems}
-//                     />
-//                     <ThreeCardLayoutSection
-//                         title="इतिहास"
-//                         titleHref="/itihas"
-//                         items={itihasItems.slice(3)}
-//                     />
-
-//                 </div>
-
-//                 <FourCardLayoutSection
-//                     items={vicharItems}
-//                     title={'देश-विदेश'}
-//                     titleHref={'/analysis'}
-
-//                 />
-//             </section>
-//         </div>
-//     )
-// }
 export default page

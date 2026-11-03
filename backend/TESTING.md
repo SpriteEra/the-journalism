@@ -1,6 +1,6 @@
 # Testing the server
 
-`npm test` — runs every test (no database needed).
+`npm test` -runs every test (no database needed).
 
 What the tests cover
 - **CORS** (`test/cors.test.js`): the browser preflight for GET / POST / PUT / PATCH / DELETE from the admin origin and local dev, and that an unknown origin is refused.

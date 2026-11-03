@@ -2,19 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
-/* Replace with real data (props or API) */
-const DEFAULT_ITEMS = Array.from({ length: 6 }, (_, i) => ({
-    id: i + 1,
-    title: "यूपी में बड़ा प्रशासनिक फेरबदल, कई एडीएम समेत 20 अधिकारियों के तबादले",
-    image: "/demo/news1.png",
-    href: `/live/${i + 1}`,
-}));
-
 const LiveNews = ({
     title = "लाइव न्यूज़",
     titleHref = "/live",
     moreHref = "/live",
-    items = DEFAULT_ITEMS,
+    items = [],
     className = "",
 }) => {
 

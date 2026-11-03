@@ -1,13 +1,14 @@
 import { isAuthenticated, requirePermission } from '../middleware/Authentication.js';
 import { P } from '../config/permissions.js';
 import {
-    createCategory, updateCategory, deleteCategory, getCategoriesAdmin, getCategoryById, getCategoryTree, getCategoryBySlug,
-    createState, updateState, deleteState, getStatesAdmin, getStatesPublic, getStateBySlug,
+    createCategory, updateCategory, deleteCategory, getCategoriesAdmin, getCategoryById,
+    createState, updateState, deleteState, getStatesAdmin, getStatesPublic,
     createDistrict, updateDistrict, deleteDistrict, getDistrictsAdmin, getDistrictBySlug, getNewsByTaxonomy,
 } from '../controller/taxonomy.controller.js';
 import {
     getHomeSectionsAdmin, createHomeSection, updateHomeSection, deleteHomeSection, reorderHomeSections, getHomeSectionsPublic,
 } from '../controller/homesection.controller.js';
+import { getCategoryBySlug, getCategoryTree, getStateBySlug, getStates } from '../controller/public.controller.js';
 
 
 // mounted at /api/v1/admin  (admin only)
@@ -18,8 +19,9 @@ export async function taxonomyPublicRouter(app) {
     // mounted at /api/v1/taxonomy  (no login)
     app.get('/categories', getCategoryTree);
     app.get('/categories/:slug', getCategoryBySlug);
-    app.get('/states', getStatesPublic);
+    app.get('/states', getStates);
     app.get('/states/:slug', getStateBySlug);
+
     app.get('/districts/:slug', getDistrictBySlug);
     app.get('/home-sections', getHomeSectionsPublic);          // ordered home page sections + their latest news
     app.get('/:type/:slug/news', getNewsByTaxonomy);

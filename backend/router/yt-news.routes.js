@@ -1,4 +1,5 @@
-import { getRelatedYtNews, getVideoNews, getYtNews } from "../controller/ytnews.controller.js";
+import { getVideoNews } from "../controller/public.controller.js";
+import { getRelatedYtNews, getYtNews } from "../controller/ytnews.controller.js";
 
 
 export default YtRouter;

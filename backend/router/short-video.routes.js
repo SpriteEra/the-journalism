@@ -11,7 +11,7 @@ const manage = [isAuthenticated, requireAnyPermission(P.VIDEO_MANAGE_OWN, P.VIDE
 const sync = [isAuthenticated, requirePermission(P.VIDEO_SYNC)];
 const maxMb = () => parseInt(process.env.MAX_VIDEO_MB) || 300;
 
-// /api/v1/short-videos  (public) — '/latest' is registered before '/:slug'
+// /api/v1/short-videos  (public) -'/latest' is registered before '/:slug'
 export async function shortVideoPublicRouter(app) {
     app.get('/latest', getLatestShortVideos);
     app.get('/', getShortVideos);
