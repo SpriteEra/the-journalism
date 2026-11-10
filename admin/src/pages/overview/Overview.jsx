@@ -4,23 +4,32 @@ import { Link } from "react-router-dom";
 import { Clapperboard, Eye, FileText, Hourglass, MoreVertical, PlaySquare, Plus, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import usePermission from "../../hooks/usePermission";
-import { useQuery } from "@tanstack/react-query";
 import { useAnalyticsDashboard, useTodayReads } from "../../hooks/admin";
 import { fmtDate } from "../../lib/api";
 import { rangeFromDays } from "../../components/analytics/RangePicker";
 import { ColumnChart, Donut, Gauge, RankBars, TrendChart } from "../../components/charts/Charts";
 import { buttonStyles } from "../../components/ui/Button";
+import InfoTip from "../../components/ui/InfoTip"; // adjust the path if needed
 import { Badge, Card, CardHeader, EmptyState, ErrorState, Skeleton, StatCard } from "../../components/ui";
 
 const greetingKey = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
-const RANGES = [["1", "Today"], ["7", "7d"], ["14", "14d"], ["30", "30d"]];
+// "today" = live read count only; every other option ends yesterday
+const RANGES = [["today", "Today"], ["1", "Yesterday"], ["7", "7d"], ["14", "14d"], ["30", "30d"]];
 
-
-function Block({ title, description, loading, children, className, actions, height = "h-60", empty }) {
+function Block({ title, description, info, loading, children, className, actions, height = "h-60", empty }) {
   return (
     <Card padded={false} className={className}>
-      <CardHeader title={title} description={description} actions={actions} />
+      <CardHeader
+        title={title}
+        description={description}
+        actions={(actions || info) ? (
+          <>
+            {actions}
+            {info && <InfoTip align="end" label={`About: ${title}`}>{info}</InfoTip>}
+          </>
+        ) : undefined}
+      />
       <div className="p-4">{loading ? <Skeleton className={`${height} w-full`} /> : empty ? <EmptyState fill={false} title={empty} className="py-8" /> : children}</div>
     </Card>
   );
@@ -126,26 +135,32 @@ function QuickActions({ can, inline = false }) {
 export default function Overview() {
   const { t } = useTranslation();
   const { user, can } = usePermission();
-  const [days, setDays] = useState("1"); // default: today
-  const isToday = days === "1";
-  const range = useMemo(() => rangeFromDays(Number(days)), [days]);
+  const [days, setDays] = useState("today");
+  const isToday = days === "today";          // live read count only
+  const isDay = isToday || days === "1";     // dashboard data is a single day (yesterday)
+  const range = useMemo(() => rangeFromDays(isToday ? 1 : Number(days), { excludeToday: true }), [days, isToday]);
   const canSee = can("analytics.view");
 
   // dashboard data must be read BEFORE anything below uses isLoading / o
   const { data, isLoading, error, refetch } = useAnalyticsDashboard(range, canSee);
   const d = data?.data; const o = d?.overview;
 
-  // today's real reads (news + yt + short + live) from the live counters
+  // today's real reads (news + yt + short + live) from the live counters: the only number that includes today
   const { data: today, isLoading: todayLoading } = useTodayReads(canSee && isToday);
   const todayReads = today ? (today.Newscount || 0) + (today.Ytcount || 0) + (today.Shortcount || 0) + (today.Livecount || 0) : 0;
   const heroLoading = isLoading || (isToday && todayLoading);
 
-  const viewsChange = Number(o?.news.change.viewsPercent);
-  const hasComparison = !isToday && Number.isFinite(viewsChange) && (o?.news.views || 0) > 0;
+  const pending = d?.approval?.pending ?? 0;
+  const aging = d?.approval?.aging;
+
+  const readsChange = Number(o?.news.change.readsPercent);
+  const hasComparison = !isDay && Number.isFinite(readsChange) && (o?.news.readsInRange || 0) > 0;
 
   const heroStats = isToday
-    ? [["Published today", o?.news.published], ["Reads today", todayReads], ["Reporters active", o?.news.activeReporters]]
-    : [["Stories", o?.news.published], ["Reads", o?.news.views], ["Reporters", o?.news.activeReporters]];
+    ? [["Reads today", todayReads], ["Waiting for review", pending], ["Published yesterday", o?.news.published]]
+    : isDay
+      ? [["Published yesterday", o?.news.published], ["Reads yesterday", o?.news.readsInRange], ["Reporters active", o?.news.activeReporters]]
+      : [["Stories", o?.news.published], ["Reads", o?.news.readsInRange], ["Reporters", o?.news.activeReporters]];
 
   // reads per hour of day, summed over the weekday x hour heat map
   const byHour = useMemo(() => {
@@ -161,9 +176,7 @@ export default function Overview() {
     { name: "Stories", value: o.news.published }, { name: "Shorts & videos", value: content.shortVideos?.total?.published || 0 }, { name: "YouTube news", value: content.youtubeVideos?.published || 0 },
     { name: "Gallery", value: content.gallery?.published || 0 }, { name: "Events", value: content.events?.published || 0 }, { name: "Live", value: content.liveNews?.published || 0 },
   ].filter((x) => x.value > 0) : [];
-  const pending = d?.approval?.pending ?? 0;
-  const aging = d?.approval?.aging;
-  const periodLabel = isToday ? "today" : "in this period";
+  const periodLabel = isDay ? "yesterday" : "in this period";
 
   return (
     <div className="space-y-4">
@@ -174,7 +187,7 @@ export default function Overview() {
         <div className="relative flex flex-col gap-3 sm:gap-6">
           <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-4">
             <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><Sparkles className="size-3.5" />Insights · {isToday ? "today" : `last ${days} days`}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><Sparkles className="size-3.5" />Insights · {isToday ? "today" : isDay ? "yesterday" : `last ${days} days`}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-fg-muted backdrop-blur"><span className="size-1.5 rounded-full bg-success" />Live</span>
             </div>
             <div className="flex flex-col items-end gap-2 sm:gap-3">
@@ -187,8 +200,10 @@ export default function Overview() {
             {canSee && !heroLoading
               ? <p className="mt-3 text-sm sm:text-base leading-relaxed text-fg-subtle sm:text-lg">
                 {isToday
-                  ? <>So far today: <b className="text-fg">{num(o?.news.published)}</b> {o?.news.published === 1 ? "story" : "stories"} published and <b className="text-fg">{num(todayReads)}</b> reads, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>
-                  : <>Here is how the newsroom is doing{hasComparison && <> - reads are {viewsChange >= 0 ? "up" : "down"} <b className="text-fg">{Math.abs(viewsChange)}%</b> on the previous period</>}, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>}
+                  ? <>So far today: <b className="text-fg">{num(todayReads)}</b> reads, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>
+                  : isDay
+                    ? <>Yesterday: <b className="text-fg">{num(o?.news.published)}</b> {o?.news.published === 1 ? "story" : "stories"} published and <b className="text-fg">{num(o?.news.readsInRange)}</b> reads, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>
+                    : <>Here is how the newsroom is doing{hasComparison && <> - reads are {readsChange >= 0 ? "up" : "down"} <b className="text-fg">{Math.abs(readsChange)}%</b> on the previous period</>}, with <b className="text-fg">{pending} {pending === 1 ? "story" : "stories"}</b> waiting for review.</>}
               </p>
               : <p className="mt-3 text-base text-fg-subtle sm:text-lg">{canSee ? "Loading your numbers…" : "Pick a section from the menu to get started."}</p>}
           </div>
@@ -210,43 +225,50 @@ export default function Overview() {
       ) : error ? <ErrorState error={error} onRetry={refetch} /> : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label={isToday ? t("Stories published today") : t("Stories published")} value={o?.news.published ?? 0} icon={FileText} tone="black" change={isToday ? undefined : o?.news.change.publishedPercent} loading={isLoading} spark={isToday ? undefined : seriesOf("published")} rows={[["Avg reads / story", num(o?.news.avgViews)], ["Reporters active", num(o?.news.activeReporters)]]} />
-            <StatCard label={isToday ? t("Reads today") : t("Reads on those stories")} value={isToday ? todayReads : (o?.news.views ?? 0)} icon={Eye} tone="info" change={isToday ? undefined : o?.news.change.viewsPercent} loading={heroLoading} spark={isToday ? undefined : seriesOf("views")} rows={[["Best hour", bestHour?.reads ? `${bestHour.hour}:00` : "—"], ["Top story", num(d?.topArticles?.[0]?.activity?.total_reads)]]} />
+            <StatCard label={isDay ? t("Stories published yesterday") : t("Stories published")} value={o?.news.published ?? 0} icon={FileText} tone="black" change={isDay ? undefined : o?.news.change.publishedPercent} loading={isLoading} spark={isDay ? undefined : seriesOf("published")} rows={[["Avg reads / new story", num(o?.news.avgViews)], ["Reporters active", num(o?.news.activeReporters)]]} />
+            <StatCard label={isToday ? t("Reads today") : isDay ? t("Reads yesterday") : t("Reads")} value={isToday ? todayReads : (o?.news.readsInRange ?? 0)} icon={Eye} tone="info" change={isDay ? undefined : o?.news.change.readsPercent} loading={heroLoading} rows={[["Best hour", bestHour?.reads ? `${bestHour.hour}:00` : "—"], ["Top story", num(d?.topArticles?.[0]?.activity?.total_reads)]]} />
             <StatCard label={t("Waiting for review")} value={pending} icon={Hourglass} tone="warning" loading={isLoading} hint={aging ? `${aging.over24h} waiting over 24h` : undefined} invert rows={[["Avg approval", `${d?.approval?.avgApprovalHours ?? 0}h`], ["Approved in range", num(d?.approval?.approvedInRange)]]} />
             <StatCard label={t("Shorts & videos")} value={content?.shortVideos?.total?.published ?? 0} icon={Clapperboard} tone="violet" loading={isLoading} rows={[["YouTube news", num(content?.youtubeVideos?.published)], ["Photo galleries", num(content?.gallery?.published)]]} />
           </div>
 
           <div className="grid gap-3 xl:grid-cols-3">
-            {isToday ? (
-              <Block className="xl:col-span-2" title={t("Today by hour")} description="Stories published and reads for each hour of today (IST)" loading={isLoading} height="h-72" empty={!byHour.some((h) => h.reads || h.stories) ? "Nothing yet today" : null}
+            {isDay ? (
+              <Block className="xl:col-span-2" title={t("Yesterday by hour")} description="Stories published for each hour of yesterday (IST)" loading={isLoading} height="h-72" empty={!byHour.some((h) => h.reads || h.stories) ? "Nothing yesterday" : null}
+                info="Number of stories published in each hour of yesterday (IST), and the lifetime reads of those stories. Today is not included, so this shows the last complete day."
                 actions={<Link to="/dashboard/analytics" className="text-sm font-medium text-primary hover:underline">{t("Full analytics →")}</Link>}>
                 <ColumnChart data={byHour} xKey="hour" series={[{ key: "stories", name: "Stories" }, { key: "reads", name: "Reads" }]} height={290} tickFormatter={(v) => (Number(v) % 3 === 0 ? v : "")} />
               </Block>
             ) : (
               <Block className="xl:col-span-2" title={t("Publishing & reads")} description="Stories published per day and their reads" loading={isLoading} height="h-72"
+                info="Stories published each day, and the lifetime reads of those stories. Reads are counted against the day the story was published, not the day it was read."
                 actions={<Link to="/dashboard/analytics" className="text-sm font-medium text-primary hover:underline">{t("Full analytics →")}</Link>}>
                 <TrendChart data={d?.timeseries.series || []} series={[{ key: "published", name: "Stories" }, { key: "views", name: "Reads" }]} height={290} />
               </Block>
             )}
-            <Block title={t("Category mix")} description="Stories per category" loading={isLoading} height="h-72" empty={!(d?.categories || []).length ? `No categories ${periodLabel}` : null}>
+            <Block title={t("Category mix")} description="Stories per category" loading={isLoading} height="h-72" empty={!(d?.categories || []).length ? `No categories ${periodLabel}` : null}
+              info="Share of stories published in this period by category (top 6). A story with several categories counts once in each.">
               <Donut data={(d?.categories || []).slice(0, 6).map((c) => ({ name: c.name, value: c.articles }))} height={290} />
             </Block>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            <Block title={t("Best publishing hours")} description={bestHour?.reads ? `Readers peak around ${bestHour.hour}:00 IST` : "Reads by hour of day (IST)"} loading={isLoading} empty={!byHour.some((h) => h.reads || h.stories) ? "Not enough data yet" : null}>
+            <Block title={t("Best publishing hours")} description={bestHour?.reads ? `Most-read stories were published around ${bestHour.hour}:00 IST` : "Reads by hour of day (IST)"} loading={isLoading} empty={!byHour.some((h) => h.reads || h.stories) ? "Not enough data yet" : null}
+              info="Lifetime reads of stories, grouped by the hour they were published (IST). It shows the best hours to publish, not when readers were online.">
               <ColumnChart data={byHour} xKey="hour" series={[{ key: "reads", name: "Reads" }]} height={230} tickFormatter={(v) => (Number(v) % 3 === 0 ? v : "")} />
             </Block>
-            <Block title={t("Top reporters")} description={`By reads ${periodLabel}`} loading={isLoading} empty={!(d?.reporters || []).length ? "No published stories yet" : null}>
+            <Block title={t("Top reporters")} description={`By reads ${periodLabel}`} loading={isLoading} empty={!(d?.reporters || []).length ? "No published stories yet" : null}
+              info="Reporters ranked by the lifetime reads of the stories they published in this period (top 6).">
               <RankBars data={(d?.reporters || []).slice(0, 6).map((r) => ({ name: r.reporter.username, value: r.views }))} label="Reads" color="var(--chart-2)" />
             </Block>
-            <Block title={t("Content by state")} description="Stories per state" loading={isLoading} empty={!(d?.states || []).length ? "No state data yet" : null}>
+            <Block title={t("Content by state")} description="Stories per state" loading={isLoading} empty={!(d?.states || []).length ? "No state data yet" : null}
+              info="Number of stories published in this period for each state (top 6).">
               <RankBars data={(d?.states || []).slice(0, 6).map((s) => ({ name: s.name, value: s.articles }))} label="Stories" color="var(--chart-3)" />
             </Block>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            <Block title={t("Review pipeline")} description="Stories waiting for an approver" loading={isLoading} height="h-56">
+            <Block title={t("Review pipeline")} description="Stories waiting for an approver" loading={isLoading} height="h-56"
+              info="Stories currently waiting for approval, by how long they have waited. The gauge is the percentage that has waited less than 24 hours; 100% means nothing is overdue. It does not depend on the selected range.">
               <div className="grid grid-cols-2 items-center gap-2">
                 <Gauge value={pending ? Math.max(0, 100 - Math.min(100, (aging?.over24h || 0) / pending * 100)) : 100} label="on time (< 24h)" color={pending && aging?.over24h ? "var(--warning)" : "var(--success)"} height={170} />
                 <ul className="space-y-2 text-sm">
@@ -257,11 +279,13 @@ export default function Overview() {
                 </ul>
               </div>
             </Block>
-            <Block title="Content mix" description={isToday ? "Everything published today" : "Everything published in this period"} loading={isLoading} empty={!contentMix.length ? "Nothing published yet" : null}>
+            <Block title="Content mix" description={isDay ? "Everything published yesterday" : "Everything published in this period"} loading={isLoading} empty={!contentMix.length ? "Nothing published yet" : null}
+              info="Share of each kind of content (stories, shorts and videos, YouTube news, gallery, events, live) published in this period.">
               <Donut data={contentMix} height={230} />
             </Block>
             <Card padded={false}>
-              <CardHeader title={t("Top stories")} description={isToday ? t("Most read today") : t("Most read in this period")} />
+              <CardHeader title={t("Top stories")} description={isDay ? t("Most read, published yesterday") : t("Most read in this period")}
+                actions={<InfoTip align="end" label="About: Top stories">The stories published in this period with the most lifetime reads (top 6).</InfoTip>} />
               <ol className="divide-y divide-line">
                 {isLoading ? [0, 1, 2, 3, 4].map((i) => <li key={i} className="p-4"><Skeleton className="h-4 w-full" /></li>) : (d?.topArticles || []).length ? d.topArticles.slice(0, 6).map((a, i) => (
                   <li key={a.news_id}>
@@ -282,6 +306,14 @@ export default function Overview() {
             </Card>
           )}
         </>
+      )}
+
+      {canSee && (
+        <p className="pt-2 text-center text-xs text-fg-faint">
+          {isToday
+            ? "Only today's read count is live. All other figures are up to yesterday, and today's data will be complete tomorrow."
+            : "Today's data isn't included. It will be visible tomorrow."}
+        </p>
       )}
     </div>
   );

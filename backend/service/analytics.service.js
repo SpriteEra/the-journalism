@@ -49,6 +49,14 @@ export { shortVideoStats };
 const sumMedia = (Model, match, viewsField = '$activity.total_reads') =>
     Model.aggregate([{ $match: match }, { $group: { _id: null, n: { $sum: 1 }, views: { $sum: viewsField } } }]).then((r) => ({ published: r[0]?.n || 0, views: r[0]?.views || 0 }));
 
+// reads that actually happened in the range (nightly snapshot, all content)
+const snapshotReads = (s, e) => MonthNewsCount.aggregate([
+    { $match: { year: { $gte: s.getFullYear(), $lte: e.getFullYear() } } },
+    { $unwind: '$days' },
+    { $match: { 'days.date': { $gte: s, $lte: e } } },
+    { $group: { _id: null, reads: { $sum: '$days.count' } } },
+]).then((r) => r[0]?.reads || 0);
+
 // ───────────────────────── overview ─────────────────────────
 export const overview = async ({ start, end, prevStart, prevEnd }) => {
     const totals = (s, e) => News.aggregate([
@@ -56,7 +64,7 @@ export const overview = async ({ start, end, prevStart, prevEnd }) => {
         { $group: { _id: null, published: { $sum: 1 }, views: { $sum: '$activity.total_reads' }, reporters: { $addToSet: '$author' }, video: { $sum: { $cond: ['$isVideo', 1, 0] } }, literature: { $sum: { $cond: ['$is_literature', 1, 0] } }, noViews: { $sum: { $cond: [{ $lte: ['$activity.total_reads', 0] }, 1, 0] } } } },
     ]).then(([r]) => ({ published: r?.published || 0, views: r?.views || 0, activeReporters: r?.reporters?.length || 0, video: r?.video || 0, literature: r?.literature || 0, noViews: r?.noViews || 0 }));
 
-    const [cur, prev, queue, drafts, deleted, scheduled, users, todayViews, gallery, events, yt, shortVideos, liveN, uncategorised, untagged] = await Promise.all([
+    const [cur, prev, queue, drafts, deleted, scheduled, users, todayViews, gallery, events, yt, shortVideos, liveN, uncategorised, untagged, readsCur, readsPrev] = await Promise.all([
         totals(start, end), totals(prevStart, prevEnd),
         News.aggregate([{ $match: { isDeleted: false, need_approval: true, draft: false } }, { $group: { _id: null, n: { $sum: 1 }, oldest: { $min: '$createdAt' } } }]),
         News.countDocuments({ isDeleted: false, draft: true }),
@@ -71,6 +79,8 @@ export const overview = async ({ start, end, prevStart, prevEnd }) => {
         sumMedia(LiveNews, { isDeleted: false, status: { $in: ['live', 'ended'] }, post_time: { $gte: start, $lte: end } }),
         News.countDocuments({ isDeleted: false, draft: false, $or: [{ category: { $exists: false } }, { category: { $size: 0 } }] }),
         News.countDocuments({ isDeleted: false, draft: false, $or: [{ tags: { $exists: false } }, { tags: { $size: 0 } }] }),
+        snapshotReads(start, end),
+        snapshotReads(prevStart, prevEnd),
     ]);
 
     return {
@@ -78,7 +88,13 @@ export const overview = async ({ start, end, prevStart, prevEnd }) => {
             published: cur.published, views: cur.views, avgViews: round(cur.published ? cur.views / cur.published : 0),
             activeReporters: cur.activeReporters, withVideo: cur.video, literature: cur.literature, withoutViews: cur.noViews,
             todayViews: todayViews[0]?.n || 0,
-            change: { publishedPercent: pct(cur.published, prev.published), viewsPercent: pct(cur.views, prev.views), previous: prev },
+            readsInRange: readsCur,
+            change: {
+                publishedPercent: pct(cur.published, prev.published),
+                viewsPercent: pct(cur.views, prev.views),
+                readsPercent: pct(readsCur, readsPrev),               // <- new
+                previous: prev,
+            },
         },
         workflow: {
             pendingApproval: queue[0]?.n || 0, oldestPendingSince: queue[0]?.oldest || null,
@@ -170,12 +186,14 @@ export const reporters = async ({ start, end }, sort = 'views', limit = 20) => {
     const key = ['views', 'published', 'avgViews', 'activeDays', 'approvalHours'].includes(sort) ? sort : 'views';
     const rows = await News.aggregate([
         { $match: live(start, end) },
-        { $group: {
-            _id: '$author', published: { $sum: 1 }, views: { $sum: '$activity.total_reads' }, last: { $max: '$post_time' },
-            days: { $addToSet: dayKey('$post_time') },
-            approved: { $sum: { $cond: [{ $ifNull: ['$approved_by', false] }, 1, 0] } },
-            approvalMs: { $sum: { $cond: [{ $ifNull: ['$approved_by', false] }, { $subtract: ['$post_time', '$createdAt'] }, 0] } },
-        } },
+        {
+            $group: {
+                _id: '$author', published: { $sum: 1 }, views: { $sum: '$activity.total_reads' }, last: { $max: '$post_time' },
+                days: { $addToSet: dayKey('$post_time') },
+                approved: { $sum: { $cond: [{ $ifNull: ['$approved_by', false] }, 1, 0] } },
+                approvalMs: { $sum: { $cond: [{ $ifNull: ['$approved_by', false] }, { $subtract: ['$post_time', '$createdAt'] }, 0] } },
+            }
+        },
         { $project: { published: 1, views: 1, last: 1, activeDays: { $size: '$days' }, approved: 1, approvalMs: 1 } },
     ]);
     const users = await User.find({ _id: { $in: rows.map((r) => r._id) } }).select('username fullName profile role trusted is_blocked').lean();

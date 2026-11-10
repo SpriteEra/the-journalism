@@ -16,6 +16,18 @@ const STALE = 600;
 const MAX_LIMIT = 100;
 const CONTENT_TYPES = ['news', 'yt', 'short', 'live'];
 
+// yesterday in IST as YYYY-MM-DD
+const yesterdayIST = () =>
+    new Date(Date.now() + 5.5 * 3600 * 1000 - 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+const clampQuery = (q) => {
+    const last = yesterdayIST();
+    const out = { ...q };
+    if (!out.to || out.to > last) out.to = last;
+    if (out.from && out.from > out.to) out.from = out.to;
+    return out;
+};
+
 // ?type=all (default) | ?type=news | ?type=yt,short,live
 const parseTypes = (raw) => {
     if (!raw || raw === 'all') return [...CONTENT_TYPES];
@@ -28,7 +40,7 @@ const parseTypes = (raw) => {
 };
 
 const serve = (name, producer, { params = '', maxDays = 366, defaultDays = 30 } = {}) => tryCatch(async (req, res) => {
-    const base = parseRange(req.query, { defaultDays, maxDays });
+    const base = parseRange(clampQuery(req.query), { defaultDays, maxDays });
     const types = parseTypes(req.query.type);
     const range = { ...base, types };                      // service receives range.types
     const extra = typeof params === 'function' ? params(req) : params;

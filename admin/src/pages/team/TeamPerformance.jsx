@@ -8,7 +8,7 @@ import { cn } from "../../lib/cn";
 import { handleImageError } from "../../utils/imageError";
 import RangePicker, { rangeFromDays } from "../../components/analytics/RangePicker";
 import { ColumnChart, Donut, RankBars } from "../../components/charts/Charts";
-import { Avatar, Badge, Card, CardHeader, DataTable, EmptyState, ErrorState, PageHeader, Skeleton, StatCard, Tabs } from "../../components/ui";
+import { Avatar, Badge, Card, CardHeader, DataTable, EmptyState, ErrorState, InfoTip, PageHeader, Skeleton, StatCard, Tabs } from "../../components/ui";
 
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
 const SORTS = [["views", "Most reads"], ["published", "Most stories"], ["avgViews", "Best average"], ["activeDays", "Most active days"]];
@@ -76,10 +76,10 @@ function ReporterCard({ r }) {
 /** Team performance: who published how much, how it was read, and what is trending this week. */
 export default function TeamPerformance() {
   const { t } = useTranslation();
-  const [range, setRange] = useState(() => rangeFromDays(30));
+  const [range, setRange] = useState(() => rangeFromDays(30, { excludeToday: true }));
+  const week = useAnalyticsDashboard(useMemo(() => rangeFromDays(7, { excludeToday: true }), []), true);
   const [sort, setSort] = useState("views");
   const board = useReportersLeaderboard(range, sort);
-  const week = useAnalyticsDashboard(useMemo(() => rangeFromDays(7), []), true);      // trending news of the last 7 days
   const rows = board.data || [];
   const totals = useMemo(() => {
     const published = rows.reduce((a, r) => a + r.published, 0); const views = rows.reduce((a, r) => a + r.views, 0);
@@ -93,7 +93,14 @@ export default function TeamPerformance() {
     { key: "rank", header: "#", cell: (r) => <span className={cn("grid size-7 place-items-center rounded-full text-xs font-semibold", MEDAL[r.rank - 1] || "bg-surface-2 text-fg-muted")}>{r.rank}</span> },
     {
       key: "who", header: t("Reporters"), primary: true, cell: (r) => (
-        <Link to={`/dashboard/reporters/${r.reporter._id}`} className="flex items-center gap-3 hover:opacity-80"><Avatar name={label(r)} src={r.reporter.profile} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-medium text-fg">{label(r)}</p><p className="text-[11px] capitalize text-fg-subtle">{r.reporter.role}</p></div></Link>)
+        <Link to={`/dashboard/reporters/${r.reporter._id}`} className="flex items-center gap-3 hover:opacity-80">
+          <Avatar name={label(r)} src={r.reporter.profile} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-fg">{label(r)}</p>
+            <p className="text-[11px] capitalize text-fg-subtle">{r.reporter.role}</p>
+          </div>
+        </Link>
+      )
     },
     { key: "published", header: t("Stories"), align: "right", cell: (r) => <b className="text-fg">{num(r.published)}</b> },
     { key: "views", header: t("reads"), align: "right", cell: (r) => num(r.views) },
@@ -109,7 +116,7 @@ export default function TeamPerformance() {
   return (
     <>
       {/* compact = small calendar menu on phones, full picker from sm up */}
-      <PageHeader title="Team performance" description="Stories published, reads and activity of every reporter -and what readers liked this week." actions={<RangePicker compact value={range} onChange={setRange} />} />
+      <PageHeader title="Team performance" description="Stories published, reads and activity of every reporter -and what readers liked this week." actions={<RangePicker compact excludeToday value={range} onChange={setRange} />} />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Team stories" value={totals.published} icon={FileText} tone="black" loading={board.isLoading} />
@@ -120,18 +127,24 @@ export default function TeamPerformance() {
 
       <div className="mb-5 grid gap-5 lg:grid-cols-3">
         <Card padded={false} className="lg:col-span-2">
-          <CardHeader icon={BarChart3} title="Stories and reads per reporter" description="Top 8 in the selected range" />
+          <CardHeader icon={BarChart3} title="Stories and reads per reporter" description="Top 8 in the selected range"
+            actions={<InfoTip align="end">Stories published and the lifetime reads of those stories, for the 8 reporters with the most reads in the selected range.</InfoTip>} />
           <div className="p-4">{board.isLoading ? <Skeleton className="h-72 w-full" /> : top.length ? <ColumnChart height={280} xKey="name" data={top.map((r) => ({ name: label(r).split(" ")[0], Stories: r.published, Reads: r.views }))} series={[{ key: "Stories", name: "Stories" }, { key: "Reads", name: "Reads", color: "var(--chart-2)" }]} /> : <EmptyState fill={false} title="No published stories in this range" className="py-10" />}</div>
         </Card>
         <Card padded={false}>
-          <CardHeader title="Share of reads" description="Who brings the readers" />
+          <CardHeader title="Share of reads" description="Who brings the readers"
+            actions={<InfoTip align="end">How the reads are split between the top 6 reporters. Reads are the lifetime reads of the stories each reporter published in the selected range.</InfoTip>} />
           <div className="p-4">{board.isLoading ? <Skeleton className="h-72 w-full" /> : top.length ? <Donut height={280} data={top.slice(0, 6).map((r) => ({ name: label(r), value: r.views }))} /> : <EmptyState fill={false} title={t("Nothing here yet")} className="py-10" />}</div>
         </Card>
       </div>
 
       <Card padded={false} className="mb-5">
         {/* sort tabs sit in the header from sm up; on phones they get their own scrollable row */}
-        <CardHeader icon={Trophy} title="Leaderboard" actions={<div className="hidden sm:block">{sortTabs}</div>} />
+        <CardHeader icon={Trophy} title="Leaderboard"
+          actions={<>
+            <div className="hidden sm:block">{sortTabs}</div>
+            <InfoTip align="end">Reporters ranked by the option you pick (reads, stories, average reads or active days). Reads are lifetime reads of stories published in the selected range. Active days is the number of different days the reporter published.</InfoTip>
+          </>} />
         <div className="overflow-x-auto border-b border-line px-3 py-2 sm:hidden">{sortTabs}</div>
         <DataTable
           breakpoint="sm"
@@ -146,7 +159,11 @@ export default function TeamPerformance() {
 
       <div className="grid gap-5 lg:grid-cols-3">
         <Card padded={false} className="lg:col-span-2">
-          <CardHeader icon={Flame} title="Trending this week" description="Most read stories published in the last 7 days" actions={<Badge tone="warning" size="sm">7 days</Badge>} />
+          <CardHeader icon={Flame} title="Trending this week" description="Most read stories published in the last 7 days"
+            actions={<>
+              <Badge tone="warning" size="sm">7 days</Badge>
+              <InfoTip align="end">The most read stories among those published in the last 7 days. It does not depend on the date range selected above.</InfoTip>
+            </>} />
           {week.isLoading ? <div className="space-y-3 p-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}</div> : trending.length ? (
             <ol className="divide-y divide-line">
               {trending.slice(0, 8).map((a, i) => (
@@ -163,10 +180,14 @@ export default function TeamPerformance() {
           ) : <EmptyState icon={Flame} title="Nothing trending yet" description="Stories published in the last 7 days will appear here." />}
         </Card>
         <Card padded={false}>
-          <CardHeader icon={Award} title="Trending topics" description="Topics of the last 7 days" />
+          <CardHeader icon={Award} title="Trending topics" description="Topics of the last 7 days"
+            actions={<InfoTip align="end">Tags used on the most stories published in the last 7 days. It does not depend on the date range selected above.</InfoTip>} />
           <div className="p-4">{week.isLoading ? <Skeleton className="h-64 w-full" /> : trendTags.length ? <RankBars data={trendTags.map((x) => ({ name: x.name, value: x.articles }))} label="Stories" color="var(--chart-4)" /> : <EmptyState fill={false} title={t("Nothing here yet")} className="py-10" />}</div>
         </Card>
       </div>
+      <p className="mt-6 text-center text-xs text-fg-faint">
+        Today's data isn't included. It will be visible tomorrow.
+      </p>
     </>
   );
 }

@@ -5,7 +5,10 @@ import DateRangeFilter from "../ui/DateRangeFilter";
 import RowMenu from "../common/RowMenu";
 import { addDays, istDay } from "../../lib/time";
 
-export const rangeFromDays = (days) => { const to = istDay(); return { from: addDays(to, -(days - 1)), to }; };
+export const rangeFromDays = (days, { excludeToday = false } = {}) => {
+  const to = excludeToday ? addDays(istDay(), -1) : istDay();
+  return { from: addDays(to, -(days - 1)), to };
+};
 
 const PRESETS = [7, 30, 90, 365];
 const shortLabel = (d) => (d === 365 ? "12m" : `${d}d`);
@@ -17,12 +20,32 @@ const longLabel = (d) => (d === 365 ? "Last 12 months" : `Last ${d} days`);
  *
  * compact (opt-in, default false): below sm the picker collapses into one small calendar button
  * that opens a menu (every preset + "Custom range"). Without it the picker looks the same everywhere, as before.
+ *
+ * excludeToday (opt-in, default false): presets end yesterday, and the calendar / custom ranges
+ * can't go past yesterday (IST).
  */
-export default function RangePicker({ value, onChange, compact = false }) {
+export default function RangePicker({ value, onChange, compact = false, excludeToday = false }) {
   const [preset, setPreset] = useState(30);
   const [custom, setCustom] = useState(false);
 
-  const pick = (d) => { setPreset(d); setCustom(false); onChange(rangeFromDays(d)); };
+  const lastDay = excludeToday ? addDays(istDay(), -1) : null;
+
+  const pick = (d) => {
+    setPreset(d);
+    setCustom(false);
+    onChange(rangeFromDays(d, { excludeToday }));
+  };
+
+  // custom range: clamp as a safety net (YYYY-MM-DD strings compare correctly)
+  const applyCustom = (r) => {
+    if (!r.from || !r.to) return false;
+    const next = lastDay && r.to > lastDay
+      ? { from: r.from > lastDay ? lastDay : r.from, to: lastDay }
+      : r;
+    setPreset(0);
+    onChange(next);
+    return true;
+  };
 
   const full = (
     <div className={cn("flex-wrap items-center gap-2", compact ? "hidden sm:flex" : "flex")}>
@@ -32,7 +55,12 @@ export default function RangePicker({ value, onChange, compact = false }) {
             className={cn("rounded-full px-3 py-1 text-xs font-medium transition-colors", preset === d ? "bg-primary text-primary-fg" : "text-fg-muted hover:text-fg")}>{shortLabel(d)}</button>
         ))}
       </div>
-      <DateRangeFilter className="w-full min-w-64 sm:w-72" value={value} onChange={(r) => { if (r.from && r.to) { setPreset(0); onChange(r); } }} />
+      <DateRangeFilter
+        className="w-full min-w-64 sm:w-72"
+        value={value}
+        excludeToday={excludeToday}
+        onChange={applyCustom}
+      />
     </div>
   );
 
@@ -58,7 +86,8 @@ export default function RangePicker({ value, onChange, compact = false }) {
               <DateRangeFilter
                 className="w-full min-w-0"
                 value={value}
-                onChange={(r) => { if (r.from && r.to) { setPreset(0); setCustom(false); onChange(r); } }}
+                excludeToday={excludeToday}
+                onChange={(r) => { if (applyCustom(r)) setCustom(false); }}
               />
             </div>
           </>

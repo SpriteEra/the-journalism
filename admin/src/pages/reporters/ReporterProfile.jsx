@@ -12,15 +12,20 @@ import { ColumnChart, Donut, Gauge, RankBars, TrendChart } from "../../component
 import PermissionOverridesPanel from "../../components/users/PermissionOverridesPanel";
 import ProfileHeader from "../../components/profile/ProfileHeader";
 import AccountActions from "../../components/users/AccountActions";
+import InfoTip from "../../components/ui/InfoTip"; // adjust the path if needed
 import { Button, Badge, Card, CardHeader, DataTable, EmptyState, ErrorState, PageHeader, Pagination, Skeleton, StatCard, StatusBadge, Tabs } from "../../components/ui";
 
 const num = (n) => Number(n || 0).toLocaleString("en-IN");
 const statusTone = (n) => (n.need_approval ? ["warning", "Needs approval"] : n.draft ? ["neutral", "Draft"] : n.isPublished ? ["success", "Published"] : ["neutral", "Unpublished"]);
 
-function Block({ title, description, loading, children, className, height = "h-56", empty }) {
+function Block({ title, description, info, loading, children, className, height = "h-56", empty }) {
   return (
     <Card padded={false} className={className}>
-      <CardHeader title={title} description={description} />
+      <CardHeader
+        title={title}
+        description={description}
+        actions={info ? <InfoTip align="end" label={`About: ${title}`}>{info}</InfoTip> : undefined}
+      />
       <div className="p-3 sm:p-4">{loading ? <Skeleton className={`${height} w-full`} /> : empty ? <EmptyState fill={false} title={empty} className="py-8" /> : children}</div>
     </Card>
   );
@@ -76,7 +81,7 @@ export default function ReporterProfile() {
   const { id } = useParams();
   const { t } = useTranslation();
   const { can } = usePermission();
-  const [range, setRange] = useState(() => rangeFromDays(30));
+  const [range, setRange] = useState(() => rangeFromDays(30, { excludeToday: true }));
   const [tab, setTab] = useState("overview");
   const detail = useUserDetail(id);
   const perf = useReporterPerformance(id, range, can("reporter.performance.all"));
@@ -116,7 +121,7 @@ export default function ReporterProfile() {
       <PageHeader
         title={t("Profile")}
         breadcrumbs={[{ label: t("Reporters"), to: "/dashboard/reporters" }, { label: name }]}
-        actions={can("reporter.performance.all") && <RangePicker compact value={range} onChange={setRange} />}
+        actions={can("reporter.performance.all") && <RangePicker compact excludeToday value={range} onChange={setRange} />}
       />
 
       <ProfileHeader className="mb-4 sm:mb-5" name={name} src={u?.profile || rep.profile}
@@ -153,22 +158,42 @@ export default function ReporterProfile() {
       {tab === "overview" && (can("reporter.performance.all") ? (
         perf.error ? <ErrorState error={perf.error} onRetry={perf.refetch} /> : (
           <div className="space-y-4 sm:space-y-5">
-            <Block title="Stories & reads" description="Per day in the selected range" loading={perf.isLoading} height="h-72">
+            <Block title="Stories & reads" description="Per day in the selected range" loading={perf.isLoading} height="h-72"
+              info="Stories published each day in the selected range, and the lifetime reads of those stories. Reads are counted against the day the story was published, not the day it was read.">
               <TrendChart data={(r?.trends.daily || []).map((x) => ({ bucket: x.date, published: x.published, views: x.views }))} series={[{ key: "published", name: "Stories" }, { key: "views", name: "Reads" }]} height={280} />
             </Block>
             <div className="grid gap-4 sm:gap-5 lg:grid-cols-3">
-              <Block title="Consistency" description={r ? `${r.summary.activeDays} active days · ${r.summary.articlesPerWeek} stories / week` : ""} loading={perf.isLoading}><Gauge value={r?.summary.consistencyPercent} label="days with a story" /></Block>
-              <Block title={t("Category")} loading={perf.isLoading} empty={!(r?.breakdown.byCategory || []).length ? t("No stories yet") : null}><Donut data={(r?.breakdown.byCategory || []).slice(0, 6).map((c) => ({ name: c.name, value: c.articles }))} height={210} /></Block>
-              <Block title="Top topics" loading={perf.isLoading} empty={!(r?.breakdown.topTags || []).length ? t("No stories yet") : null}><RankBars data={(r?.breakdown.topTags || []).slice(0, 6).map((x) => ({ name: x.name, value: x.articles }))} label="Stories" color="var(--chart-3)" /></Block>
+              <Block title="Consistency" description={r ? `${r.summary.activeDays} active days · ${r.summary.articlesPerWeek} stories / week` : ""} loading={perf.isLoading}
+                info="Percentage of days in the selected range on which this person published at least one story.">
+                <Gauge value={r?.summary.consistencyPercent} label="days with a story" />
+              </Block>
+              <Block title={t("Category")} loading={perf.isLoading} empty={!(r?.breakdown.byCategory || []).length ? t("No stories yet") : null}
+                info="Categories of the stories published in the selected range (top 6). A story with several categories counts once in each.">
+                <Donut data={(r?.breakdown.byCategory || []).slice(0, 6).map((c) => ({ name: c.name, value: c.articles }))} height={210} />
+              </Block>
+              <Block title="Top topics" loading={perf.isLoading} empty={!(r?.breakdown.topTags || []).length ? t("No stories yet") : null}
+                info="Tags used on the most stories this person published in the selected range (top 6).">
+                <RankBars data={(r?.breakdown.topTags || []).slice(0, 6).map((x) => ({ name: x.name, value: x.articles }))} label="Stories" color="var(--chart-3)" />
+              </Block>
             </div>
             <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-              <Block title="When they publish" description="Stories by hour (IST)" loading={perf.isLoading}><ColumnChart data={hours} xKey="hour" series={[{ key: "Stories", name: "Stories" }]} height={210} tickFormatter={(v) => (Number(v) % 3 === 0 ? v : "")} /></Block>
-              <Block title="By weekday" loading={perf.isLoading}><ColumnChart data={weekday} xKey="day" series={[{ key: "Stories", name: "Stories", color: "var(--chart-2)" }]} height={210} /></Block>
+              <Block title="When they publish" description="Stories by hour (IST)" loading={perf.isLoading}
+                info="Number of stories published in each hour of the day (IST), added up over the selected range.">
+                <ColumnChart data={hours} xKey="hour" series={[{ key: "Stories", name: "Stories" }]} height={210} tickFormatter={(v) => (Number(v) % 3 === 0 ? v : "")} />
+              </Block>
+              <Block title="By weekday" loading={perf.isLoading}
+                info="Number of stories published on each weekday (IST) in the selected range.">
+                <ColumnChart data={weekday} xKey="day" series={[{ key: "Stories", name: "Stories", color: "var(--chart-2)" }]} height={210} />
+              </Block>
             </div>
             <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-              <Block title="Top places" description="Stories by state" loading={perf.isLoading} empty={!(r?.breakdown.byState || []).length ? "No place data yet" : null}><RankBars data={(r?.breakdown.byState || []).slice(0, 6).map((s) => ({ name: s.name, value: s.articles }))} label="Stories" color="var(--chart-4)" /></Block>
+              <Block title="Top places" description="Stories by state" loading={perf.isLoading} empty={!(r?.breakdown.byState || []).length ? "No place data yet" : null}
+                info="States this person's stories were about, by number of stories published in the selected range (top 6).">
+                <RankBars data={(r?.breakdown.byState || []).slice(0, 6).map((s) => ({ name: s.name, value: s.articles }))} label="Stories" color="var(--chart-4)" />
+              </Block>
               <Card padded={false}>
-                <CardHeader icon={Award} title="Top stories" description="Most read in the range" />
+                <CardHeader icon={Award} title="Top stories" description="Most read in the range"
+                  actions={<InfoTip align="end" label="About: Top stories">The stories published in the selected range with the most lifetime reads.</InfoTip>} />
                 <DataTable rows={r?.topArticles} loading={perf.isLoading} rowKey="news_id" empty={<EmptyState fill={false} title={t("No stories yet")} className="py-10" />} columns={[
                   { key: "t", header: t("Title"), primary: true, cell: (a) => <Link to={`/dashboard/news/${a.news_id}`} className="hindi-font line-clamp-1 max-w-[12rem] font-medium text-fg hover:text-primary sm:max-w-xs">{a.title}</Link> },
                   { key: "v", header: t("reads"), align: "right", cell: (a) => <b className="text-fg">{num(a.views)}</b> },
@@ -191,10 +216,14 @@ export default function ReporterProfile() {
               title="Content mix"
               description="What this person uploads"
               loading={perf.isLoading} empty={!mix.length ? t("Nothing here yet") : null}
+              info="Share of each kind of content (stories, shorts, YouTube news, live) this person published in the selected range."
             >
               <Donut data={mix} height={240} />
             </Block>
-            <Block title="Month by month" description="Stories and reads per month" loading={perf.isLoading} empty={!(r?.trends.monthly || []).length ? t("Nothing here yet") : null}><ColumnChart data={(r?.trends.monthly || []).map((m) => ({ month: m.month, Stories: m.published, Reads: m.views }))} xKey="month" series={[{ key: "Stories", name: "Stories" }, { key: "Reads", name: "Reads", color: "var(--chart-2)" }]} height={240} /></Block>
+            <Block title="Month by month" description="Stories and reads per month" loading={perf.isLoading} empty={!(r?.trends.monthly || []).length ? t("Nothing here yet") : null}
+              info="Stories published each month and the lifetime reads of those stories. Reads are counted against the month the story was published.">
+              <ColumnChart data={(r?.trends.monthly || []).map((m) => ({ month: m.month, Stories: m.published, Reads: m.views }))} xKey="month" series={[{ key: "Stories", name: "Stories" }, { key: "Reads", name: "Reads", color: "var(--chart-2)" }]} height={240} />
+            </Block>
           </div>
           {r && (
             <Card>
@@ -222,6 +251,10 @@ export default function ReporterProfile() {
       {tab === "account" && (u ? <AccountActions user={u} /> : <Skeleton className="h-64 w-full" />)}
 
       {tab === "access" && (u ? <PermissionOverridesPanel userId={id} role={u.role} /> : <Skeleton className="h-64 w-full" />)}
+
+      <p className="mt-6 text-center text-xs text-fg-faint">
+        Today's data isn't included. It will be visible tomorrow.
+      </p>
     </>
   );
 }

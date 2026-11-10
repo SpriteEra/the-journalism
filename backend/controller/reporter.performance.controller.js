@@ -18,15 +18,25 @@ const round = (n, d = 1) => (Number.isFinite(n) ? Math.round(n * 10 ** d) / 10 *
 const pct = (cur, prev) => (prev ? round(((cur - prev) / prev) * 100) : (cur ? 100 : 0));
 
 /** ?from=YYYY-MM-DD&to=YYYY-MM-DD  (default: last 30 days, IST day boundaries, max 366 days) */
+// yesterday in IST as YYYY-MM-DD
+const yesterdayIST = () => new Date(Date.now() + 5.5 * 3600000 - DAY).toISOString().slice(0, 10);
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** ?from=YYYY-MM-DD&to=YYYY-MM-DD  (default: last 30 days ending yesterday, IST day boundaries, max 366 days).
+ *  Today is never included: `to` is clamped to yesterday and `from` can't go past `to`. */
 const parseRange = (q) => {
-    const end = q.to ? new Date(`${q.to}T23:59:59.999+05:30`) : new Date();
-    const start = q.from ? new Date(`${q.from}T00:00:00+05:30`) : new Date(end.getTime() - 30 * DAY);
+    if ((q.from && !DAY_RE.test(q.from)) || (q.to && !DAY_RE.test(q.to))) throw new ErrorHandler(400, 'Invalid from/to date (use YYYY-MM-DD)');
+    const last = yesterdayIST();
+    const to = q.to && q.to <= last ? q.to : last;
+    const from = q.from && q.from > to ? to : q.from;
+
+    const end = new Date(`${to}T23:59:59.999+05:30`);
+    const start = from ? new Date(`${from}T00:00:00+05:30`) : new Date(end.getTime() - 30 * DAY);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) throw new ErrorHandler(400, 'Invalid from/to date (use YYYY-MM-DD)');
     if (start > end) throw new ErrorHandler(400, '`from` must be before `to`');
     if (end - start > 366 * DAY) throw new ErrorHandler(400, 'Range cannot exceed 366 days');
     return { start, end, days: Math.max(1, Math.ceil((end - start) / DAY)) };
 };
-
 const resolveReporter = async (req) => {
     const { id } = req.params;
     const me = req.user;

@@ -15,39 +15,46 @@ import Modal from "./Modal";
 const toDate = (s) => (s ? dayToLocalDate(s) : null);
 const label = (d, locale) => format(d, "d MMM yyyy", { locale });
 
-/** Preset ranges as IST calendar days (so "Today" is today in India, not in the browser's time zone). */
-const presets = () => {
+/** Preset ranges as IST calendar days (so "Today" is today in India, not in the browser's time zone).
+ *  With excludeToday, nothing ends after yesterday and the "Today" chip is dropped. */
+const presets = (excludeToday) => {
   const today = istDay();
+  const last = excludeToday ? addDays(today, -1) : today;
   const [y, m] = today.split("-").map(Number);
   const first = `${y}-${String(m).padStart(2, "0")}-01`;
   const prevFirst = m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, "0")}-01`;
-  return [
+  const list = [
     ["Today", today, today],
     ["Yesterday", addDays(today, -1), addDays(today, -1)],
-    ["Last 7 days", addDays(today, -6), today],
-    ["Last 30 days", addDays(today, -29), today],
-    ["This month", first, today],
+    ["Last 7 days", addDays(last, -6), last],
+    ["Last 30 days", addDays(last, -29), last],
+    ["This month", first, last],
     ["Last month", prevFirst, addDays(first, -1)],
   ];
+  if (!excludeToday) return list;
+  // drop "Today", and "This month" when it would be empty (1st of the month)
+  return list.filter(([name, s]) => name !== "Today" && s <= last);
 };
 
 /**
  * Date range filter (react-date-range inside a popup: a bottom sheet on phones).
  *   <DateRangeFilter value={{ from: "2026-10-01", to: "2026-10-14" }} onChange={({ from, to }) => …} />
  * Values are plain "YYYY-MM-DD" strings (IST days) -exactly what the API's ?from= & ?to= expect. Empty strings = no filter.
+ *
+ * excludeToday (opt-in): no "Today" preset, and the calendar can't select today or later.
  */
-export default function DateRangeFilter({ value, onChange, className, maxDate, placeholder, compact }) {
+export default function DateRangeFilter({ value, onChange, className, maxDate, placeholder, compact, excludeToday = false }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "hi" ? hiLocale : enUS;
   const [open, setOpen] = useState(false);
   const from = toDate(value?.from); const to = toDate(value?.to);
-  const todayLocal = dayToLocalDate(istDay());
-  const [draft, setDraft] = useState([{ startDate: from || todayLocal, endDate: to || from || todayLocal, key: "selection" }]);
+  const lastLocal = dayToLocalDate(excludeToday ? addDays(istDay(), -1) : istDay());
+  const [draft, setDraft] = useState([{ startDate: from || lastLocal, endDate: to || from || lastLocal, key: "selection" }]);
 
-  const openPicker = () => { setDraft([{ startDate: from || todayLocal, endDate: to || from || todayLocal, key: "selection" }]); setOpen(true); };
+  const openPicker = () => { setDraft([{ startDate: from || lastLocal, endDate: to || from || lastLocal, key: "selection" }]); setOpen(true); };
   const apply = (s, e) => { onChange({ from: s, to: e }); setOpen(false); };
   const sel = draft[0];
-  const presetList = useMemo(() => (open ? presets() : []), [open]);
+  const presetList = useMemo(() => (open ? presets(excludeToday) : []), [open, excludeToday]);
   const active = Boolean(from || to);
   const text = active ? `${from ? label(from, locale) : "…"} – ${to ? label(to, locale) : "…"}` : (placeholder || t("Any date"));
 
@@ -85,7 +92,7 @@ export default function DateRangeFilter({ value, onChange, className, maxDate, p
             months={1}
             direction="vertical"
             scroll={{ enabled: false }}
-            maxDate={maxDate || todayLocal}
+            maxDate={maxDate || lastLocal}
             rangeColors={["var(--primary)"]}
             locale={locale}
             showMonthAndYearPickers
