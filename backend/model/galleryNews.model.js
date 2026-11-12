@@ -40,12 +40,15 @@ const galleryNewsSchema = new mongoose.Schema(
       ref: 'UpdateStack',
       required: true,
     },
+    need_approval: { type: Boolean, default: false },
+    approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    approved_at: { type: Date },
   },
   { timestamps: true }
 );
 
 galleryNewsSchema.index({ draft: 1 });
 galleryNewsSchema.index({ createdAt: 1 }); // createdAt is added by timestamps:true
-
+galleryNewsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
 const GalleryNews = mongoose.model("GalleryNews", galleryNewsSchema);
 export default GalleryNews;

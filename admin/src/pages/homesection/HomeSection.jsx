@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
-import { Check, GripVertical, LayoutList, Pencil, Plus, RotateCcw, Save, Search, Trash2 } from "lucide-react";
+import { Check, GripVertical, LayoutList, Pencil, Plus, RefreshCw, RotateCcw, Save, Search, Trash2 } from "lucide-react";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import useTaxonomyNames from "../../hooks/useTaxonomyNames";
@@ -8,6 +8,7 @@ import { useApiMutation, useCategories, useDistricts, useHomeSections, useStates
 import {
     Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, IconButton, Modal, PageHeader, StatusBadge,
 } from "../../components/ui";
+import { cn } from "../../lib/cn";
 
 const MAX_FALLBACK = 9;
 const KIND_LABEL = {
@@ -218,7 +219,7 @@ export default function HomeSections() {
     const { can } = usePermission();
     const canEdit = can("homeSection.manage");   // adjust to your permission key
     const nameOf = useTaxonomyNames();
-    const { data, isLoading, error, refetch } = useHomeSections();
+    const { data, isLoading, isFetching, error, refetch } = useHomeSections();
 
     const [local, setLocal] = useState(null);     // unsaved order (array of ids) or null
     const [editing, setEditing] = useState(null);
@@ -260,11 +261,18 @@ export default function HomeSections() {
             <PageHeader
                 title="Home page sections"
                 description={`Choose which sections appear on the home page and drag them into the order readers see. Up to ${max} sections.`}
-                actions={canEdit && (
-                    <Button leftIcon={Plus} onClick={() => setEditing({})} disabled={full} title={full ? `Remove a section first (max ${max})` : undefined}>
-                        Add section
-                    </Button>
-                )}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+                            <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+                        </Button>
+                        {canEdit && (
+                            <Button leftIcon={Plus} onClick={() => setEditing({})} disabled={full} title={full ? `Remove a section first (max ${max})` : undefined}>
+                                Add section
+                            </Button>
+                        )}
+                    </div>
+                }
             />
 
             <Card padded={false}>

@@ -20,7 +20,7 @@ import { errMsg } from "../lib/api";
 import { readOra, writeOra } from "../lib/oraCache";
 import { fromIstInput } from "../lib/time";
 import { handleImageError } from "../utils/imageError.js";
-import { Badge, Button, Card, CardHeader, Field, InfoTip, Input, Switch, Textarea, useConfirm } from "./ui";
+import { Alert, Badge, Button, Card, CardHeader, Field, InfoTip, Input, Switch, Textarea, useConfirm } from "./ui";
 import { cn } from "../lib/cn";
 
 const CHAR_LIMIT = 400;
@@ -214,11 +214,34 @@ const PublishForm = () => {
       navigate("/dashboard/draft-news");
     } catch (e) { toast.error(errMsg(e, "Could not save the draft"), { id }); } finally { setBusy(false); }
   };
-  const canDraft = mode !== "edit" || blog.draft === true;
 
-  const goBackToEditor = () => { setEditorState("editor"); setHasChanges(true); setTextEditor((p) => ({ ...p, isReady: false })); };
+  // a story that was saved as a draft and is not published yet
+  const isDraftStory = blog.draft === true || type === "draft";
+  const isNewStory = mode !== "edit";
 
-  const verb = mode !== "edit" || type === "guest-news" || type === "review" ? "Publish" : "Update";
+  // const canDraft = mode !== "edit" || blog.draft === true;
+  // Draft + Publish while the story is new or still a draft; only Update once it is live
+  const canDraft = isNewStory || isDraftStory;
+  const canPublish = can("news.publish");
+  const isReviewer = type === "review" && can("news.approve");                       // an approver opened it from the review queue
+  const needsReview = !canPublish && !isReviewer && (isNewStory || isDraftStory);    // this submit goes to the review queue
+  const verb = isReviewer ? "Approve & publish" : needsReview ? "Submit for approval" : isNewStory || isDraftStory || type === "guest-news" ? "Publish" : "Update";
+
+  const canSchedule = can("news.schedule");
+  const showSchedule =
+    canSchedule && Boolean(user?.trusted) &&
+    ((mode !== "edit" && type !== "guest-news") ||
+      (mode === "edit" && type === "schedule_news"));
+
+  const goBackToEditor = () => {
+    setEditorState("editor");
+    setHasChanges(true);
+    setTextEditor((p) => (
+      { ...p, isReady: false }
+    ));
+  };
+
+  // const verb = mode !== "edit" || type === "guest-news" || type === "review" ? "Publish" : "Update";
   const post = async (replaceFeatured) => {
     const endpoint = mode === "edit" && type === "guest-news" ? "/publish-guest-news" : mode === "edit" ? "/update-news" : "/create-news";
     return httpClient.post(endpoint, buildForm(blog, { newsId: news_id, replaceFeatured }), { headers: { "Content-Type": "multipart/form-data" } });
@@ -228,15 +251,18 @@ const PublishForm = () => {
     if (!ready) return toast.error(`Missing: ${firstProblem?.text}`);
     if (blog.feature?.enabled && !blog.feature.until) return toast.error("Choose until when the story stays featured");
     const ok = await confirm({
-      title: verb === "Publish" ? "Publish this story?" : "Update this story?",
-      message: blog.feature?.enabled ? "It goes live now and is pinned at the top of the site as the featured story." : sendNotification ? "It goes live now and a push notification is sent to readers." : "It goes live right away.",
+      title: needsReview ? "Send for approval?" : isReviewer ? "Approve and publish?" : verb === "Publish" ? "Publish this story?" : "Update this story?",
+      message: needsReview
+        ? "It will not go live yet. It is published as soon as an authorized person approves it, and you get a notification with the result."
+        : blog.feature?.enabled ? "It goes live now and is pinned at the top of the site as the featured story." : sendNotification ? "It goes live now and a push notification is sent to readers." : "It goes live right away.",
       tone: "primary", confirmLabel: t(verb),
     });
     if (!ok) return;
     setBusy(true);
-    const id = toast.loading(mode === "edit" ? "Updating…" : "Publishing…");
+    const id = toast.loading(needsReview ? "Sending for approval…" : mode === "edit" ? "Updating…" : "Publishing…");
     try {
-      try { await post(false); }
+      let res;
+      try { res = await post(false); }
       catch (e) {
         // another story is featured right now: ask before replacing it
         const conflict = e?.response?.status === 409 && e.response.data?.data?.code === "FEATURED_CONFLICT" ? e.response.data.data.current : null;
@@ -248,17 +274,21 @@ const PublishForm = () => {
         });
         if (!replace) { setBusy(false); return; }
         toast.loading("Publishing…", { id });
-        await post(true);
+        res = await post(true);
       }
-      toast.success("Published successfully", { id });
+      const pending = Boolean(res?.data?.pending || res?.data?.submitted);
+      toast.success(pending ? "Sent for approval. It will be published once an authorized person approves it." : isReviewer ? "Approved and published" : "Published successfully", { id, duration: pending ? 7000 : 4000 });
       localStorage.removeItem("blog");
       queryClient.invalidateQueries({ queryKey: ["news"] });
+      queryClient.invalidateQueries({ queryKey: ["review-queue"] });
       queryClient.invalidateQueries({ queryKey: ["featured-current"] });
-      navigate("/dashboard/news");
-    } catch (e) { toast.error(errMsg(e, "Failed to publish"), { id }); } finally { setBusy(false); }
+      navigate(isReviewer ? "/dashboard/review-news" : "/dashboard/news");
+    } catch (e) { toast.error(errMsg(e, needsReview ? "Failed to send for approval" : "Failed to publish"), { id }); } finally { setBusy(false); }
   };
 
   const schedule = async () => {
+    if (!canSchedule) return toast.error("You don't have permission to schedule news");
+
     if (!ready) return toast.error(`Missing: ${firstProblem?.text}`);
     if (!post_time?.date) return toast.error("Please select the schedule date");
     if (!post_time?.time) return toast.error("Please select the schedule time");
@@ -271,9 +301,9 @@ const PublishForm = () => {
       navigate("/dashboard/schedule-news");
     } catch (e) { toast.error(errMsg(e, "Failed to schedule"), { id }); }
   };
-  const showSchedule =
-    (mode !== "edit" && type !== "guest-news") ||
-    (mode === "edit" && type === "schedule_news");
+  // const showSchedule =
+  //   (mode !== "edit" && type !== "guest-news") ||
+  //   (mode === "edit" && type === "schedule_news");
   return (
     <div className="mx-auto w-full max-w-7xl pb-20  lg:pb-8">
       <div className="sticky top-15 z-20 -mx-1 mb-3 sm:mb-5 flex flex-wrap items-center gap-2 sm:gap-3 bg-surface/90 backdrop-blur-xs px-2 py-2 sm:px-3 shadow-sm lg:flex-nowrap">
@@ -389,7 +419,7 @@ const PublishForm = () => {
             </div>
           </Card>
 
-          <AdvancedPanel blog={blog} update={update} title={title} description={description} canFeature={can("news.feature")} currentFeatured={featuredNow} editingId={news_id} />
+          <AdvancedPanel blog={blog} update={update} title={title} description={description} canFeature={can("news.feature") && canPublish} currentFeatured={featuredNow} editingId={news_id} />
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-34 lg:self-start">
@@ -403,18 +433,23 @@ const PublishForm = () => {
               <p className="hindi-font line-clamp-3 text-sm text-fg-subtle">{description}</p>
             </div>
           </Card>
-
+          {needsReview && (
+            <Alert tone="info">
+              Your story is reviewed before it goes live. After you submit it, an authorized person approves it and only then is it published. You are notified of the result.
+            </Alert>
+          )}
           <Card>
-            <p className="mb-3 text-sm font-semibold text-fg">Before you publish</p>
+            <p className="mb-3 text-sm font-semibold text-fg">{needsReview ? "Before you submit" : "Before you publish"}</p>
             <ul className="space-y-2.5">{checks.map((c) => <Check_ key={c.text} ok={c.ok}>{c.text}</Check_>)}</ul>
           </Card>
-
-          <Card>
-            <label className="flex cursor-pointer items-center justify-between gap-3">
-              <span className="text-sm"><span className="flex items-center gap-1 font-semibold text-fg">{t("Send push notification")}<InfoTip>Sends a notification to readers who allowed alerts, the moment the story goes live.</InfoTip></span><span className="block text-fg-subtle">Alert readers when it goes live</span></span>
-              <Switch checked={Boolean(sendNotification)} onChange={(v) => update({ sendNotification: v })} />
-            </label>
-          </Card>
+          {(canPublish || isReviewer) && (
+            <Card>
+              <label className="flex cursor-pointer items-center justify-between gap-3">
+                <span className="text-sm"><span className="flex items-center gap-1 font-semibold text-fg">{t("Send push notification")}<InfoTip>Sends a notification to readers who allowed alerts, the moment the story goes live.</InfoTip></span><span className="block text-fg-subtle">Alert readers when it goes live</span></span>
+                <Switch checked={Boolean(sendNotification)} onChange={(v) => update({ sendNotification: v })} />
+              </label>
+            </Card>
+          )}
 
           <div className="fixed inset-x-0 -bottom-5 z-30 flex justify-between flex-wrap lg:grid lg:grid-cols-2 gap-2 border-t border-line bg-surface/95 p-3 backdrop-blur lg:static lg:z-auto lg:grid-cols-1 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             {type !== "schedule_news" &&
@@ -427,24 +462,26 @@ const PublishForm = () => {
               </Button>
             }
             {canDraft && <Button size="lg" variant="outline" leftIcon={FileClock} disabled={busy} onClick={saveDraft} className="order-2 lg:w-full">Save as draft</Button>}
-            {((mode !== "edit" && type !== "guest-news") || (mode === "edit" && type === "schedule_news")) && (
+            {showSchedule && (
               <Button size="lg" variant="outline" leftIcon={CalendarClock} onClick={() => setScheduleOpen(true)} className="hidden lg:inline-flex lg:order-3 lg:w-full">{mode === "edit" ? "Update schedule" : t("Schedule")}</Button>
             )}
             <Button size="lg" variant="ghost" leftIcon={Eye} onClick={() => setPreviewOpen(true)} className="order-1 px-3 lg:order-4 lg:w-full lg:border lg:border-line"><span className="sr-only lg:not-sr-only">{t("Full preview")}</span></Button>
           </div>
-          {((mode !== "edit" && type !== "guest-news") || (mode === "edit" && type === "schedule_news")) && (
+          {showSchedule && (
             <Button variant="outline" leftIcon={CalendarClock} onClick={() => setScheduleOpen(true)} className="w-full lg:hidden">{mode === "edit" ? "Update schedule" : t("Schedule")}</Button>
           )}
         </aside>
       </div>
 
       <NewsPreview open={previewOpen} onClose={() => setPreviewOpen(false)} news={previewNews} />
-      <SchedulePopUp
-        popupOpen={scheduleOpen} setPopUpOpen={setScheduleOpen} post_time={post_time} handleSchedule={schedule}
-        handleDateChange={(val) => update({ post_time: { ...post_time, date: val } })}
-        handleTimeChange={(i) => { setTimeIndex(i); update({ post_time: { ...post_time, time: timeOptions[i] } }); }}
-        timeOptions={timeOptions} selectedTimeIndex={timeIndex}
-      />
+      {showSchedule && (
+        <SchedulePopUp
+          popupOpen={scheduleOpen} setPopUpOpen={setScheduleOpen} post_time={post_time} handleSchedule={schedule}
+          handleDateChange={(val) => update({ post_time: { ...post_time, date: val } })}
+          handleTimeChange={(i) => { setTimeIndex(i); update({ post_time: { ...post_time, time: timeOptions[i] } }); }}
+          timeOptions={timeOptions} selectedTimeIndex={timeIndex}
+        />
+      )}
       <AITagsPopup isOpen={aiPopup} onClose={() => setAiPopup(false)} aiGeneratedTags={aiGeneratedTags || []} existingTags={[...kw.hi, ...kw.en]}
         onAddTags={onAddAI} onRegenerate={() => generateAI(true)} isRegenerating={aiLoading} onRemoveTags={onRemoveAI} />
     </div>

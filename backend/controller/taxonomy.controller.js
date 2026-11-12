@@ -12,6 +12,101 @@ import { uploadImage, deleteImage } from '../utils/uploadImage.js';
 import { buildUrl, seoConfig } from '../config/seo.config.js';
 import { cached, clearCache, setPublicCache } from '../utils/cache.js';
 
+// ─────────── SEO (category / state / district) ───────────
+const SEO_TEXT_MAX = {
+    metaTitle: 120, metaDescription: 320, focusKeyword: 80, breadcrumbTitle: 80,
+    ogTitle: 120, ogDescription: 320, ogImageAlt: 200,
+    twitterTitle: 120, twitterDescription: 320, twitterImageAlt: 200,
+};
+const SEO_IMAGE_KEYS = ['ogImage', 'twitterImage'];
+const SEO_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const SEO_IMAGE_MAX = 5 * 1024 * 1024;       // 5 MB
+const OG_TYPES = ['', 'website', 'article'];
+const TWITTER_CARDS = ['summary', 'summary_large_image'];
+
+const isHttpUrl = (v) => { try { return ['http:', 'https:'].includes(new URL(v).protocol); } catch { return false; } };
+
+/**
+ * Reads, validates and merges the seo block (+ ogImage / twitterImage uploads, same upload flow as the news banner).
+ * Returns undefined when the request does not touch seo.
+ */
+const readSeo = async (req, existing) => {
+    const files = req.files || {};
+    let raw = req.body?.seo;
+    if (typeof raw === 'string') {
+        if (!raw.trim()) raw = undefined;
+        else { try { raw = JSON.parse(raw); } catch { throw new ErrorHandler(400, 'seo is not valid JSON'); } }
+    }
+    if (raw !== undefined && (raw === null || typeof raw !== 'object' || Array.isArray(raw))) throw new ErrorHandler(400, 'seo must be an object');
+    if (raw === undefined && !files.ogImage && !files.twitterImage) return undefined;
+
+    const input = raw || {};
+    const next = {};
+
+    // text fields: trimmed + length checked
+    for (const [key, max] of Object.entries(SEO_TEXT_MAX)) {
+        if (input[key] === undefined) continue;
+        const v = String(input[key] ?? '').trim();
+        if (v.length > max) throw new ErrorHandler(400, `${key} cannot exceed ${max} characters`);
+        next[key] = v;
+    }
+
+    // keywords: array or "a, b, c"
+    if (input.metaKeywords !== undefined) {
+        const list = Array.isArray(input.metaKeywords) ? input.metaKeywords : String(input.metaKeywords ?? '').split(',');
+        const kw = [...new Set(list.map((k) => String(k ?? '').trim()).filter(Boolean))];
+        if (kw.length > 20) throw new ErrorHandler(400, 'Use at most 20 meta keywords');
+        if (kw.some((k) => k.length > 60)) throw new ErrorHandler(400, 'Each meta keyword can have at most 60 characters');
+        next.metaKeywords = kw;
+    }
+
+    if (input.canonicalUrl !== undefined) {
+        const v = String(input.canonicalUrl ?? '').trim();
+        if (v && !isHttpUrl(v)) throw new ErrorHandler(400, 'Canonical URL must start with http:// or https://');
+        next.canonicalUrl = v;
+    }
+    if (input.ogType !== undefined) {
+        if (!OG_TYPES.includes(input.ogType)) throw new ErrorHandler(400, `ogType must be one of: ${OG_TYPES.filter(Boolean).join(', ')} (or empty)`);
+        next.ogType = input.ogType;
+    }
+    if (input.twitterCard !== undefined) {
+        if (!TWITTER_CARDS.includes(input.twitterCard)) throw new ErrorHandler(400, `twitterCard must be one of: ${TWITTER_CARDS.join(', ')}`);
+        next.twitterCard = input.twitterCard;
+    }
+    if (input.twitterCreator !== undefined) {
+        const v = String(input.twitterCreator ?? '').trim();
+        if (v && !/^@?\w{1,15}$/.test(v)) throw new ErrorHandler(400, 'Twitter handle looks like @username (max 15 characters)');
+        next.twitterCreator = v && !v.startsWith('@') ? `@${v}` : v;
+    }
+
+    // images: validate BOTH files before uploading anything, so a bad second file leaves no orphan upload
+    for (const key of SEO_IMAGE_KEYS) {
+        const file = files[key];
+        if (!file) continue;
+        if (Array.isArray(file)) throw new ErrorHandler(400, `Send only one ${key}`);
+        if (!SEO_IMAGE_TYPES.includes(file.mimetype)) throw new ErrorHandler(400, `${key} must be a JPG, PNG or WEBP image`);
+        if (file.size > SEO_IMAGE_MAX) throw new ErrorHandler(400, `${key} cannot be larger than 5 MB`);
+    }
+
+    const current = existing?.seo?.toObject?.() ?? existing?.seo ?? {};
+    const toDelete = [];
+    for (const key of SEO_IMAGE_KEYS) {
+        const file = files[key];
+        const old = current[key];
+        if (file) {
+            try { next[key] = await uploadImage(file.data, file.name, 'seo'); }
+            catch (error) { throw new ErrorHandler(502, `Failed to upload ${key}: ${error.message}`); }
+            if (old) toDelete.push(old);
+        } else if (input[key] === '') {            // explicit clear
+            next[key] = '';
+            if (old) toDelete.push(old);
+        }                                          // otherwise: keep the stored image (merge below)
+    }
+    toDelete.forEach((url) => deleteImage(url).catch(() => { }));   // old images go only after new uploads succeeded
+
+    return { ...current, ...next };                // merge: robots, schemaType, sitemap, faq etc. stay untouched
+};
+
 /** taxonomy changed -> menu tree, id/slug index, home sections and analytics names are all stale */
 const invalidateTaxonomy = () => { clearCache('tax:'); clearCache('home:'); clearCache('analytics:'); };
 
@@ -69,7 +164,7 @@ const readCategoryBody = async (req, existing) => {
             data.parent = parent._id;
         }
     }
-    const seo = sanitizeSeo(b.seo);
+    const seo = await readSeo(req, existing);
     if (seo) data.seo = seo;
     if (req.files?.image) {
         if (existing?.image) await deleteImage(existing.image);
@@ -192,7 +287,8 @@ const readLocationBody = async (req, Model, existing, nameField) => {
     if (b.displayName !== undefined) data.displayName = String(b.displayName).trim();
     if (b.description !== undefined) data.description = b.description;
     if (b.order !== undefined) data.order = Number(b.order) || 0;   // ← add this
-    if (b.isActive !== undefined) data.isActive = toBool(b.isActive); const seo = sanitizeSeo(b.seo);
+    if (b.isActive !== undefined) data.isActive = toBool(b.isActive);
+    const seo = await readSeo(req, existing);
     if (seo) data.seo = seo;
     if (req.files?.image) {
         if (existing?.image) await deleteImage(existing.image);

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Eye, Pencil, Plus, Radio, Trash2, Zap } from "lucide-react";
+import { BadgeCheck, ExternalLink, Eye, Pencil, Plus, Radio, RefreshCw, Trash2, Zap } from "lucide-react";
+import { cn } from "../../lib/cn";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation } from "../../hooks/admin";
 import { useLiveNewsList } from "../../hooks/live";
 import { Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, PageHeader, Pagination, SearchInput, StatusBadge, Tabs } from "../../components/ui";
 import RowActions from "../../components/common/RowActions";
+import ApprovalInfoModal, { ApprovalBadge, approvalState, hasApprovalInfo } from "../../components/common/ApprovalInfoModal";
 import { fmtISTDateTime } from "../../lib/time";
 import { siteUrl } from "../../lib/share";
 
@@ -38,18 +40,20 @@ export default function LiveNews() {
   const [params, setParams] = useState({ page: 1, limit: 20, status: "all", search: "" });
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
-  const { data, isLoading, error, refetch } = useLiveNewsList(params);
+  const [approval, setApproval] = useState(null);   // the row whose approval popup is open
+  const { data, isLoading, isFetching, error, refetch } = useLiveNewsList(params);
   const patch = (p) => setParams((s) => ({ ...s, page: 1, ...p }));
-
+  const canReview = can("live.manage.any");
   const goLive = useApiMutation((l) => httpClient.put(`/live/${l.slug}`, { status: "live" }).then((r) => r.data), { invalidate: ["live-news"], success: "Published" });
   const del = useApiMutation(() => httpClient.delete(`/live/${deleting.slug}`).then((r) => r.data), { invalidate: ["live-news"], onSuccess: () => setDeleting(null) });
-
+  const showStatus = (l) => approvalState(l) !== "pending";
   const rowActions = (l) => (
     <RowActions
       row={l}
       share={["live", "ended"].includes(l.status) ? { url: (r) => siteUrl(`/live/${r.slug}`), title: (r) => r.title } : undefined}
       actions={[
         { label: "Edit", icon: Pencil, onClick: (r) => navigate(`/dashboard/live/${r.slug}/edit`) },
+        { label: "Approval details", icon: BadgeCheck, hidden: (r) => !canReview || !hasApprovalInfo(r), onClick: (r) => setApproval(r) },
         { label: "Publish now", icon: Zap, hidden: (r) => !["draft", "scheduled"].includes(r.status) || !can("live.publish"), onClick: (r) => goLive.mutate(r) },
         { label: "View on website", icon: ExternalLink, hidden: (r) => !["live", "ended"].includes(r.status), onClick: (r) => window.open(siteUrl(`/live/${r.slug}`), "_blank", "noopener") },
         { label: "Delete", icon: Trash2, danger: true, onClick: (r) => setDeleting(r) },
@@ -66,7 +70,14 @@ export default function LiveNews() {
         </div>
       ),
     },
-    { key: "status", header: "Status", cell: (l) => <StatusBadge status={l.status === "live" ? "published" : l.status} /> },
+    {
+      key: "status", header: "Status", cell: (l) => (
+        <div className="flex flex-col items-start gap-1.5">
+          {showStatus(l) && <StatusBadge status={l.status === "live" ? "published" : l.status} />}
+          <ApprovalBadge item={l} onClick={canReview ? setApproval : undefined} />
+        </div>
+      ),
+    },
     { key: "by", header: "By", cell: (l) => l.author?.username || "—" },
     { key: "when", header: "Time", cell: (l) => { const [label, at] = whenOf(l); return <span className="text-xs"><span className="text-fg-subtle">{label}</span><br />{fmtISTDateTime(at)}</span>; } },
     { key: "views", header: "Views", align: "right", cell: (l) => <span className="inline-flex items-center gap-1 text-fg-muted"><Eye className="size-3.5" />{l.activity?.total_reads ?? 0}</span> },
@@ -84,8 +95,11 @@ export default function LiveNews() {
             <p className="mt-1 text-xs text-fg-subtle">{label} {fmtISTDateTime(at)} · {l.author?.username || "—"}</p>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <StatusBadge status={l.status === "live" ? "published" : l.status} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {showStatus(l) && <StatusBadge status={l.status === "live" ? "published" : l.status} />}
+            <ApprovalBadge item={l} onClick={canReview ? setApproval : undefined} />
+          </div>
           <span className="inline-flex items-center gap-1 text-xs text-fg-subtle"><Eye className="size-3.5" />{l.activity?.total_reads ?? 0}</span>
         </div>
         {rowActions(l)}
@@ -98,7 +112,14 @@ export default function LiveNews() {
       <PageHeader
         title="Live news"
         description="Write a live story and publish it on the website."
-        actions={can("live.create") && <Button leftIcon={Plus} onClick={() => navigate("/dashboard/live/new")}>New live news</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+            </Button>
+            {can("live.create") && <Button leftIcon={Plus} onClick={() => navigate("/dashboard/live/new")}>New live news</Button>}
+          </div>
+        }
       />
 
       <Card padded={false} className="flex min-h-0 flex-1 flex-col overflow-hidden max-sm:border-none max-sm:bg-transparent max-sm:p-0">
@@ -128,6 +149,11 @@ export default function LiveNews() {
       </Card>
 
       {deleting && <ConfirmDialog open onClose={() => setDeleting(null)} tone="danger" loading={del.isPending} onConfirm={() => del.mutate()} confirmLabel="Delete" title="Delete this live news?" message={`“${deleting.title}” will be removed from the website.`} />}
+      <ApprovalInfoModal
+        item={canReview ? approval : null}
+        onClose={() => setApproval(null)}
+        reviewTo={approval ? `/dashboard/review/live/${approval.slug}` : undefined}
+      />
     </div>
   );
 }

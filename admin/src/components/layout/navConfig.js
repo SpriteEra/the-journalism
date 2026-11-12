@@ -1,8 +1,9 @@
-import { LayoutList, Radio } from "lucide-react";
+import { ActivitySquare, LayoutList, Radio } from "lucide-react";
 import {
   BarChart3, CalendarCheck, CalendarClock, CalendarCog, CalendarDays, FileText, FolderTree, Images, KeyRound, LayoutGrid, Megaphone,
   PlaySquare, Rss, Save, ScrollText, ShieldCheck, Sparkles, Tags, Trash2, Trophy, UserCog, Users, Video,
 } from "lucide-react";
+import { Activity } from "react";
 
 /**
  * Sidebar structure. An item shows when the user has ANY of `perm` (no `perm` = everybody).
@@ -14,18 +15,18 @@ export const NAV = [
     items: [
       { label: "Overview", to: "/dashboard", icon: LayoutGrid, end: true, perm: ["analytics.view"] },
       { label: "News", to: "/dashboard/news", icon: FileText, perm: ["news.view.own", "news.view.all"] },
-      { label: "Review queue", to: "/dashboard/review-news", icon: ShieldCheck, perm: ["news.approve"] },
+      { label: "Review queue", to: "/dashboard/review-news", icon: ShieldCheck, perm: ["news.approve", "yt.approve", "video.approve", "live.approve"], badge: "reviewCount" },
+      { label: "Live news", to: "/dashboard/live", icon: Radio, perm: ["live.create", "live.manage.own", "live.manage.any", "live.approve"] },
       { label: "Drafts", to: "/dashboard/draft-news", icon: Save, perm: ["news.view.own", "news.view.all"] },
-      { label: "Scheduled", to: "/dashboard/schedule-news", icon: CalendarClock, perm: ["news.schedule"] },
-      { label: "Live news", to: "/dashboard/live", icon: Radio, perm: ["live.create", "live.manage.own", "live.manage.any"] },
+      { label: "Scheduled", to: "/dashboard/schedule-news", icon: CalendarClock, perm: ["news.schedule"], trustedOnly: true },
       // { label: "Breaking news", to: "/dashboard/breaking-news", icon: Rss, perm: ["breaking.manage"] },
     ],
   },
   {
     title: "Media",
     items: [
-      { label: "Shorts & videos", to: "/dashboard/short-videos", icon: PlaySquare, perm: ["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage"] },
-      { label: "YouTube news", to: "/dashboard/videos", icon: Video, perm: ["yt.manage"] },
+      { label: "Shorts & videos", to: "/dashboard/short-videos", icon: PlaySquare, perm: ["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage", "video.approve"] },
+      { label: "YouTube news", to: "/dashboard/videos", icon: Video, perm: ["yt.create", "yt.manage.own", "yt.manage.any", "yt.approve"] },
       // { label: "Photo gallery", to: "/dashboard/photo-gallery", icon: Images, perm: ["gallery.create", "gallery.manage.own", "gallery.manage.any"] },
       // { label: "Events", to: "/dashboard/events", icon: CalendarCheck, perm: ["event.create", "event.manage.own", "event.manage.any"] },
       // { label: "Event categories", to: "/dashboard/admin-events", icon: CalendarCog, perm: ["event.category.manage"] },
@@ -36,7 +37,7 @@ export const NAV = [
     title: "Content setup",
     items: [
       { label: "Categories", to: "/dashboard/categories", icon: FolderTree, perm: ["taxonomy.view"] },
-      { to: "/dashboard/home-sections", label: "Home sections", icon: LayoutList, perms: ["taxonomy.view"] },
+      { to: "/dashboard/home-sections", label: "Home sections", icon: LayoutList, perm: ["homeSection.manage"] },
       { label: "Topics", to: "/dashboard/tags", icon: Tags, perm: ["taxonomy.view"] },
       {
         label: "Advertising", icon: Megaphone, perm: ["ads.manage"], key: "ads",
@@ -54,6 +55,7 @@ export const NAV = [
     title: "Team & insights",
     items: [
       { label: "Analytics", to: "/dashboard/analytics", icon: BarChart3, perm: ["analytics.view", "reporter.performance.own", "reporter.performance.all"] },
+      { label: "Live analytics", to: "/dashboard/live-analytics", icon: ActivitySquare, perm: ["analytics.view"] },
       { label: "Team performance", to: "/dashboard/team-performance", icon: Trophy, perm: ["reporter.performance.all"] },
       { label: "Reporters", to: "/dashboard/reporters", icon: Users, perm: ["user.view"] },
       { label: "Roles & permissions", to: "/dashboard/roles", icon: KeyRound, perm: ["role.view"] },
@@ -65,10 +67,15 @@ export const NAV = [
 ];
 
 /** NAV filtered for a user: `allowed(perms[])` => boolean */
-export const visibleNav = (allowed) =>
+/** NAV filtered for a user */
+export const visibleNav = ({ allowed, isSuper = false, trusted = false }) =>
   NAV.map((section) => ({
     ...section,
-    items: section.items.filter((i) => !i.perm || allowed(i.perm)),
+    items: section.items.filter((i) => {
+      if (i.perm && !allowed(i.perm)) return false;
+      if (i.trustedOnly && !(trusted || isSuper)) return false;
+      return true;
+    }),
   })).filter((s) => s.items.length);
 
 /** Flat list (for the breadcrumb / title lookup) */

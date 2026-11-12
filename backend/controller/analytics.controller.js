@@ -292,7 +292,6 @@
 
 import News from "../model/news.models.js"
 import MonthNewsCount from "../model/news.read.model.js";
-import monthNewsCount from "../model/news.read.model.js";
 import YtNews from "../model/yt-news.models.js"
 import ShortVideo from "../model/short-video.model.js";   // ADDED
 import LiveNews from "../model/live.news.model.js";       // ADDED
@@ -300,6 +299,8 @@ import { generateLast12MonthsData, generateLast30DaysData } from "../utils/analy
 import tryCatch from "../utils/asyncFunction.js"
 import cron from 'node-cron';
 import { cached, setPrivateCache } from "../utils/cache.js";
+import { TZ, DAY, istDay } from '../utils/dateRange.js';
+import { sumToday } from "../service/analytics.service.js";
 
 const LEGACY_TTL = 300; // these charts change slowly: 5 min is plenty and saves dozens of countDocuments per request
 
@@ -320,6 +321,16 @@ const formatMonth = (month, year) => {
 };
 
 
+// live counter of one collection; the $gt:0 filter lets the partial index serve it
+// export const sumToday = (Model) => Model.aggregate([
+//     { $match: { 'activity.total_today_count': { $gt: 0 } } },
+//     { $group: { _id: null, n: { $sum: '$activity.total_today_count' } } },
+// ]).then((r) => r[0]?.n || 0);
+
+const todayCounters = async () => {
+    const [news, yt, shorts, live] = await Promise.all([sumToday(News), sumToday(YtNews), sumToday(ShortVideo), sumToday(LiveNews)]);
+    return { total: news + yt + shorts + live, news, yt, shorts, live };
+};
 export const getYtVideos12MonthAnalytics = tryCatch(async (req, res, next) => {
     try {
         const { year } = req.query;
@@ -507,46 +518,23 @@ export const getNewsYearlyClickAnalytics = tryCatch(async (req, res, next) => {
 });
 
 // ADDED: helper used by today-view and the cron
-const sumToday = async (Model) => {
-    const r = await Model.aggregate([{ $group: { _id: null, total: { $sum: "$activity.total_today_count" } } }]);
-    return r[0]?.total || 0;
-};
+// const sumToday = async (Model) => {
+//     const r = await Model.aggregate([{ $group: { _id: null, total: { $sum: "$activity.total_today_count" } } }]);
+//     return r[0]?.total || 0;
+// };
 
 // today's reads: Newscount / Ytcount unchanged, Shortcount / Livecount added
 export const getNewsViewCountToday = tryCatch(async (req, res, next) => {
     const payload = await cached('analytics:legacy:today-view', 60, async () => {
-        const todayCount = await News.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$activity.total_today_count" }
-                }
-            }
+        const [Newscount, Ytcount, Shortcount, Livecount] = await Promise.all([
+            sumToday(News), sumToday(YtNews), sumToday(ShortVideo), sumToday(LiveNews),
         ]);
-
-        const todayYtCount = await YtNews.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$activity.total_today_count" }
-                }
-            }
-        ]);
-
-        const todayShortCount = await sumToday(ShortVideo);   // ADDED
-        const todayLiveCount = await sumToday(LiveNews);      // ADDED
-
-        return {
-            success: true,
-            Newscount: todayCount[0]?.total || 0,
-            Ytcount: todayYtCount[0]?.total || 0,
-            Shortcount: todayShortCount,                      // ADDED
-            Livecount: todayLiveCount,                        // ADDED
-        };
+        return { success: true, Newscount, Ytcount, Shortcount, Livecount };
     }, { stale: 120 });
     setPrivateCache(res, 30);
     res.status(200).json(payload);
 })
+
 export const getTopTrendingNews = tryCatch(async (req, res, next) => {
     const { limit = 5 } = req.query;
 
@@ -593,75 +581,39 @@ export const getTopTrendingNews = tryCatch(async (req, res, next) => {
     res.status(200).json({ topNews, topYtNews, topShorts, topLive });
 });
 
+export const topArticles = async ({ start, end }, limit = 10, by = 'views') => {
+    const today = by === 'today';
+    const filter = today
+        ? { isDeleted: false, isPublished: true, draft: false, 'activity.total_today_count': { $gt: 0 } }
+        : live(start, end);
+    const sortField = today ? 'activity.total_today_count' : by === 'recent' ? 'post_time' : 'activity.total_reads';
+    return News.find(filter).sort({ [sortField]: -1 }).limit(limit)
+        .populate('author', 'username -_id').populate('category', 'name slug -_id')
+        .select('news_id title banner post_time activity.total_reads activity.total_today_count author category -_id').lean();
+};
 // for news reads
 
-cron.schedule('0 2 * * *', async () => {
-    // cron.schedule('* * * * *', async () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const month = yesterday.getMonth() + 1;
-    const year = yesterday.getFullYear();
-    const date = yesterday.getDate();
+const COUNTED = [News, YtNews, ShortVideo, LiveNews];
+const HAS_READS = { 'activity.total_today_count': { $gt: 0 } };
 
+// runs at 00:00 IST: saves the IST day that just ended, then resets the live counters
+cron.schedule('0 0 * * *', async () => {
     try {
-        const totalTodayCount = await News.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$activity.total_today_count" }
-                }
-            }
-        ]);
+        const day = istDay(new Date(Date.now() - 3600 * 1000));          // the IST day that just ended
+        const date = new Date(`${day}T00:00:00+05:30`);
+        const [year, month] = day.split('-').map(Number);
 
-        // console.log(totalTodayCount)
+        const count = (await Promise.all(COUNTED.map(sumToday))).reduce((a, b) => a + b, 0);
 
-        // const totalTodayEventNewsCount = await EventNews.aggregate([
-        //     {
-        //         $group: {
-        //             _id: null,
-        //             total: { $sum: "$activity.total_today_count" }
-        //         }
-        //     }
-        // ])
-
-        const totalTodayYtCount = await YtNews.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$activity.total_today_count" }
-                }
-            }
-        ])
-
-        const newsCount = totalTodayCount[0]?.total || 0;
-        // const eventNewsCount = totalTodayEventNewsCount[0]?.total || 0;
-        const ytCount = totalTodayYtCount[0]?.total || 0;
-        const shortCount = await sumToday(ShortVideo);    // ADDED
-        const liveCount = await sumToday(LiveNews);       // ADDED
-
-        const count = newsCount + ytCount + shortCount + liveCount;
-
-        let monthData = await monthNewsCount.findOne({ month, year });
-
-        // console.log(monthData)
-
-        if (!monthData) {
-            monthData = new monthNewsCount({ month, year, days: [] });
+        // never save the same day twice
+        const exists = await MonthNewsCount.exists({ month, year, 'days.date': date });
+        if (!exists) {
+            await MonthNewsCount.updateOne({ month, year }, { $push: { days: { date, count } } }, { upsert: true });
         }
 
-        monthData.days.push({ date: yesterday, count });
-        await monthData.save();
-
-        await News.updateMany({}, { $set: { "activity.total_today_count": 0 } });
-        // await EventNews.updateMany({}, { $set: { "activity.total_today_count": 0 } });
-        await YtNews.updateMany({}, { $set: { "activity.total_today_count": 0 } });
-        await ShortVideo.updateMany({}, { $set: { "activity.total_today_count": 0 } });   // ADDED
-        await LiveNews.updateMany({}, { $set: { "activity.total_today_count": 0 } });     // ADDED
-
-        // console.log(`Stored count ${count} for date ${startOfDay.toISOString().substring(0, 10)}`);
+        // only after the snapshot is saved, and only docs that actually have reads
+        await Promise.all(COUNTED.map((M) => M.updateMany(HAS_READS, { $set: { 'activity.total_today_count': 0 } })));
     } catch (err) {
-        console.error(err);
+        console.error('daily reads snapshot failed', err);
     }
-}, {
-    timezone: "Asia/Kolkata" // Set the timezone to IST
-});
+}, { timezone: 'Asia/Kolkata' });

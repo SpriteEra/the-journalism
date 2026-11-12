@@ -9,6 +9,8 @@ import Trash from "../model/trash.model.js";
 import { NotificationService } from "../service/NotificationService.js";
 import { P } from "../config/permissions.js";
 import { canOwnOrAny } from "../middleware/Authentication.js";
+import { toBool } from '../utils/slug.js';
+import { notifyApprovers, approveHandler, approvalCleared } from '../utils/approval.js';
 
 const notMine = (req, doc) => !canOwnOrAny(req, doc?.author, P.GALLERY_MANAGE_OWN, P.GALLERY_MANAGE_ANY);
 const FORBIDDEN = { success: false, message: "You can only manage your own gallery news" };
@@ -175,6 +177,10 @@ export const createGalleryNews = tryCatch(async (req, res, next) => {
         photos: photosMetaJson,
     } = req.body;
     let authorId = req.user._id;
+    const isDraft = toBool(draft);
+    const publishNow = !isDraft && req.can(P.GALLERY_PUBLISH);
+    const needApproval = !isDraft && !publishNow;
+
 
     // Parse photo metadata
     const photosMeta = JSON.parse(photosMetaJson || "[]");
@@ -226,10 +232,12 @@ export const createGalleryNews = tryCatch(async (req, res, next) => {
         photos,
         tags: tags || [],
         author: authorId,
-        draft,
-        post_time: draft ? null : new Date(),
-        isPublished: !draft,
+        draft: isDraft,
+        post_time: publishNow ? new Date() : null,
+        isPublished: publishNow,
+        need_approval: needApproval,
     });
+
     const updateStack = new UpdateStack({
         relatedId: newGalleryNews._id, // Will set after blog creation
         type: 'GalleryNews',
@@ -244,7 +252,8 @@ export const createGalleryNews = tryCatch(async (req, res, next) => {
     await newGalleryNews.save();
     res.status(201).json({ message: "Gallery news created", news: newGalleryNews });
 
-    NotificationService.sendToAdmins('Gallery News', `Gallery News ${title} has been published`, { excludeIds: [req.user._id], createdBy: req.user.username })
+    if (needApproval) notifyApprovers(req, { perms: [P.GALLERY_MANAGE_ANY], label: 'Gallery news', title, link: '/dashboard/gallery' });
+    else if (publishNow) NotificationService.sendToAdmins('Gallery News', `Gallery News ${title} has been published`, { excludeIds: [req.user._id], createdBy: req.user.username });
 })
 
 // UPDATE
@@ -352,6 +361,10 @@ export const updateGalleryNews = tryCatch(async (req, res, next) => {
 export const publishDraftGalleryNews = tryCatch(async (req, res, next) => {
     const { news_id } = req.params;
     const { title, description, location, tags, ref_reporter } = req.body;
+    const publishNow = req.can(P.GALLERY_PUBLISH);
+    Object.assign(updateData, { draft: false, isPublished: publishNow, need_approval: !publishNow }, approvalCleared);
+    if (publishNow) updateData.post_time = new Date();
+    changes.push(publishNow ? 'Gallery news published' : 'Submitted for approval');
 
     // Validate required fields
     if (!title) {
@@ -790,3 +803,6 @@ export const deletePhoto = tryCatch(async (req, res, next) => {
         }
     });
 });
+
+
+export const approveGalleryNews = approveHandler({ Model: GalleryNews, find: (req) => ({ news_id: req.params.news_id }), perm: P.GALLERY_MANAGE_ANY, label: 'Gallery news', link: () => '/dashboard/gallery' });

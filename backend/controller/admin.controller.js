@@ -386,60 +386,133 @@ export const resetPassword = tryCatch(async (req, res) => {
 export const getAdminNotifications = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { page = 1, limit = 50, filter, priority, unreadOnly } = req.query;
-        if (String(userId) !== String(req.user._id) && !req.access.isSuper) return res.status(403).json({ success: false, message: 'You can only read your own notifications' });
 
-        const admin = await User.findById(userId).select('_id fullName username email');
-        if (!admin) return res.status(404).json({ success: false, message: 'User not found' });
+        // Pagination
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(
+            100,
+            Math.max(1, parseInt(req.query.limit) || 50)
+        );
 
-        const query = { recipients: admin._id, archivedBy: { $ne: admin._id } };
+        const { filter, priority, unreadOnly } = req.query;
 
-        // Filter unread
-        if (filter === 'unread' || unreadOnly === 'true') {
-            query['readBy.userId'] = { $ne: admin._id };
+        // Authorization
+        if (
+            String(userId) !== String(req.user._id) &&
+            !req.access?.isSuper
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only read your own notifications"
+            });
         }
 
-        // Filter by category/type
-        if (filter && filter !== 'unread' && filter !== 'all') {
-            query.$or = [{ category: filter }, { type: filter }];
+        // Find user
+        const admin = await User.findById(userId)
+            .select("_id fullName username email")
+            .lean();
+
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
         }
 
-        if (priority && priority !== 'all') {
+        // Base query
+        const baseQuery = {
+            recipients: admin._id,
+            archivedBy: { $ne: admin._id }
+        };
+
+        // Main query
+        const query = { ...baseQuery };
+
+        // Unread filter
+        if (filter === "unread" || unreadOnly === "true") {
+            query["readBy.userId"] = { $ne: admin._id };
+        }
+
+        // Category / Type filter
+        if (filter && filter !== "unread" && filter !== "all") {
+            query.$or = [
+                { category: filter },
+                { type: filter }
+            ];
+        }
+
+        // Priority filter
+        if (priority && priority !== "all") {
             query.priority = priority;
         }
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        // Pagination offset
+        const skip = (page - 1) * limit;
 
-        const [notifications, totalCount, unreadCount] = await Promise.all([
-            AdminNotification.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
+        // Unread count query
+        const unreadQuery = {
+            ...baseQuery,
+            "readBy.userId": { $ne: admin._id }
+        };
+
+        // Fetch notifications
+        const [
+            notifications,
+            totalCount,
+            unreadCount
+        ] = await Promise.all([
+
+            AdminNotification.find(query)
+                .sort({ createdAt: -1, _id: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+
             AdminNotification.countDocuments(query),
-            AdminNotification.countDocuments({ recipients: admin._id, archivedBy: { $ne: admin._id }, 'readBy.userId': { $ne: admin._id } })
+
+            AdminNotification.countDocuments(unreadQuery)
         ]);
 
-        const notificationsWithStatus = notifications.map(n => ({
-            ...n,
-            isRead: n.readBy?.some(r => String(r.userId) === String(admin._id)) || false
+        // Add read status
+        const notificationsWithStatus = notifications.map((notification) => ({
+            ...notification,
+            isRead: notification.readBy?.some(
+                (read) =>
+                    String(read.userId) === String(admin._id)
+            ) || false
         }));
 
-        res.status(200).json({
+        // Response
+        return res.status(200).json({
             success: true,
             notifications: notificationsWithStatus,
+
             pagination: {
-                currentPage: parseInt(page),
-                totalPages: Math.ceil(totalCount / parseInt(limit)),
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
                 totalNotifications: totalCount,
-                hasNextPage: skip + parseInt(limit) < totalCount,
-                hasPrevPage: parseInt(page) > 1
+                hasNextPage: skip + limit < totalCount,
+                hasPrevPage: page > 1
             },
+
             unreadCount,
+
             user: {
                 userId: admin._id,
-                name: `${admin.fullName}`
+                name: admin.fullName
             }
         });
+
     } catch (error) {
-        console.error('Error fetching notifications:', error);
-        res.status(500).json({ success: false, message: 'Error fetching notifications' });
+        console.error("Error fetching notifications:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching notifications",
+            error: process.env.NODE_ENV === "development"
+                ? error.message
+                : undefined
+        });
     }
 };
 

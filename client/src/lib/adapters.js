@@ -4,7 +4,19 @@
  *   story link   /{section}/news/{slug}      (section = the story's primary category or state slug)
  *   old link     /news/{news_id}             (used while a record has no slug yet -the page redirects to the new link)
  */
-export const ytThumb = (id) => (id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "");
+const YT_QUALITY = ["maxresdefault", "sddefault", "hqdefault"];
+
+export const ytThumb = (id, quality = "sddefault") =>
+  id ? `https://i.ytimg.com/vi/${id}/${quality}.jpg` : "";
+
+/** use as onError on <img>: steps down to the next quality instead of showing a broken image */
+export const ytThumbFallback = (e) => {
+  const img = e.currentTarget;
+  const m = img.src.match(/\/vi\/([\w-]{11})\/(\w+)\.jpg/);
+  if (!m) return;
+  const next = YT_QUALITY[YT_QUALITY.indexOf(m[2]) + 1];
+  if (next) img.src = ytThumb(m[1], next);
+};
 export const ytWatchUrl = (id) => (id ? `https://www.youtube.com/watch?v=${id}` : "");
 export const ytShortsUrl = (id) => (id ? `https://www.youtube.com/shorts/${id}` : "");
 

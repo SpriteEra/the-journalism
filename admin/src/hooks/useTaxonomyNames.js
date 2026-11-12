@@ -3,7 +3,10 @@ import { useCategories, useDistricts, useStates } from "./admin";
 
 /** id -> readable name for categories / states / districts (lists are cached by react-query). */
 export default function useTaxonomyNames() {
-  const cats = useCategories(); const states = useStates(); const districts = useDistricts();
+  const cats = useCategories();
+  const states = useStates();
+  const districts = useDistricts();
+
   return useMemo(() => {
     const map = new Map();
     (cats.data || []).forEach((c) => map.set(c._id, c.name));

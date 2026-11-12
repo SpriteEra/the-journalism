@@ -19,7 +19,7 @@ export async function tagPublicRouter(app) {
 
 export async function tagAdminRouter(app) {
     // 'suggest' is registered before '/tags/:id' on purpose
-    app.get('/tags/suggest', { onRequest: [...perm(P.TAXONOMY_VIEW)] }, suggestTags);
+    app.get('/tags/suggest', suggestTags);
     app.get('/tags', { onRequest: [...perm(P.TAXONOMY_VIEW)] }, getTagsAdmin);
     app.get('/tags/:id', { onRequest: [...perm(P.TAXONOMY_VIEW)] }, getTagAdmin);
     app.post('/tags', { onRequest: [...perm(P.TAG_CREATE)] }, createTagAdmin);

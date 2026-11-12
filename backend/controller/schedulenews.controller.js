@@ -1,558 +1,344 @@
+import moment from "moment-timezone";
+import cron from 'node-cron';
 import News from "../model/news.models.js";
 import ScheduleNews from "../model/scheduleNews.model.js";
+import User from "../model/user.model.js";
+import UpdateStack from "../model/updatedstack.model.js";
 import tryCatch from "../utils/asyncFunction.js";
 import ErrorHandler from "../utils/errorHandler.js";
-import translate from "translate-google";
-import cron from 'node-cron'
 import { sendNewsNotification } from "./pushnotification.controller.js";
 import { deleteImage, uploadImage } from "../utils/uploadImage.js";
-import User from "../model/user.model.js";
 import { notifyUsers } from "../service/notification.service.js";
 import { P } from "../config/permissions.js";
 import { assertOwnOrAny, assertPermission } from "../middleware/Authentication.js";
 import { buildTaxonomyFilter, resolveNewsTaxonomy } from "../utils/newsTaxonomy.js";
-import { resolveNewsTags } from "../utils/newsTags.js";
+import { parseTagInput, resolveNewsTags } from "../utils/newsTags.js";
 import { onNewsChanged } from "../utils/newsCache.js";
-import { rolesWithPermission } from "../service/access.service.js";
+import { makeSlug } from "../utils/slug.js";
+import { sanitizeSeo } from "../utils/seo.js";
+import { parseKeywords } from "../utils/newsKeywords.js";
+import { parseRelatedIds, resolveRelated } from "../utils/relatedNews.js";
+import { makeNewsSlug, parsePrimaryInput, pickPrimary } from "../utils/newsRoute.js";
+
+// ───────────────────────── helpers ─────────────────────────
 function generateNanoId(length = 5) {
     let result = '';
-    for (let i = 0; i < length; i++) {
-        result += Math.floor(Math.random() * 10); // Generates a random digit between 0 and 9
-    }
+    for (let i = 0; i < length; i++) result += Math.floor(Math.random() * 10);
     return result;
 }
 
-// Function to format the current date as YYYYMMDD
+// YYYYMMDD
 function getCurrentDate() {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
+    const d = new Date();
+    return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export const createScheduleNews = tryCatch(async (req, res, next) => {
+const toBool = (v) => v === true || v === 'true';
 
-    // let authorId = req.user._id;
-    // let { id, title, description, content, state, district, location, news_section_type, banner, tags, draft, post_time, sendNotification, imageRef } = req.body;
+const parseJson = (raw, label, fallback) => {
+    if (raw === undefined || raw === null || raw === '') return fallback;
+    if (typeof raw !== 'string') return raw;
+    try { return JSON.parse(raw); } catch { throw new ErrorHandler(400, `${label} is not valid JSON`); }
+};
 
+// { date: "2026-11-12", time: "09:15 AM" } (IST) -> a real Date
+const toPublishAt = (pt) => {
+    const m = moment.tz(`${pt?.date} ${pt?.time}`, 'YYYY-MM-DD hh:mm A', 'Asia/Kolkata');
+    if (!m.isValid()) throw new ErrorHandler(400, 'Invalid schedule date or time');
+    if (m.valueOf() < Date.now() - 60_000) throw new ErrorHandler(400, 'Schedule time must be in the future');
+    return m.toDate();
+};
+
+// the fields the editor sends besides the basic ones
+const extraFields = (b) => {
+    const p = parsePrimaryInput(b.primaryRoute);
+    return {
+        keywords: parseKeywords(b.keywords) ?? { hi: [], en: [] },
+        seo: sanitizeSeo(b.seo) || {},
+        ref_reporter: b.ref_reporter || '',
+        is_literature: toBool(b.is_literature),
+        relatedIds: parseRelatedIds(b.relatedNews) || [],
+        ...(p ? { primaryRoute: { kind: p.kind, ref: p.id } } : {}),
+    };
+};
+
+// checks shared by create and update (non-draft only)
+const assertSchedulable = ({ description, content, tags, post_time, hasBanner, isVideo, video }) => {
+    if (!description?.length) throw new ErrorHandler(400, 'You must provide some description for the news');
+    if (!content) throw new ErrorHandler(400, 'You must provide some content for the news');
+    if (!tags?.length) throw new ErrorHandler(400, 'You must provide tags for the news');
+    if (!post_time?.date || !post_time?.time) throw new ErrorHandler(400, 'You must provide post time and date for the news');
+    if (!hasBanner) throw new ErrorHandler(400, 'You must provide banner image for the news');
+    if (isVideo && !String(video || '').trim()) throw new ErrorHandler(400, 'You must provide video for the news');
+};
+
+// ───────────────────────── create ─────────────────────────
+export const createScheduleNews = tryCatch(async (req, res) => {
     assertPermission(req, P.NEWS_SCHEDULE);
 
-    let authorId = req.user._id;
-    let { id, title, description, content, location, tags, draft, sendNotification, imageRef, post_time, isVideo, video, aiGeneratedTags } = req.body;
+    const b = req.body || {};
+    const authorId = req.user._id;
+    const draft = toBool(b.draft);
+    const isVideo = toBool(b.isVideo);
+    const sendNotification = toBool(b.sendNotification);
+    const title = String(b.title ?? '').trim();
+    const description = String(b.description ?? '').trim();
+    const content = parseJson(b.content, 'content', []);
+    const post_time = parseJson(b.post_time, 'post_time', {});
+    const aiGeneratedTags = parseJson(b.aiGeneratedTags, 'aiGeneratedTags', []);
+    const location = String(b.location ?? '').trim().toLowerCase();
+    const bannerFile = req.files?.banner;
 
+    if (!title) throw new ErrorHandler(400, `You must provide a title to ${draft ? 'save' : 'schedule'} a news`);
+    if (title.length > 300) throw new ErrorHandler(400, 'Title cannot exceed 300 characters');
 
-    content = JSON.parse(req.body.content || "[]");
-    post_time = JSON.parse(req.body.post_time)
-    aiGeneratedTags = JSON.parse(req.body.aiGeneratedTags || "[]");
-    // Convert strings to booleans
-    draft = draft === 'true' || draft === true;
-    isVideo = isVideo === 'true' || isVideo === true;
-    sendNotification = sendNotification === 'true' || sendNotification === true;
+    const tax = await resolveNewsTaxonomy(b, { requireCategory: false, requireRoute: !draft });
+    const tagItems = parseTagInput(b.tags);
+    const tags = (await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TAG_CREATE), userId: authorId, requireTag: !draft })).ids;
 
-    // let videoFile = req.files?.video
-    let bannerFile = req.files?.banner
-    // category >= 1 (unless draft); sub-category / state / district optional
-    const tax = await resolveNewsTaxonomy(req.body, { requireCategory: false, requireRoute: !draft });
-    const { state, district } = tax;
-    // tags: ids / slugs / titles; unknown titles are created when the caller has tag.create
-    tags = (await resolveNewsTags(tags, { canCreate: req.can(P.TAG_CREATE), userId: authorId, requireTag: !draft })).ids;
+    if (!draft) assertSchedulable({ description, content, tags, post_time, hasBanner: Boolean(bannerFile), isVideo, video: b.video });
+    const publishAt = draft ? undefined : toPublishAt(post_time);
 
-    if (!title?.length) {
-        return res.status(403).json({ error: `You must provide a title to ${draft === true ? "Publish" : "Save"} a news` })
-    }
-    if (!draft) {
-        if (!description.length) {
-            return next(new ErrorHandler(403, 'You must provide some descrtiption for the news'))
-        }
-        if (!content) {
-            return res.status(403).json({ error: 'You must provide some content for the news' })
-        }
-
-        if (!location || location.trim() === '') {
-            return res.status(403).json({ error: 'You must provide a location for the news' })
-        }
-
-        // Check if tags is provided and not empty
-        if (!tags || tags.length === 0) {
-            return res.status(403).json({ error: 'You must provide tags for the news' })
-        }
-
-        if (!post_time.date || !post_time.time) {
-            return res.status(403).json({ error: 'You must provide post time and date for the news' })
-        }
-
-        if (!bannerFile) {
-            return res.status(403).json({ error: 'You must provide banner image for the news' })
-        }
-
-        if (isVideo && !video.length) {
-            return res.status(403).json({ error: 'You must provide video for the news' })
-        }
-
-        location = location.trim().toLowerCase();
+    let banner = '';
+    if (bannerFile) {
+        try { banner = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
+        catch (error) { throw new ErrorHandler(502, `Failed to upload banner image: ${error.message}`); }
     }
 
-    // if (id) {
-    //     ScheduleNews.findOneAndUpdate({ news_id: id }, {
-    //         title, description, content, state, district, location, banner, tags, news_section_type, post_time, imageRef,
-    //     }).then(news => {
-    //         return res.status(200).json({ id: news.news_id, message: 'update Successfully' })
-    //     })
-    // }
-    // else {
-
-    let newUrlTitle = ""
-    await translate(title, { from: 'hi', to: 'en' }).then(res => {
-
-        newUrlTitle = res;
-    }).catch(err => {
-        console.log(err)
-        return res.status(500).json({ success: false, error: err.message })
+    const news_id = `${await makeSlug(title)}-${getCurrentDate()}-${generateNanoId()}`;
+    const news = new ScheduleNews({
+        news_id, title, description, content, banner, location, tags, aiGeneratedTags,
+        category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district,
+        post_time, publishAt, draft, sendNotification, author: authorId,
+        imageRef: b.imageRef || '', isVideo, video: b.video || '', isPublished: false,
+        ...extraFields(b),
     });
+    await news.save();
 
-    let news_id = id || newUrlTitle
-        .trim()
-        .toLocaleLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, ''); // Remove leading or trailing hyphens
+    res.status(200).json({ success: true, message: 'News Schedule successfully', news_id });
+});
 
-    news_id += '-' + getCurrentDate() + '-' + generateNanoId();
-
-    // let video = ""
-    let banner = ""
-
-    // add here for video
-
-    try {
-        banner = await uploadImage(bannerFile.data, bannerFile.name, 'news');
-    } catch (error) {
-        console.error('Error uploading banner:', error);
-        throw new Error('Failed to upload banner image: ' + error.message);
-    }
-
-    let news = new ScheduleNews({
-        title, description, content, category: tax.category, subCategory: tax.subCategory, state, district, location, tags, banner, post_time, draft: Boolean(draft), news_id, sendNotification, author: authorId, imageRef, isVideo, video, isPublished: !draft
-    })
-
-    await news.save()
-
-    res.status(200).json({ message: 'News Schedule successfully' });
-
-})
-
-
-// check once
-export const updateScheduledNews = tryCatch(async (req, res, next) => {
-    let authorId = req.user._id;
+// ───────────────────────── update ─────────────────────────
+export const updateScheduledNews = tryCatch(async (req, res) => {
     assertPermission(req, P.NEWS_SCHEDULE);
-    let { id, title, description, content, location, tags, draft, sendNotification, imageRef, isVideo, video, banner, post_time, aiGeneratedTags } = req.body;
 
-    content = JSON.parse(req.body.content || "[]");
-    post_time = JSON.parse(req.body.post_time)
-    // Convert strings to booleans
-    draft = draft === 'true' || draft === true;
-    isVideo = isVideo === 'true' || isVideo === true;
-    sendNotification = sendNotification === 'true' || sendNotification === true;
-    aiGeneratedTags = JSON.parse(req.body.aiGeneratedTags || "[]");
-    // let videoFile = req.files?.video
-    let bannerFile = req.files?.banner
-    const tax = await resolveNewsTaxonomy(req.body, { requireCategory: false, requireRoute: !draft });
-    const { state, district } = tax;
-    // tags: ids / slugs / titles; unknown titles are created when the caller has tag.create
-    tags = (await resolveNewsTags(tags, { canCreate: req.can(P.TAG_CREATE), userId: authorId, requireTag: !draft })).ids;
-
-    if (!title?.length) {
-        return res.status(403).json({ error: `You must provide a title to ${draft === true ? "Publish" : "Save"} a news` })
-    }
-
-
-    if (!draft) {
-        if (!description.length) {
-            return next(new ErrorHandler(403, 'You must provide some descrtiption for the news'))
-        }
-        if (!content) {
-            return res.status(403).json({ error: 'You must provide some content for the news' })
-        }
-
-        if (!location || location.trim() === '') {
-            return res.status(403).json({ error: 'You must provide a location for the news' })
-        }
-
-        // Check if tags is provided and not empty
-        if (!tags || tags.length === 0) {
-            return res.status(403).json({ error: 'You must provide tags for the news' })
-        }
-
-        if (!post_time.date || !post_time.time) {
-            return res.status(403).json({ error: 'You must provide post time and date for the news' })
-        }
-
-        if (!bannerFile && !banner) {
-            return res.status(403).json({ error: 'You must provide banner image for the news' })
-        }
-
-        if (isVideo && !video.length) {
-            return res.status(403).json({ error: 'You must provide video for the news' })
-        }
-
-        location = location.trim().toLowerCase();
-    }
-
-
-
-    let news_id = id
-
-
-    // try {
-    //     // Upload banner image (existing code)
-    //     banner = await uploadImage(bannerFile.data, bannerFile.name, 'news');
-
-    //     if (isVideo) {
-    //         // Upload video with proper error handling
-    //         const videoResult = await uploadVideo(videoFile.data, videoFile.name);
-
-    //         if (!videoResult.success) {
-
-    //             return res.status(400).json({
-    //                 success: false,
-    //                 message: 'Video upload failed'
-    //             });
-    //         }
-
-    //         video = videoResult.url
-    //     }
-
-    //     // If everything succeeds
-
-    // } catch (error) {
-    //     console.error('Upload error:', error);
-    //     return res.status(400).json({
-    //         success: false,
-    //         message: error.message || 'Upload failed'
-    //     });
-    // }
-
-    const news = await ScheduleNews.findOne({ news_id: id })
+    const b = req.body || {};
+    const news = await ScheduleNews.findOne({ news_id: b.id });
     if (!news) return res.status(404).json({ success: false, message: 'Scheduled news not found' });
     assertOwnOrAny(req, news.author, P.NEWS_UPDATE_OWN, P.NEWS_UPDATE_ANY, "You can only edit your own scheduled news");
 
-    if (bannerFile) {
-        if (news?.banner) await deleteImage(news.banner).catch((e) => console.error('[schedule] image delete failed:', e.message));
-        try {
-            banner = await uploadImage(bannerFile.data, bannerFile.name, 'news');
-        } catch (error) {
-            console.error('Error uploading banner:', error);
-            throw new Error('Failed to upload banner image: ' + error.message);
-        }
+    const authorId = req.user._id;
+    const draft = toBool(b.draft);
+    const isVideo = toBool(b.isVideo);
+    const sendNotification = toBool(b.sendNotification);
+    const title = String(b.title ?? '').trim();
+    const description = String(b.description ?? '').trim();
+    const content = parseJson(b.content, 'content', []);
+    const post_time = parseJson(b.post_time, 'post_time', {});
+    const aiGeneratedTags = parseJson(b.aiGeneratedTags, 'aiGeneratedTags', []);
+    const location = String(b.location ?? '').trim().toLowerCase();
+    const bannerFile = req.files?.banner;
 
+    if (!title) throw new ErrorHandler(400, `You must provide a title to ${draft ? 'save' : 'schedule'} a news`);
+    if (title.length > 300) throw new ErrorHandler(400, 'Title cannot exceed 300 characters');
+
+    const tax = await resolveNewsTaxonomy(b, { requireCategory: false, requireRoute: !draft });
+    const tagItems = parseTagInput(b.tags);
+    const tags = (await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TAG_CREATE), userId: authorId, existing: news.tags, requireTag: !draft })).ids;
+
+    const hasBanner = Boolean(bannerFile || b.banner || news.banner);
+    if (!draft) assertSchedulable({ description, content, tags, post_time, hasBanner, isVideo, video: b.video });
+    const publishAt = draft ? undefined : toPublishAt(post_time);
+
+    // new banner: upload first, delete the old one only after the save worked
+    const oldBanner = news.banner;
+    let uploaded = null;
+    if (bannerFile) {
+        try { uploaded = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
+        catch (error) { throw new ErrorHandler(502, `Failed to upload banner image: ${error.message}`); }
+        news.banner = uploaded;
+    } else if (typeof b.banner === 'string' && b.banner && !b.banner.startsWith('data:image')) {
+        news.banner = b.banner;
     }
 
+    news.set({
+        title, description, content, location, tags, aiGeneratedTags,
+        category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district,
+        post_time, publishAt, draft, sendNotification,
+        imageRef: b.imageRef ?? news.imageRef, isVideo, video: b.video || '',
+        ...extraFields(b),
+    });
+    await news.save();
 
-    // let news = new News({
-    //     title, description, content, state, district, location, tags, banner, news_section_type, draft: Boolean(draft), news_id, author: authorId, imageRef, isVideo, video
-    // });
-
-    news.title = title;
-    news.description = description;
-    news.content = content;
-    news.state = state;
-    news.district = district;
-    news.location = location;
-    news.tags = tags;
-    news.category = tax.category;
-    news.subCategory = tax.subCategory;
-    if (banner !== undefined) news.banner = banner;
-    news.draft = Boolean(draft);
-    news.news_id = news_id;
-    news.imageRef = imageRef;
-    news.isVideo = isVideo;
-    news.video = video;
-    news.post_time = post_time
-    news.aiGeneratedTags = aiGeneratedTags;
-    await news.save()
-
-    res.status(200).json({ message: 'Scheduled News Updated Successfully' });
+    if (uploaded && oldBanner) deleteImage(oldBanner).catch((e) => console.error('[schedule] image delete failed:', e.message));
+    res.status(200).json({ success: true, message: 'Scheduled News Updated Successfully' });
 });
 
-export const getScheduleNews = tryCatch(async (req, res, next) => {
-    let { news_id } = req.query;
-
-
+// ───────────────────────── read ─────────────────────────
+export const getScheduleNews = tryCatch(async (req, res) => {
+    const { news_id, preview } = req.query;
     const news = await ScheduleNews.findOne({ news_id })
-        .select('news_id title description content tags category subCategory state district banner location post_time createdAt isVideo video author imageRef aiGeneratedTags -_id')
+        .select('news_id title description content tags category subCategory state district banner location post_time publishAt createdAt isVideo video author imageRef aiGeneratedTags keywords seo primaryRoute relatedIds ref_reporter is_literature sendNotification draft -_id');
     if (!news) return res.status(404).json({ success: false, message: 'Scheduled news not found' });
     assertOwnOrAny(req, news.author, P.NEWS_UPDATE_OWN, P.NEWS_UPDATE_ANY, "You can only view your own scheduled news");
 
-    return res.status(200).json({ news })
-})
-
-
-export const publishScheduleNews = tryCatch(async (req, res, next) => {
-    assertPermission(req, P.NEWS_SCHEDULE, P.NEWS_PUBLISH);
-
-    let { news_id } = req.body;
-
-    // Find the scheduled news by news_id
-    const scheduledNews = await ScheduleNews.findOne({ news_id });
-
-    if (!scheduledNews) {
-        return res.status(404).json({ message: 'Scheduled news not found' });
+    // preview only: names instead of ids (the edit screen needs the plain ids, so it does not send this flag)
+    if (preview === 'true') {
+        await news.populate([
+            { path: 'author', select: 'username fullName profile designation about' },
+            { path: 'category', select: 'name slug' },
+            { path: 'subCategory', select: 'name slug' },
+            { path: 'state', select: 'state displayName slug' },
+            { path: 'district', select: 'district displayName slug' },
+            { path: 'tags', select: 'title slug' },
+        ]);
     }
+    return res.status(200).json({ news });
+});
 
-    let newUrlTitle = ""
-    await translate(scheduledNews.title, { from: 'hi', to: 'en' }).then(res => {
+const ql = (q, k) => q[k] ?? q[`${k}[]`];
 
-        newUrlTitle = res;
-    }).catch(err => {
-        console.log(err)
-        return res.status(500).json({ success: false, error: err.message })
+export const getScheduleNewsByReporters = tryCatch(async (req, res) => {
+    const seeAll = req.can(P.NEWS_VIEW_ALL);
+    if (!seeAll && !req.can(P.NEWS_VIEW_OWN) && !req.can(P.NEWS_UPDATE_OWN)) throw new ErrorHandler(403, 'You cannot view scheduled news');
+    const q = req.query;
+    const page = Math.max(parseInt(q.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(q.limit) || 12, 1), 100);
+
+    const { filter, empty } = await buildTaxonomyFilter({
+        category: ql(q, 'category'), subCategory: ql(q, 'subCategory'), state: ql(q, 'state'), district: ql(q, 'district'),
     });
+    if (empty) return res.status(200).json({ news: [], total: 0, page, limit });
 
-    let new_news_id = newUrlTitle
-        .trim()
-        .toLocaleLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, ''); // Remove leading or trailing hyphens
+    const query = { draft: q.draft === 'true' ? true : { $ne: true }, ...filter };
+    if (!seeAll) query.author = req.user._id;
+    else if (q.author && mongoose.Types.ObjectId.isValid(q.author)) query.author = q.author;
 
-    new_news_id += '-' + getCurrentDate() + '-' + generateNanoId() + '123';
-
-    // Create a new News document from the scheduled news data
-    const publishedNews = new News({
-        news_id: new_news_id,
-        title: scheduledNews.title,
-        banner: scheduledNews.banner,
-        description: scheduledNews.description,
-        content: scheduledNews.content,
-        state: scheduledNews.state,
-        district: scheduledNews.district,
-        location: scheduledNews.location,
-        tags: scheduledNews.tags,
-        aiGeneratedTags: scheduledNews.aiGeneratedTags,
-        category: scheduledNews.category,
-        subCategory: scheduledNews.subCategory,
-        author: scheduledNews.author,
-        imageRef: scheduledNews.imageRef,
-        isPublished: true,
-        post_time: new Date(), // Set the current date and time as the post time
-        activity: {
-            total_reads: 0,
-            total_today_count: 0,
-        },
-        draft: false, // Ensure it's not marked as a draft
-    });
-
-    // Save the published news
-    await publishedNews.save();
-
-    // Remove the scheduled news from the ScheduleNews collection
-    await ScheduleNews.findByIdAndDelete({ _id: scheduledNews._id });
-
-
-
-    // Return a success response
-    res.status(200).json({ message: 'News published successfully', news: publishedNews });
-
-
-    (async () => {
-        try {
-            await User.findOneAndUpdate({ _id: publishedNews.author }, { $inc: { "account_info.total_news": 1 } })
-            onNewsChanged();
-            const admins = await User.find({
-                role: "admin",
-                fcm: { $exists: true, $ne: null },
-                "notificationPreferences.newsAdded": true,
-            });
-
-            await notifyUsers({
-                users: admins,
-                event: "news_created",
-                fcmTitle: `News Published By @${req.user?.username}`,
-                fcmBody: `${publishedNews.title}`,
-                link: `${process.env.FRONTEND_URL_PROD}/news/${publishedNews.news_id}`,
-            });
-
-            if (scheduledNews.sendNotification) {
-                try {
-                    await sendNewsNotification({ news_id: publishedNews.news_id, title: scheduledNews.title, });
-                } catch (err) {
-                    console.log("Notification sending failed: ", err);
-                }
-            }
-        } catch (err) {
-            console.error("Background job failed:", err);
-        }
-    })();
-})
-
-export const getScheduleNewsByReporters = tryCatch(async (req, res, next) => {
-    const { _id } = req.user;
-    let { page, limit, draft = false } = req.query;
-    let query = {};
-    if (!req.can(P.NEWS_VIEW_ALL)) {
-        query.author = _id
+    // scheduled day range (IST, both days included)
+    if (q.from || q.to) {
+        const day = /^\d{4}-\d{2}-\d{2}$/;
+        if ((q.from && !day.test(q.from)) || (q.to && !day.test(q.to))) throw new ErrorHandler(400, 'from / to must look like YYYY-MM-DD');
+        const range = {};
+        if (q.from) range.$gte = moment.tz(q.from, 'Asia/Kolkata').startOf('day').toDate();
+        if (q.to) range.$lte = moment.tz(q.to, 'Asia/Kolkata').endOf('day').toDate();
+        query.publishAt = range;
     }
-    if (draft) {
-        query.draft = draft
+    if (q.search) {
+        const rx = new RegExp(escapeRegex(String(q.search).trim().slice(0, 100)), 'i');
+        query.$and = [{ $or: [{ title: rx }, { location: rx }, ...keywordClauses(rx)] }];
     }
-    const authorId = req.user._id;
-    limit = limit ? parseInt(limit) : 10;
-    page = page ? parseInt(page) : 1;
-    // console.log(query)
-    const news = await ScheduleNews.find(query)
-        .sort({ createdAt: -1 })
-        .skip(limit * (page - 1))
-        .limit(limit).
-        populate('author', "username email").
-        select('news_id title createdAt banner post_time -_id').exec();
-    const totalNews = await ScheduleNews.countDocuments(query)
 
-    return res.status(200).json({ news, total: totalNews })
-})
+    const [news, total] = await Promise.all([
+        ScheduleNews.find(query)
+            .sort({ publishAt: 1, createdAt: -1 })
+            .skip((page - 1) * limit).limit(limit)
+            .populate('author', 'username fullName profile')
+            .select('news_id title banner post_time publishAt isVideo sendNotification author -_id')
+            .lean(),
+        ScheduleNews.countDocuments(query),
+    ]);
+    return res.status(200).json({ news, total, page, limit });
+});
 
 
-export const getMyScheduleNewsCount = tryCatch(async (req, res, next) => {
+
+export const getMyScheduleNewsCount = tryCatch(async (req, res) => {
     const { tags, state, district, location, draft } = req.body;
-    const authorId = req.user._id;
-    const tf = await buildTaxonomyFilter({ state, district, tag: tags });     // ids / slugs, same rules as the public filters
+    const tf = await buildTaxonomyFilter({ state, district, tag: tags });
     if (tf.empty) return res.status(200).json({ totalDocs: 0 });
-    let query = { ...tf.filter }
+    const query = { ...tf.filter };
     if (location) query.location = location;
     if (draft) query.draft = draft;
-    const count = await ScheduleNews.countDocuments({ author: authorId, ...query }).exec();
-    return res.status(200).json({ totalDocs: count })
-})
+    const count = await ScheduleNews.countDocuments({ author: req.user._id, ...query }).exec();
+    return res.status(200).json({ totalDocs: count });
+});
 
-
-export const deleteScheduleNews = tryCatch(async (req, res, next) => {
+export const deleteScheduleNews = tryCatch(async (req, res) => {
     const { id } = req.params;
     const news = await ScheduleNews.findOne({ news_id: id });
     if (!news) return res.status(404).json({ success: false, message: 'Scheduled news not found' });
     assertOwnOrAny(req, news.author, P.NEWS_DELETE_OWN, P.NEWS_DELETE_ANY, "You can only delete your own scheduled news");
     await news.deleteOne();
-    return res.status(200).json({ message: "News deleted successfully" })
-})
+    return res.status(200).json({ message: "News deleted successfully" });
+});
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-cron.schedule('*/15 * * * *', async () => {
+// ───────────────────────── publishing ─────────────────────────
+// Takes the scheduled story out of ScheduleNews and creates a complete News document.
+// findOneAndDelete is the claim: if two callers race, only one gets the document.
+const publishScheduled = async (scheduledId) => {
+    const s = await ScheduleNews.findOneAndDelete({ _id: scheduledId }).lean();
+    if (!s) return null;
     try {
-        // console.log("Cron running every minute");
+        const input = s.primaryRoute?.ref ? { kind: s.primaryRoute.kind, id: String(s.primaryRoute.ref) } : undefined;
+        const ids = { categoryIds: s.category, subCategoryIds: s.subCategory, stateIds: s.state };
+        let primaryRoute;
+        try { primaryRoute = await pickPrimary({ input, ...ids }); }
+        catch { primaryRoute = await pickPrimary(ids); }      // the chosen section was removed meanwhile
 
-        // Get the current date and time in India timezone
-        const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
-        const nowDate = new Date(now);
-
-        const currentDate = nowDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-        const currentTime = nowDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }); // Format: HH:MM AM/PM
-
-        // Find all scheduled news where the scheduled date and time are less than the current date and time
-        const overdueNews = await ScheduleNews.find({
-            'post_time.date': currentDate, // Check if the date is today
-            'post_time.time': currentTime  // Check if the time is less than or equal to the current time
+        const now = new Date();
+        const news = new News({
+            news_id: `${await makeSlug(s.title)}-${getCurrentDate()}-${generateNanoId()}`,
+            slug: await makeNewsSlug(s.title),
+            ...(primaryRoute ? { primaryRoute } : {}),
+            title: s.title, banner: s.banner, description: s.description, content: s.content,
+            category: s.category, subCategory: s.subCategory, state: s.state, district: s.district,
+            location: s.location, tags: s.tags, aiGeneratedTags: s.aiGeneratedTags,
+            keywords: s.keywords, seo: s.seo || {}, ref_reporter: s.ref_reporter || '', is_literature: Boolean(s.is_literature),
+            imageRef: s.imageRef, isVideo: s.isVideo, video: s.video, author: s.author,
+            relatedNews: await resolveRelated(s.relatedIds || [], null),
+            isPublished: true, draft: false, need_approval: false, post_time: now, contentUpdatedAt: now,
         });
+        const stack = new UpdateStack({
+            relatedId: news._id, type: 'News',
+            updates: [{ updatedBy: s.author, updatedByModel: 'User', updatedAt: now, description: 'Published from schedule' }],
+        });
+        news.update_stack = stack._id;
+        await news.save();
+        await stack.save();
 
+        await User.updateOne({ _id: news.author }, { $inc: { 'account_info.total_news': 1 } });
+        onNewsChanged();
 
-        if (overdueNews.length > 0) {
-            for (let scheduledNews of overdueNews) {
-                let newUrlTitle = "";
-                await translate(scheduledNews.title, { from: 'hi', to: 'en' }).then(res => {
-                    newUrlTitle = res;
-                }).catch(err => {
-                    console.log(err);
-                    return res.status(500).json({ success: false, error: err.message });
-                });
-
-                let news_id = newUrlTitle
-                    .trim()
-                    .toLocaleLowerCase()
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/-+/g, '-')
-                    .replace(/^-|-$/g, ''); // Remove leading or trailing hyphens
-
-                news_id += '-' + getCurrentDate() + '-' + generateNanoId();
-
-                // Publish the news by copying it to the News collection
-                const newNews = new News({
-                    news_id,
-                    title: scheduledNews.title,
-                    banner: scheduledNews.banner,
-                    description: scheduledNews.description,
-                    content: scheduledNews.content,
-                    state: scheduledNews.state,
-                    district: scheduledNews.district,
-                    location: scheduledNews.location,
-                    tags: scheduledNews.tags,
-                    aiGeneratedTags: scheduledNews.aiGeneratedTags,
-                    category: scheduledNews.category,
-                    subCategory: scheduledNews.subCategory,
-                    author: scheduledNews.author,
-                    imageRef: scheduledNews.imageRef,
-                    post_time: nowDate,
-                    isVideo: scheduledNews.isVideo,
-                    video: scheduledNews.video,
-                    isPublished: scheduledNews.isPublished,
-                });
-
-                await newNews.save();
-
-
-                // Remove the scheduled news after publishing
-                await ScheduleNews.deleteOne({ _id: scheduledNews._id });
-                await User.findOneAndUpdate({ _id: newNews.author }, { $inc: { "account_info.total_news": 1 } })
-                onNewsChanged();
-                const admins = await User.find({
-                    role: "admin",
-                    fcm: { $exists: true, $ne: null },
-                    "notificationPreferences.newsAdded": true,
-                });
-
+        // background: admin notification + push (a failure here must not undo the publish)
+        (async () => {
+            try {
+                const admins = await User.find({ role: "admin", fcm: { $exists: true, $ne: null }, "notificationPreferences.newsAdded": true });
                 await notifyUsers({
-                    users: admins,
-                    event: "news_created",
-                    fcmTitle: `Scheduled news published`,
-                    fcmBody: `${newNews.title}`,
-                    link: `${process.env.FRONTEND_URL_PROD}/news/${newNews.news_id}`,
+                    users: admins, event: "news_created", fcmTitle: "Scheduled news published", fcmBody: news.title,
+                    link: `${process.env.FRONTEND_URL_PROD}/news/${news.news_id}`,
                 });
+                if (s.sendNotification) await sendNewsNotification(news);
+            } catch (err) { console.error("Scheduled publish notification failed:", err); }
+        })();
+        return news;
+    } catch (err) {
+        await ScheduleNews.collection.insertOne(s).catch(() => { });   // put it back so it is not lost
+        throw err;
+    }
+};
 
-                if (scheduledNews.sendNotification) {
-                    try {
-                        await sendNewsNotification({ news_id: publishedNews.news_id, title: scheduledNews.title, });
-                    } catch (err) {
-                        console.log("Notification sending failed: ", err);
-                    }
-                }
+// "publish now" button
+export const publishScheduleNews = tryCatch(async (req, res) => {
+    assertPermission(req, P.NEWS_SCHEDULE, P.NEWS_PUBLISH);
+    const scheduled = await ScheduleNews.findOne({ news_id: req.body.news_id }).select('_id');
+    if (!scheduled) return res.status(404).json({ message: 'Scheduled news not found' });
+    const news = await publishScheduled(scheduled._id);
+    if (!news) return res.status(404).json({ message: 'Scheduled news not found' });
+    res.status(200).json({ message: 'News published successfully', news });
+});
 
-
-                // console.log(`Published overdue news with ID: ${scheduledNews.news_id} at ${nowDate}`);
-            }
-        } else {
-            // console.log(`No overdue scheduled news found to publish at ${nowDate}`);
+// every 15 minutes (matches the time dropdown). Everything due is published, so a restart or a missed run catches up.
+let publishing = false;
+cron.schedule('*/15 * * * *', async () => {
+    if (publishing) return;                 // never overlap with the previous run
+    publishing = true;
+    try {
+        const due = await ScheduleNews.find({ publishAt: { $lte: new Date() }, draft: { $ne: true } }).select('_id').lean();
+        for (const { _id } of due) {
+            try { await publishScheduled(_id); }
+            catch (err) { console.error('Scheduled publish failed:', _id, err); }
         }
     } catch (error) {
         console.error('Error publishing scheduled news:', error);
-    }
-}, {
-    timezone: "Asia/Kolkata" // Set the timezone to India
-});
+    } finally { publishing = false; }
+}, { timezone: "Asia/Kolkata" });

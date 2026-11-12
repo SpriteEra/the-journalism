@@ -1,5 +1,5 @@
 import { REFERENCE_STALE } from "../lib/persistedQueries";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import httpClient from "../api/httpClient";
 import { cleanParams, errMsg } from "../lib/api";
@@ -48,8 +48,18 @@ export const useShortVideos = (params) => useQuery({ queryKey: ["short-videos", 
 export const useSyncStatus = (enabled) => useQuery({ queryKey: ["short-videos-sync"], queryFn: () => get("/short-videos/sync-status"), enabled, select: (d) => d.status });
 
 // analytics (cached on the server: X-Cache HIT/STALE/MISS)
-export const useAnalyticsDashboard = (range, enabled = true) =>
-  useQuery({ queryKey: ["analytics-dashboard", range], queryFn: () => get("/analytics/dashboard", range), enabled, staleTime: 60_000, placeholderData: (p) => p });
+// Today sends only today=true; every other filter sends its date range as before.
+export const useAnalyticsDashboard = (range, enabled = true, { today = false } = {}) =>
+  useQuery({
+    queryKey: ["analytics", "dashboard", today ? "today" : range],
+    queryFn: () => get("/analytics/dashboard", today ? { today: true } : range),
+    enabled,
+    staleTime: today ? 15_000 : 120_000,
+    refetchInterval: today ? 30_000 : false,
+    refetchIntervalInBackground: false,   // no polling in hidden tabs
+    placeholderData: keepPreviousData,    // no flicker when switching filters
+  });
+
 export const useReporterPerformance = (id, range, enabled = true) =>
   useQuery({ queryKey: ["reporter-performance", id, range], queryFn: () => get(`/reporters/${id}/performance`, range), enabled, select: (d) => d.report, staleTime: 60_000 });
 
@@ -71,3 +81,15 @@ export const useTodayReads = (enabled = true) => useQuery({
   refetchInterval: 60_000, // the backend caches for 60s
   staleTime: 30_000,
 });
+
+// live analytics: hourly reads for Today / last 24 hours (server cache: 30 s fresh + 60 s stale)
+const liveOptions = (name, params) => ({
+  queryFn: () => get(`/analytics/live/${name}`, params),
+  staleTime: 15_000,
+  refetchInterval: 30_000,
+  refetchIntervalInBackground: false,   // no polling in hidden tabs
+  placeholderData: keepPreviousData,    // no flicker when you change page or filter
+});
+export const useLiveSummary = (params) => useQuery({ queryKey: ["analytics", "live", "summary", params], ...liveOptions("summary", params) });
+export const useLiveContent = (params) => useQuery({ queryKey: ["analytics", "live", "content", params], ...liveOptions("content", params) });
+export const useLiveBreakdown = (params) => useQuery({ queryKey: ["analytics", "live", "breakdown", params], ...liveOptions("breakdown", params) });

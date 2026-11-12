@@ -39,10 +39,20 @@ const liveNewsSchema = new Schema({
     },
     isDeleted: { type: Boolean, default: false },
     update_stack: { type: Schema.Types.ObjectId, ref: 'UpdateStack' },
+    requestedStatus: { type: String, enum: ['scheduled', 'live', ''], default: '' },
+    need_approval: { type: Boolean, default: false },
+    approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    approved_at: { type: Date },
+    rejected_reason: { type: String, default: '', maxLength: 300 },
+    rejected_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    rejected_at: { type: Date },
 }, { timestamps: true });
-
+liveNewsSchema.index(
+    { 'activity.total_today_count': -1 },
+    { partialFilterExpression: { 'activity.total_today_count': { $gt: 0 } } }
+);
 liveNewsSchema.index({ isDeleted: 1, status: 1, startTime: -1 });
 liveNewsSchema.index({ isDeleted: 1, status: 1, post_time: -1 });
 liveNewsSchema.index({ author: 1, createdAt: -1 });
-
+liveNewsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
 export default mongoose.model('LiveNews', liveNewsSchema);

@@ -29,9 +29,32 @@ import {
   Play,
   Youtube,
   Copy,
+  Radio,
+  Pin,
+  Film,
 } from "lucide-react";
 import useTaxonomyNames from "../hooks/useTaxonomyNames";
 import NewsContent from "../utils/BlogContent";
+
+const formatDuration = (sec) => {
+  if (!sec) return "";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+};
+
+const formatSize = (bytes) => {
+  if (!bytes) return "";
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
+};
+
+const LIVE_STATUS_CLASSES = {
+  live: "bg-success-soft text-success",
+  scheduled: "bg-primary-soft text-primary",
+  ended: "bg-surface-2 text-fg",
+  draft: "bg-warning-soft text-warning",
+};
 
 const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
   const nameOf = useTaxonomyNames();
@@ -62,6 +85,15 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
   const formatDate = (date) => {
     if (!date) return "N/A";
     return new Date(date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+  };
+
+  // The API now returns populated taxonomy docs ({ name } / { displayName, state } / { displayName, district }).
+  // Plain ids (older rows) still fall back to the useTaxonomyNames lookup.
+  const labelOf = (item) => {
+    if (item && typeof item === "object") {
+      return item.name || item.displayName || item.district || item.state || "";
+    }
+    return nameOf(item) || "";
   };
 
   const InfoItem = ({ icon: Icon, label, children, className = "" }) => (
@@ -140,7 +172,6 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
     return (
       <div className="grid grid-cols-2 gap-3">
         <div className="flex items-center gap-2 p-3 rounded-lg bg-primary-soft">
-          <Eye size={16} className="text-primary" />
           <div>
             <div className="text-sm font-medium text-fg-muted">
               Total Reads
@@ -199,6 +230,78 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
       </>
     );
 
+    // Shared by News and ShortVideo: location, categories, sub-categories, topics (all populated by the API)
+    const renderTaxonomy = () => (
+      <>
+        {(docData.location ||
+          docData.state?.length > 0 ||
+          docData.district?.length > 0) && (
+            <InfoItem icon={MapPin} label="Location Details">
+              <div className="space-y-2">
+                {docData.location && (
+                  <div className="text-sm">
+                    <span className="font-medium">Location: </span>
+                    {docData.location}
+                  </div>
+                )}
+                {docData.state?.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-fg-muted block mb-1">
+                      States:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {docData.state.map((state, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 text-xs bg-primary-soft text-primary rounded capitalize"
+                        >
+                          {labelOf(state) || "—"}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {docData.district?.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-fg-muted block mb-1">
+                      Districts:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {docData.district.map((district, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 text-xs bg-primary-soft text-primary rounded capitalize"
+                        >
+                          {labelOf(district) || "—"}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </InfoItem>
+          )}
+
+        {docData.category?.length > 0 && (
+          <TagList
+            tags={docData.category.map((c) => labelOf(c) || "—")}
+            title="Categories"
+          />
+        )}
+
+        {docData.subCategory?.length > 0 && (
+          <TagList
+            tags={docData.subCategory.map((c) => labelOf(c) || "—")}
+            title="Sub Categories"
+          />
+        )}
+
+        {docData.tags?.length > 0 && (
+          <TagList tags={docData.tags} title="Topics" />
+        )}
+      </>
+    );
+
     switch (model) {
       case "News":
         return (
@@ -242,62 +345,7 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
               </InfoItem>
             )}
 
-            {docData.location ||
-              docData.state?.length ||
-              docData.district?.length ? (
-              <InfoItem icon={MapPin} label="Location Details">
-                <div className="space-y-2">
-                  {docData.location && (
-                    <div className="text-sm">
-                      <span className="font-medium">Location: </span>
-                      {docData.location}
-                    </div>
-                  )}
-                  {docData.state?.length > 0 && (
-                    <div>
-                      <span className="text-sm font-medium text-fg-muted block mb-1">
-                        States:
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {docData.state.map((state, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 text-xs bg-primary-soft text-primary rounded capitalize"
-                          >
-                            {nameOf(state) || "—"}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {docData.district?.length > 0 && (
-                    <div>
-                      <span className="text-sm font-medium text-fg-muted block mb-1">
-                        Districts:
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {docData.district.map((district, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 text-xs bg-primary-soft text-primary rounded"
-                          >
-                            {nameOf(district) || "—"}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </InfoItem>
-            ) : null}
-
-            {docData.category?.length > 0 && (
-              <TagList tags={docData.category.map((c) => nameOf(c) || "—")} title="Categories" />
-            )}
-
-            {docData.tags?.length > 0 && (
-              <TagList tags={docData.tags} title="Topics" />
-            )}
+            {renderTaxonomy()}
 
             <div className="p-4 rounded-lg bg-surface-2">
               <h4 className="font-medium text-fg mb-3 flex items-center gap-2">
@@ -312,13 +360,16 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
                   trueColor="green"
                   falseColor="gray"
                 />
-                <StatusBadge
-                  condition={docData.draft}
-                  trueText="Draft"
-                  falseText="Final"
-                  trueColor="yellow"
-                  falseColor="green"
-                />
+                {
+                  docData.draft &&
+                  <StatusBadge
+                    condition={docData.draft}
+                    trueText="Draft"
+                    falseText="Final"
+                    trueColor="yellow"
+                    falseColor="green"
+                  />
+                }
                 <StatusBadge
                   condition={docData.isVideo}
                   trueText="Video Content"
@@ -514,6 +565,285 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
             {docData.activity && <ActivityStats activity={docData.activity} />}
           </div>
         );
+
+      case "ShortVideo": {
+        const isUpload = docData.sourceType === "upload";
+        const thumb =
+          docData.thumbnail ||
+          (docData.videoLinkId
+            ? `https://img.youtube.com/vi/${docData.videoLinkId}/hqdefault.jpg`
+            : "");
+        const youtubeUrl = docData.videoLinkId
+          ? `https://youtube.com/watch?v=${docData.videoLinkId}`
+          : "";
+        const frameClass =
+          docData.kind === "short"
+            ? "aspect-[9/16] max-h-96 mx-auto"
+            : "aspect-video";
+
+        return (
+          <div className="space-y-4">
+            {renderCommonInfo()}
+
+            <InfoItem icon={Film} label="Video">
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-soft text-primary capitalize">
+                    {docData.kind || "short"}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-fg">
+                    {docData.sourceType === "youtube_auto"
+                      ? "YouTube (auto)"
+                      : docData.sourceType === "youtube_manual"
+                        ? "YouTube (manual)"
+                        : "Uploaded"}
+                  </span>
+                  {docData.duration > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-fg">
+                      <Clock size={12} />
+                      {formatDuration(docData.duration)}
+                    </span>
+                  )}
+                  {isUpload && docData.size > 0 && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-2 text-fg">
+                      {formatSize(docData.size)}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  className={`${frameClass} bg-ink rounded-lg overflow-hidden border border-line relative`}
+                >
+                  {isUpload && docData.videoUrl ? (
+                    <video
+                      src={docData.videoUrl}
+                      poster={thumb || undefined}
+                      controls
+                      preload="none"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : thumb ? (
+                    <>
+                      <img
+                        src={thumb}
+                        alt={docData.title || "Video thumbnail"}
+                        className="w-full h-full object-cover"
+                      />
+                      {youtubeUrl && (
+                        <a
+                          href={youtubeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute inset-0 flex items-center justify-center bg-ink/20 opacity-0 hover:opacity-100 transition-opacity duration-200"
+                          aria-label="Watch on YouTube"
+                        >
+                          <span className="bg-danger text-paper rounded-full p-4 shadow-lg">
+                            <Play size={24} fill="currentColor" />
+                          </span>
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-center text-fg-subtle">
+                      <div>
+                        <Video size={48} className="mx-auto mb-2" />
+                        <p className="text-sm">Preview not available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {youtubeUrl && (
+                  <div className="flex items-center justify-between text-xs text-fg-subtle">
+                    <div className="flex items-center gap-1">
+                      <Youtube size={12} className="text-danger" />
+                      <span className="font-mono">{docData.videoLinkId}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={youtubeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 hover:text-fg-muted transition-colors"
+                      >
+                        <ExternalLink size={12} />
+                        <span>Open</span>
+                      </a>
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(youtubeUrl)}
+                        className="flex items-center gap-1 hover:text-fg-muted transition-colors"
+                        title="Copy YouTube URL"
+                      >
+                        <Copy size={12} />
+                        <span>Copy URL</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {isUpload && (docData.videoUrl || docData.hlsUrl) && (
+                  <div className="text-xs font-mono bg-surface-2 p-2 rounded border break-all text-fg-subtle">
+                    {docData.videoUrl || docData.hlsUrl}
+                  </div>
+                )}
+              </div>
+            </InfoItem>
+
+            {docData.channelTitle && (
+              <InfoItem icon={Youtube} label="Channel">
+                {docData.channelTitle}
+              </InfoItem>
+            )}
+
+            {docData.publishedAt && (
+              <InfoItem icon={Calendar} label="Published At">
+                {formatDate(docData.publishedAt)}
+              </InfoItem>
+            )}
+
+            {renderTaxonomy()}
+
+            {docData.keywords?.length > 0 && (
+              <TagList tags={docData.keywords} title="Keywords" />
+            )}
+
+            <div className="p-4 rounded-lg bg-surface-2">
+              <h4 className="font-medium text-fg mb-3 flex items-center gap-2">
+                <Shield size={16} />
+                Status & Flags
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge
+                  condition={docData.isPublished}
+                  trueText="Published"
+                  falseText="Waiting for approval"
+                  trueColor="green"
+                  falseColor="yellow"
+                />
+                {
+                  docData.draft &&
+                  <StatusBadge
+                    condition={docData.draft}
+                    trueText="Draft"
+                    falseText="Final"
+                    trueColor="yellow"
+                    falseColor="green"
+                  />
+                }
+              </div>
+            </div>
+
+            {docData.activity && <ActivityStats activity={docData.activity} />}
+          </div>
+        );
+      }
+
+      case "LiveNews": {
+        const liveUpdates = (docData.updates || []).filter((u) => !u.isDeleted);
+
+        return (
+          <div className="space-y-4">
+            {renderCommonInfo()}
+
+            {docData.image && (
+              <InfoItem icon={Image} label="Cover Image">
+                <div className="space-y-2">
+                  <img
+                    src={docData.image}
+                    alt={docData.imageAlt || "Live news cover"}
+                    className="w-full h-48 object-cover rounded-lg border border-line"
+                  />
+                  {docData.imageAlt && (
+                    <div className="text-xs text-fg-subtle">
+                      {docData.imageAlt}
+                    </div>
+                  )}
+                </div>
+              </InfoItem>
+            )}
+
+            <InfoItem icon={Radio} label="Coverage">
+              <div className="space-y-2 text-sm">
+                {docData.status && (
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${LIVE_STATUS_CLASSES[docData.status] || LIVE_STATUS_CLASSES.ended
+                      }`}
+                  >
+                    {docData.status}
+                  </span>
+                )}
+                {docData.startTime && (
+                  <div>
+                    <span className="font-medium">Started: </span>
+                    {formatDate(docData.startTime)}
+                  </div>
+                )}
+                {docData.endTime && (
+                  <div>
+                    <span className="font-medium">Ended: </span>
+                    {formatDate(docData.endTime)}
+                  </div>
+                )}
+              </div>
+            </InfoItem>
+
+            {docData.tags?.length > 0 && (
+              <TagList tags={docData.tags} title="Tags" />
+            )}
+
+            {docData.activity && <ActivityStats activity={docData.activity} />}
+
+            {docData.content?.length > 0 && <NewsContent item={docData} />}
+
+            {/* Timeline updates */}
+            <div className="p-4 rounded-lg bg-surface-2">
+              <h4 className="font-medium text-fg mb-3 flex items-center gap-2">
+                <Clock size={16} />
+                Timeline Updates ({liveUpdates.length})
+              </h4>
+              {liveUpdates.length === 0 ? (
+                <p className="text-sm text-fg-subtle">No updates were posted.</p>
+              ) : (
+                <div className="space-y-3">
+                  {liveUpdates.map((update, index) => (
+                    <div
+                      key={update._id || index}
+                      className="bg-surface rounded-lg p-3 border border-line space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h5 className="font-semibold text-sm text-fg">
+                          {update.title || `Update #${index + 1}`}
+                        </h5>
+                        {update.pinned && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-warning-soft text-warning">
+                            <Pin size={10} />
+                            Pinned
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-fg-subtle">
+                        <Clock size={12} />
+                        {formatDate(update.time)}
+                      </div>
+                      {update.image && (
+                        <img
+                          src={update.image}
+                          alt={update.caption || update.title || "Update image"}
+                          className="w-full h-32 object-cover rounded-lg border border-line"
+                        />
+                      )}
+                      {update.caption && (
+                        <p className="text-xs text-fg-muted">{update.caption}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
       case "EventNews":
         return (
           <div className="space-y-4">
@@ -540,13 +870,16 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <StatusBadge
-                condition={docData.draft}
-                trueText="Draft"
-                falseText="Published"
-                trueColor="yellow"
-                falseColor="green"
-              />
+              {
+                docData.draft &&
+                <StatusBadge
+                  condition={docData.draft}
+                  trueText="Draft"
+                  falseText="Final"
+                  trueColor="yellow"
+                  falseColor="green"
+                />
+              }
             </div>
 
             {docData.activity && <ActivityStats activity={docData.activity} />}
@@ -569,13 +902,16 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <StatusBadge
-                condition={docData.draft}
-                trueText="Draft"
-                falseText="Published"
-                trueColor="yellow"
-                falseColor="green"
-              />
+              {
+                docData.draft &&
+                <StatusBadge
+                  condition={docData.draft}
+                  trueText="Draft"
+                  falseText="Final"
+                  trueColor="yellow"
+                  falseColor="green"
+                />
+              }
               <StatusBadge
                 condition={docData.published}
                 trueText="Published"
@@ -712,8 +1048,8 @@ const TrashItemDetailPanel = ({ docId, isOpen, onClose }) => {
               <InfoItem icon={Shield} label="Role">
                 <span
                   className={`px-3 py-1 rounded-full text-sm font-medium ${docData.role === "admin"
-                      ? "bg-danger-soft text-danger"
-                      : "bg-primary-soft text-primary"
+                    ? "bg-danger-soft text-danger"
+                    : "bg-primary-soft text-primary"
                     }`}
                 >
                   {docData.role}

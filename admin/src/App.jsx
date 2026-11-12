@@ -14,6 +14,9 @@ import httpClient from "./api/httpClient";
 import Loader from "./components/Loader";
 import TrendsDashboard from "./components/keywords/AIDashboard";
 import ShortVideoFormPage from "./pages/shortVideos/ShortVideoForm";
+import LiveAnalytics from "./pages/analytics/Liveanalytics";
+import TaxonomyEditor from "./pages/taxonomy/TaxonomyEditor";
+import ReviewDetail from "./pages/reviewNews/ReviewDetail";
 
 const AdminLayout = lazy(() => import("./components/layout/AdminLayout"));
 const Login = lazy(() => import("./pages/Login"));
@@ -176,6 +179,7 @@ const App = () => {
             <Route path="draft-news" element={<ProtectedRoute component={DraftNews} permission={["news.view.own", "news.view.all"]} />} />
             <Route path="schedule-news" element={<ProtectedRoute component={ScheduledNews} permission="news.schedule" />} />
             <Route path="review-news" element={<ProtectedRoute component={ReviewNews} permission="news.approve" />} />
+            <Route path="review/:type/:id" element={<ReviewDetail />} />
             <Route path="review-news/edit-news/:news_id" element={<ProtectedRoute component={CreateNews} permission="news.approve" />} />
             <Route path="live" element={<ProtectedRoute component={LiveNews} permission={["live.create", ...LIVE_MANAGE]} />} />
             <Route path="live/new" element={<ProtectedRoute component={LiveNewsForm} permission="live.create" />} />
@@ -207,6 +211,8 @@ const App = () => {
 
             {/* content setup */}
             <Route path="categories" element={<ProtectedRoute component={Categories} permission="taxonomy.view" />} />
+            <Route path="taxonomy/:kind/new" element={<TaxonomyEditor />} />
+            <Route path="taxonomy/:kind/:id/edit" element={<TaxonomyEditor />} />
             <Route path="home-sections" element={<ProtectedRoute component={HomeSections} permission="taxonomy.view" />} />
             <Route path="tags" element={<ProtectedRoute component={Tags} permission="taxonomy.view" />} />
             <Route path="ora-ai" element={<ProtectedRoute component={TrendsDashboard} permission="tools.ai" />} />
@@ -219,6 +225,7 @@ const App = () => {
 
             {/* team & insights */}
             <Route path="analytics" element={<ProtectedRoute component={Analytics} permission={["analytics.view", "reporter.performance.own", "reporter.performance.all"]} />} />
+            <Route path="live-analytics" element={<LiveAnalytics />} />
             <Route path="reporters" element={<ProtectedRoute component={Reporters} permission="user.view" />} />
             <Route path="team-performance" element={<ProtectedRoute component={TeamPerformance} permission="reporter.performance.all" />} />
             <Route path="reporters/new" element={<ProtectedRoute component={ReporterForm} permission="user.create" />} />

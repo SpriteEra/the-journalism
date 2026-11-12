@@ -16,6 +16,7 @@ import UpdateStack from "../model/updatedstack.model.js";
 import Trash from "../model/trash.model.js";
 import { P } from "../config/permissions.js";
 import { assertOwnOrAny } from "../middleware/Authentication.js";
+import { approveHandler } from '../utils/approval.js';
 const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
 const __dirname = path.dirname(__filename);
 
@@ -159,6 +160,8 @@ export const createEventNews = tryCatch(async (req, res, next) => {
     let draftRaw = req.body.draft ?? "false"; // default to false if missing
     let draft = draftRaw === "true";
 
+
+
     // console.log("req.body", req.body)
     // console.log(req.files)
 
@@ -214,9 +217,12 @@ export const createEventNews = tryCatch(async (req, res, next) => {
 
     news_id += '-' + getCurrentDate() + '-' + generateNanoId();
 
+    const publishNow = !draft && req.can(P.EVENT_PUBLISH);
+    const needApproval = !draft && !publishNow;
     let news = new EventNews({
-        title, description, event_type: activeCategory.title, banner, draft: false, news_id, author: authorId, event_category: activeCategory._id, post_time: new Date(),
-    })
+        title, description, event_type: activeCategory.title, banner, news_id, author: authorId, event_category: activeCategory._id,
+        draft, isPublished: publishNow, need_approval: needApproval, post_time: publishNow ? new Date() : null,
+    });
 
     const updateStack = new UpdateStack({
         relatedId: news._id, // Will set after blog creation
@@ -233,20 +239,7 @@ export const createEventNews = tryCatch(async (req, res, next) => {
 
     res.status(200).json({ id: news.news_id })
 
-    try {
-        NotificationService.sendNewsNotification({
-            title: news.title,
-            author: req.user?.username
-        }, "eventNews",
-            {
-                link: `/dashboard/events`,
-                targetRole: "admin",
-                excludeIds: [req.user._id]
-            }
-        )
-    } catch (err) {
-        console.error("Event news notification failed:", err);
-    }
+    if (needApproval) notifyApprovers(req, { perms: [P.EVENT_MANAGE_ANY], label: 'Event news', title: news.title, link: '/dashboard/events', type: 'eventNews' });
 
 
 })
@@ -715,3 +708,6 @@ cron.schedule("0 0 * * *", async () => {
         console.error("Event category status update failed:", err);
     }
 });
+
+
+export const approveEventNews = approveHandler({ Model: EventNews, find: (req) => ({ news_id: req.params.news_id }), perm: P.EVENT_MANAGE_ANY, label: 'Event news', link: () => '/dashboard/events' });

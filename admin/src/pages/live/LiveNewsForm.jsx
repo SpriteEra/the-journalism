@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft, ExternalLink, ImagePlus, Radio, Search, ChevronDown,
-  RotateCcw, CheckCircle2, Circle, Lightbulb,
-} from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ExternalLink, ImagePlus, Radio, Search, Send, ChevronDown, RotateCcw, CheckCircle2, Circle, Lightbulb } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation } from "../../hooks/admin";
 import { useLiveNewsItem } from "../../hooks/live";
-import { Alert, Badge, Button, Card, ChipInput, ErrorState, Field, Input, PageLoader, StatusBadge, Tabs, Textarea } from "../../components/ui";
+import { Alert, Badge, Button, Card, ChipInput, ErrorState, Field, Input, PageLoader, StatusBadge, Tabs, Textarea, useConfirm } from "../../components/ui";
 import LiveEditor from "../../components/live/LiveEditor";
 import { cn } from "../../lib/cn";
 import { fromIstInput, fmtISTDateTime, toIstInput } from "../../lib/time";
@@ -46,11 +43,11 @@ export default function LiveNewsFormPage() {
   return <LiveForm key={live?._id || "new"} live={live} />;
 }
 
-const MODES = {
+const modesFor = (canPublish) => ({
   draft: { label: "Save as draft", submit: "Save draft" },
-  live: { label: "Publish now", submit: "Publish" },
-  scheduled: { label: "Schedule", submit: "Schedule" },
-};
+  live: canPublish ? { label: "Publish now", submit: "Publish" } : { label: "Submit for approval", submit: "Submit for approval" },
+  scheduled: canPublish ? { label: "Schedule", submit: "Schedule" } : { label: "Schedule (needs approval)", submit: "Submit for approval" },
+});;
 
 function LiveForm({ live }) {
   const navigate = useNavigate();
@@ -61,6 +58,12 @@ function LiveForm({ live }) {
   const isLive = status === "live";
   const isEnded = status === "ended";
   const slugLocked = Boolean(live?.post_time);            // the server refuses slug changes after the first publish
+  const confirm = useConfirm();
+  const MODES = modesFor(canPublish);
+  const needsReview = !canPublish;
+  const waiting = Boolean(live?.need_approval);                       // submitted, an approver has not decided yet
+  const rejected = Boolean(live?.rejected_at) && !waiting;            // sent back with a reason
+  const showModes = !waiting && (!editing || ["draft", "scheduled"].includes(status));
 
   // local copy of the work in progress (survives refresh / crash). One key per story, one for "new".
   const draftKey = `live-draft:${live?.slug || "new"}`;
@@ -83,11 +86,10 @@ function LiveForm({ live }) {
       slug: live?.slug || "",
       tags: (live?.tags || []).map((t) => ({ title: t })),
       startTime: live?.startTime ? toIstInput(live.startTime) : "",
-      mode: status === "scheduled" ? "scheduled" : "draft",
+      mode: status === "scheduled" ? "scheduled" : (waiting || rejected) && live?.requestedStatus ? live.requestedStatus : "draft",
       seo: { metaTitle: live?.seo?.metaTitle || "", metaDescription: live?.seo?.metaDescription || "", focusKeyword: live?.seo?.focusKeyword || "" },
     };
     const merged = { ...base, ...(draft?.f || {}), seo: { ...base.seo, ...(draft?.f?.seo || {}) } };
-    if (!canPublish) merged.mode = "draft";
     return merged;
   });
   const [cover, setCover] = useState(() => {
@@ -151,7 +153,12 @@ function LiveForm({ live }) {
     return data;
   }, {
     invalidate: ["live-news"],
-    onSuccess: () => { try { localStorage.removeItem(draftKey); } catch { /* ignore */ } setDirty(false); setNeedsSave(false); back(); },
+    onSuccess: (data) => {
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      setDirty(false); setNeedsSave(false);
+      if (data?.pending || data?.submitted) toast.success("Sent for approval. It will go live once an authorized person approves it.", { duration: 7000 });
+      back();
+    },
   });
 
   const submit = async (e) => {
@@ -172,6 +179,17 @@ function LiveForm({ live }) {
       if (fromIstInput(f.startTime) <= new Date()) return toast.error("The start time must be in the future (IST)");
     }
 
+    if (needsReview && showModes && f.mode !== "draft") {
+      const ok = await confirm({
+        title: "Send for approval?",
+        message: f.mode === "scheduled"
+          ? "It will not go live yet. Once an authorized person approves it, it goes live at the chosen time (or right away if that time has already passed). You get a notification with the result."
+          : "It will not go live yet. It goes live as soon as an authorized person approves it, and you get a notification with the result.",
+        tone: "primary", confirmLabel: "Submit for approval",
+      });
+      if (!ok) return;
+    }
+
     const seo = { ...(live?.seo || {}), ...f.seo }; delete seo._id;
     const payload = {
       title,
@@ -183,10 +201,10 @@ function LiveForm({ live }) {
     };
     if (!slugLocked && f.slug.trim() && f.slug.trim() !== live?.slug) payload.slug = f.slug.trim();
 
-    if (["draft", "scheduled"].includes(status)) {            // live / ended coverage keeps its own times
+    if (!waiting && ["draft", "scheduled"].includes(status)) {
       if (f.mode === "scheduled") payload.startTime = fromIstInput(f.startTime).toISOString();
       else if (f.mode === "draft") payload.startTime = f.startTime ? fromIstInput(f.startTime).toISOString() : "";
-      if (f.mode !== status) payload.status = f.mode;           // create: always sent, edit: only on change
+      if (f.mode !== status) payload.status = f.mode;
     }
     save.mutate(payload);
   };
@@ -198,10 +216,11 @@ function LiveForm({ live }) {
     window.location.reload();
   };
 
-  const modeItems = Object.entries(MODES).filter(([k]) => canPublish || k === "draft").map(([value, m]) => ({ value, label: m.label }));
-  const submitLabel = editing && (isLive || isEnded) ? "Save changes" : MODES[f.mode].submit;
-  const submitIcon = f.mode === "live" && !isLive && !isEnded ? Radio : undefined;
-  const showModes = !editing || ["draft", "scheduled"].includes(status);
+  const modeItems = Object.entries(MODES).map(([value, m]) => ({ value, label: m.label }));
+  const submitLabel = (editing && (isLive || isEnded)) || waiting ? "Save changes" : MODES[f.mode].submit;
+  const submitIcon = !showModes || f.mode === "draft" ? undefined : canPublish ? (f.mode === "live" ? Radio : undefined) : Send;
+
+  // const showModes = !editing || ["draft", "scheduled"].includes(status);
 
   // ── "ready" checklist (display only, the real checks stay in submit) ──
   const checklist = [
@@ -306,9 +325,24 @@ function LiveForm({ live }) {
                 <p className="text-sm font-semibold text-fg">Publish</p>
                 <div className="flex items-center gap-2">
                   <span className="hidden text-xs text-fg-subtle lg:inline">{needsSave ? "Saving locally…" : "Draft saved locally"}</span>
-                  {editing && <StatusBadge status={status === "live" ? "published" : status} />}
+                  {editing && (waiting
+                    ? <Badge tone="warning" size="sm">Needs approval</Badge>
+                    : rejected ? <Badge tone="danger" size="sm">Rejected</Badge>
+                      : <StatusBadge status={status === "live" ? "published" : status} />)}
                 </div>
               </div>
+
+              {waiting && (
+                <Alert tone="warning" title="Waiting for approval">
+                  An authorized person has to approve this story. It then goes {live.requestedStatus === "scheduled" ? "live at the scheduled time" : "live right away"}. You can still correct it meanwhile.
+                </Alert>
+              )}
+              {rejected && (
+                <Alert tone="danger" title={`Rejected${live.rejected_by?.username ? ` by ${live.rejected_by.username}` : ""} · ${fmtISTDateTime(live.rejected_at)}`}>
+                  <p className="whitespace-pre-line">{live.rejected_reason}</p>
+                  <p className="mt-1">Fix it and submit again, or <Link to={`/dashboard/review/live/${live.slug}`} className="font-medium underline">apply again from the review page</Link>.</p>
+                </Alert>
+              )}
 
               {isLive && (
                 <Alert tone="success" title="This story is published">
@@ -324,13 +358,15 @@ function LiveForm({ live }) {
               {showModes && (
                 <>
                   {modeItems.length > 1 && <Tabs variant="pill" value={f.mode} onChange={(mode) => set({ mode })} items={modeItems} className="w-full [&>button]:flex-1" />}
-                  {!canPublish && <p className="text-xs text-fg-subtle">You can save drafts. A person with publish rights has to take it live.</p>}
+                  {needsReview && f.mode !== "draft" && (
+                    <Alert tone="info">Your story is reviewed before it goes live. After you submit it, an authorized person approves it and only then is it published. You are notified of the result.</Alert>
+                  )}
                   {f.mode === "scheduled" && (
-                    <Field label="Publish time" required hint="India time (IST). It is published by itself at this time.">
+                    <Field label="Publish time" required hint={needsReview ? "India time (IST). Once approved it goes live at this time." : "India time (IST). It is published by itself at this time."}>
                       <Input type="datetime-local" value={f.startTime} min={toIstInput()} onChange={(e) => set({ startTime: e.target.value })} />
                     </Field>
                   )}
-                  {f.mode === "live" && <p className="text-xs text-fg-subtle">The story appears on the website the moment you press “Publish”.</p>}
+                  {f.mode === "live" && canPublish && <p className="text-xs text-fg-subtle">The story appears on the website the moment you press “Publish”.</p>}
                 </>
               )}
 
@@ -380,7 +416,7 @@ function LiveForm({ live }) {
             {/* desktop readiness checklist */}
             <div className="hidden rounded-2xl border border-line/50 bg-surface p-4 shadow-card lg:block">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-fg">Ready to continue?</h3>
+                <h3 className="text-base font-semibold text-fg">{needsReview ? "Before you submit" : "Ready to continue?"}</h3>
                 <span className="text-xs text-fg-subtle">{doneCount}/{checklist.length}</span>
               </div>
               <ul className="space-y-1.5">

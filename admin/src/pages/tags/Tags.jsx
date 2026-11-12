@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { ChevronsDown, GitMerge, Newspaper, Pencil, Plus, Star, Tags as TagsIcon, Trash2 } from "lucide-react";
+import { ChevronsDown, GitMerge, Newspaper, Pencil, Plus, RefreshCw, Star, Tags as TagsIcon, Trash2 } from "lucide-react";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation, useTagSuggest, useTags } from "../../hooks/admin";
@@ -9,7 +9,7 @@ import {
   SearchInput, Select, StatusBadge, Tabs,
 } from "../../components/ui";
 import TagFormModal from "./TagFormModal";
-
+import { cn } from "../../lib/cn";
 /** Space taken above/below the page content (top bar + page padding). Tweak if the card ends too high or scrolls the page. */
 const PAGE_OFFSET = "7.5rem";
 
@@ -203,7 +203,14 @@ export default function Tags() {
         <PageHeader
           title="Topics"
           description="Topics group related stories and get their own page on the website. Reporters can also create topics straight from the news form."
-          actions={can("tag.create") && <Button leftIcon={Plus} onClick={() => setEditing({})}>New topic</Button>}
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+                <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+              </Button>
+              {can("tag.create") && <Button leftIcon={Plus} onClick={() => setEditing({})}>New topic</Button>}
+            </div>
+          }
         />
         <Card padded={false} className="flex min-h-0 flex-1 flex-col max-sm:shadow-none max-sm:border-none max-sm:bg-transparent">
           <div className="flex shrink-0 flex-col gap-2 sm:border-b border-line sm:p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">

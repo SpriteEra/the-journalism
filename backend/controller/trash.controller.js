@@ -6,6 +6,8 @@ import { deleteImage } from "../utils/uploadImage.js";
 import YtNews from "../model/yt-news.models.js";
 import GalleryNews from "../model/galleryNews.model.js";
 import EventNews from "../model/event.news.model.js";
+import LiveNews from "../model/live.news.model.js";
+import ShortVideo from "../model/short-video.model.js";
 import cron from "node-cron";
 import User from "../model/user.model.js";
 import UpdateStack from "../model/updatedstack.model.js";
@@ -36,9 +38,18 @@ export const getTrashData = tryCatch(async (req, res, next) => {
         .limit(limit)
         .lean();
 
+    // taxonomy populate – used for models that carry category / subCategory / state / district
+    const taxonomyPopulate = [
+        { path: "category", select: "name slug" },
+        { path: "subCategory", select: "name slug parent" },
+        { path: "state", select: "state displayName slug" },
+        { path: "district", select: "district displayName slug state" },
+    ];
+
     const populatedTrash = await Promise.all(
         trashDocs.map(async (trash) => {
             let selectFields;
+            let populate = [];
             let model = trash.model;
 
             if (model === "User") {
@@ -47,6 +58,14 @@ export const getTrashData = tryCatch(async (req, res, next) => {
                 selectFields = "title videoLinkId news_id update_stack";
             } else if (model === "GalleryNews") {
                 selectFields = "title news_id photos update_stack";
+            } else if (model === "LiveNews") {
+                selectFields = "title slug image status update_stack";
+            } else if (model === "ShortVideo") {
+                selectFields = "title slug kind sourceType videoLinkId thumbnail category subCategory state district update_stack";
+                populate = taxonomyPopulate;
+            } else if (model === "News") {
+                selectFields = "title banner news_id category subCategory state district update_stack";
+                populate = taxonomyPopulate;
             } else {
                 selectFields = "title banner news_id update_stack";
             }
@@ -54,6 +73,7 @@ export const getTrashData = tryCatch(async (req, res, next) => {
             let populatedDoc = await mongoose
                 .model(model)
                 .findById(trash.docId, selectFields)
+                .populate(populate)
                 .lean();
 
             if (!populatedDoc) return { ...trash, docId: null };
@@ -64,6 +84,11 @@ export const getTrashData = tryCatch(async (req, res, next) => {
                 delete populatedDoc.photos;
             } else if (model === "YtNews") {
                 populatedDoc.banner = `https://img.youtube.com/vi/${populatedDoc.videoLinkId}/mqdefault.jpg`;
+            } else if (model === "LiveNews") {
+                populatedDoc.banner = populatedDoc.image || null;
+            } else if (model === "ShortVideo") {
+                populatedDoc.banner = populatedDoc.thumbnail
+                    || (populatedDoc.videoLinkId ? `https://img.youtube.com/vi/${populatedDoc.videoLinkId}/mqdefault.jpg` : null);
             }
 
             return {
@@ -92,7 +117,6 @@ export const TrashItemDetailViews = tryCatch(async (req, res, next) => {
 
     // Step 1: Find the trash item to know the model type
     const trashItemBase = await Trash.findById(id)
-        .populate('docId', '')
         .populate("deletedBy", "username fullName email")
         .lean()
         .exec();
@@ -104,7 +128,25 @@ export const TrashItemDetailViews = tryCatch(async (req, res, next) => {
         return res.status(403).json({ message: "You can only view items you deleted yourself" });
     }
 
-    return res.json(trashItemBase);
+    // Step 2: load the original doc; News and ShortVideo also resolve their taxonomy
+    const taxonomyModels = ["News", "ShortVideo"];
+    const populate = taxonomyModels.includes(trashItemBase.model)
+        ? [
+            { path: "category", select: "name slug" },
+            { path: "subCategory", select: "name slug parent" },
+            { path: "state", select: "state displayName slug" },
+            { path: "district", select: "district displayName slug state" },
+            { path: "tags", select: "title slug" },
+        ]
+        : [];
+
+    const doc = await mongoose
+        .model(trashItemBase.model)
+        .findById(trashItemBase.docId)
+        .populate(populate)
+        .lean();
+
+    return res.json({ ...trashItemBase, docId: doc || null });
 });
 
 export const RestoreTrashedItem = tryCatch(async (req, res, next) => {
@@ -198,6 +240,25 @@ export const RestoreTrashedItem = tryCatch(async (req, res, next) => {
         );
 
         NotificationService.sendToAdmins('Youtube News Restored', `News ${doc.title} has been restored`, { excludeIds: [req.user._id], restoredBy: req.user.username })
+    }
+    else if (trashItem.model === 'LiveNews' || trashItem.model === 'ShortVideo') {
+        // update_stack is optional on these two schemas, so guard it
+        if (doc.update_stack) {
+            await UpdateStack.findByIdAndUpdate(
+                doc.update_stack,
+                {
+                    $push: {
+                        updates: {
+                            updatedBy: req.user._id,
+                            updatedByModel: "User",
+                            updatedAt: new Date(),
+                            description: `Restore ${trashItem.model} document`,
+                        },
+                    },
+                },
+                { new: true }
+            );
+        }
     }
     await doc.save({ validateBeforeSave: trashItem.model !== 'News' });   // old news may pre-date the category rule
     if (trashItem.model === 'News') onNewsChanged();
@@ -321,6 +382,27 @@ const deleteHandlers = {
         );
         await Promise.all(photoDeletePromises);
         await GalleryNews.findByIdAndDelete(docId);
+    },
+
+    LiveNews: async (docId) => {
+        const live = await LiveNews.findById(docId);
+        if (!live) return;
+
+        const images = [live.image, ...(live.updates || []).map((u) => u.image)].filter(Boolean);
+        await Promise.all(images.map((img) => deleteImage(img)));
+        await LiveNews.findByIdAndDelete(docId);
+    },
+
+    ShortVideo: async (docId) => {
+        const video = await ShortVideo.findById(docId);
+        if (!video) return;
+
+        // only our own uploads have files to clean up; YouTube items just point at youtube
+        if (video.sourceType === 'upload' && video.thumbnail) {
+            await deleteImage(video.thumbnail);
+        }
+        // TODO: delete the uploaded video file too (video.storageProvider / video.storageKey) with your media-server helper
+        await ShortVideo.findByIdAndDelete(docId);
     },
 };
 // cron.schedule("* * * * *", async () => {

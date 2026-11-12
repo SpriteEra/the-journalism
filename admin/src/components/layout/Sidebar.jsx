@@ -5,6 +5,7 @@ import { cn } from "../../lib/cn";
 import usePermission from "../../hooks/usePermission";
 import { useTranslation } from "react-i18next";
 import { visibleNav } from "./navConfig";
+import { useReviewCount } from "../../hooks/review";
 const SPRITEERA_URL = "https://spriteera.com"; // put your real site URL here
 const POWERED_BY_URL = `${SPRITEERA_URL}/?utm_source=thejournalism_admin_panel&utm_medium=sidebar&utm_campaign=powered_by_spriteera`;
 
@@ -13,7 +14,7 @@ const linkBase = "group relative flex items-center gap-3 rounded-md px-3 py-2.5 
 const linkIdle = "text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-fg";
 const linkOn = "bg-surface text-fg shadow-card ring-1 ring-line";
 
-function Item({ item, collapsed, onNavigate }) {
+function Item({ item, collapsed, onNavigate, count = 0 }) {
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const Icon = item.icon;
@@ -52,6 +53,13 @@ function Item({ item, collapsed, onNavigate }) {
           <>
             <Icon className={cn("size-5 shrink-0", isActive && "text-fg")} aria-hidden />
             {!collapsed && <span className="truncate">{t(item.label)}</span>}
+
+            {!collapsed && count > 0 && (
+              <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-danger px-1.5 py-1 text-[11px] font-semibold leading-none text-white" aria-label={`${count} waiting for review`}>
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
+            {collapsed && count > 0 && <span className="absolute right-2 top-1.5 size-2 rounded-full bg-danger" aria-hidden />}
           </>
         )}
       </NavLink>
@@ -64,9 +72,20 @@ function Item({ item, collapsed, onNavigate }) {
  * Items are filtered by the user's permissions.
  */
 export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
-  const { canAny } = usePermission();
+  const { canAny, user } = usePermission();
   const { t } = useTranslation();
-  const sections = useMemo(() => visibleNav((perms) => canAny(perms)), [canAny]);
+  const sections = useMemo(
+    () =>
+      visibleNav({
+        allowed: (perms) => canAny(perms),
+        isSuper: Boolean(user?.isSuper),
+        trusted: Boolean(user?.trusted),
+      }),
+    [canAny, user?.isSuper, user?.trusted]
+  );
+  const showsReview = useMemo(() => sections.some((s) => s.items.some((i) => i.badge === "reviewCount")), [sections]);
+  const { data: reviewCount = 0 } = useReviewCount(showsReview);
+
   const { pathname } = useLocation();
   useEffect(() => { onCloseMobile?.(); }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -86,7 +105,17 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
           {sections.map((s) => (
             <div key={s.title}>
               {!narrow ? <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted/70">{t(s.title)}</p> : <div className="mx-3 mb-2 h-px bg-sidebar-line" />}
-              <ul className="space-y-0.5">{s.items.map((i) => <Item key={i.to || i.key} item={i} collapsed={narrow} onNavigate={onCloseMobile} />)}</ul>
+              <ul className="space-y-0.5">
+                {s.items.map((i) => (
+                  <Item
+                    key={i.to || i.key}
+                    item={i}
+                    collapsed={narrow}
+                    onNavigate={onCloseMobile}
+                    count={i.badge === "reviewCount" ? reviewCount : 0}
+                  />
+                ))}
+              </ul>
             </div>
           ))}
         </nav>

@@ -14,17 +14,6 @@ const SPRITEERA_URL = "https://spriteera.com"; // put your real site URL here
 const POWERED_BY_URL = `${SPRITEERA_URL}/?utm_source=journalism_admin_panel&utm_medium=login_page&utm_campaign=powered_by_spriteera`;
 const REMEMBER_KEY = "login:remembered-email";
 
-/** Pen-nib mark + serif wordmark. */
-function Brand({ className = "" }) {
-  return (
-    <div className={`flex items-center gap-2.5 ${className}`}>
-      <span className="grid size-10 place-items-center rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900">
-        <PenTool className="size-5" />
-      </span>
-      <span className="font-serif text-2xl font-bold tracking-tight text-fg">{BRAND}</span>
-    </div>
-  );
-}
 
 function PoweredBy({ className = "" }) {
   return (

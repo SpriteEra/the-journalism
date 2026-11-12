@@ -19,17 +19,50 @@ const WhatsAppIcon = ({ className }) => (
     </svg>
 );
 
+/** your YouTube channel; set NEXT_PUBLIC_YT_CHANNEL_URL in .env (e.g. https://www.youtube.com/@yourchannel?sub_confirmation=1) */
+const YT_CHANNEL_URL = process.env.NEXT_PUBLIC_YT_CHANNEL_URL || "https://www.youtube.com/@the_journalism?sub_confirmation=1";
+
+const YouTubeIcon = ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+        <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z" />
+    </svg>
+);
+
+// YouTube IFrame Player API: one script load, then mute / unMute / pause / play are real player calls (no reload)
+let ytApiPromise;
+const loadYT = () => {
+    if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+    if (window.YT?.Player) return Promise.resolve(window.YT);
+    if (!ytApiPromise) {
+        ytApiPromise = new Promise((resolve) => {
+            const prevReady = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => { prevReady?.(); resolve(window.YT); };
+            const s = document.createElement("script");
+            s.src = "https://www.youtube.com/iframe_api";
+            document.head.appendChild(s);
+        });
+    }
+    return ytApiPromise;
+};
+
 const glass =
     "border border-white/20 bg-white/10 backdrop-blur-md text-white transition hover:bg-white/25 active:scale-95";
 
+/** how many shorts must remain ahead before the next batch is fetched */
+const PREFETCH_AHEAD = 3;
+
 /**
  * Props
- *  - items    array of { id, title, description?, image, videoUrl }
+ *  - items    first shorts: array of { id, title, description?, image, videoUrl, hlsUrl, youtubeId }
  *  - startId  id of the short this page is for
+ *
+ * The list is endless: when few shorts remain ahead, the next ones are fetched from /api/shorts/next
+ * (same tags first, then same category, then newest) and never repeat a short already in the list.
  */
-const ShortsViewer = ({ items = [], startId }) => {
+const ShortsViewer = ({ items: firstItems = [], startId }) => {
     const router = useRouter();
-    const initial = Math.max(0, items.findIndex((i) => String(i.id) === String(startId)));
+    const [items, setItems] = useState(firstItems);
+    const initial = Math.max(0, firstItems.findIndex((i) => String(i.id) === String(startId)));
 
     const [index, setIndex] = useState(initial);
     const [muted, setMuted] = useState(true);
@@ -38,16 +71,62 @@ const ShortsViewer = ({ items = [], startId }) => {
     const [visible, setVisible] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const iframeRef = useRef(null);
+    const ytHostRef = useRef(null);
+    const playerRef = useRef(null);
     const videoRef = useRef(null);
     const lastWheel = useRef(0);
     const touchY = useRef(null);
+    const fetching = useRef(false);
+    const hasMore = useRef(true);
 
     const item = items[index];
     const prev = items[index - 1];
     const next = items[index + 1];
     const ytId = item?.youtubeId || getYouTubeId(item?.videoUrl);
+
+    // Seeds the mute state of each new YouTube player; later mute / unmute go through the player API (no reload).
+    const mutedRef = useRef(true);
+
+    // YouTube short: create ONE player per short and keep it. Muting never touches the iframe.
+    useEffect(() => {
+        if (!ytId || !mounted) return undefined;
+        let cancelled = false;
+        let player;
+        loadYT()
+            .then((YT) => {
+                const host = ytHostRef.current;
+                if (cancelled || !host) return;
+                host.innerHTML = "";
+                const el = document.createElement("div");
+                host.appendChild(el);
+                player = new YT.Player(el, {
+                    host: "https://www.youtube-nocookie.com",
+                    videoId: ytId,
+                    playerVars: {
+                        autoplay: 1,
+                        mute: mutedRef.current ? 1 : 0,
+                        controls: 0,
+                        loop: 1,
+                        playlist: ytId,
+                        playsinline: 1,
+                        rel: 0,
+                        modestbranding: 1,
+                    },
+                    events: {
+                        onStateChange: (e) => { if (e.data === 1) setReady(true); },   // 1 = playing
+                    },
+                });
+                playerRef.current = player;
+            })
+            .catch(() => { });
+        return () => {
+            cancelled = true;
+            playerRef.current = null;
+            try { player?.destroy(); } catch { /* host already removed */ }
+        };
+    }, [ytId, index, mounted]);
 
     useEffect(() => setMounted(true), []);
 
@@ -82,6 +161,38 @@ const ShortsViewer = ({ items = [], startId }) => {
         else router.push("/");
     }, [router]);
 
+    /* ---------- endless list: warm the next poster + top up when few remain ---------- */
+    useEffect(() => {
+        if (!item) return;
+
+        // warm the next poster
+        if (next?.image) {
+            const img = new window.Image();
+            img.src = next.image;
+        }
+
+        if (items.length - index > PREFETCH_AHEAD || !hasMore.current || fetching.current) return;
+
+        fetching.current = true;
+        setLoading(true);
+        const exclude = items.map((i) => i.id).join(",");
+        fetch(`/api/shorts/next?slug=${encodeURIComponent(item.id)}&exclude=${encodeURIComponent(exclude)}`)
+            .then((r) => (r.ok ? r.json() : { items: [], hasMore: false }))
+            .then((d) => {
+                hasMore.current = Boolean(d.hasMore);
+                setItems((cur) => {
+                    const have = new Set(cur.map((i) => String(i.id)));
+                    const fresh = (d.items || []).filter((i) => !have.has(String(i.id)));
+                    return fresh.length ? [...cur, ...fresh] : cur;
+                });
+            })
+            .catch(() => { })
+            .finally(() => {
+                fetching.current = false;
+                setLoading(false);
+            });
+    }, [index, items, item, next]);
+
     useEffect(() => {
         setPaused(false);
         setReady(false);
@@ -112,23 +223,24 @@ const ShortsViewer = ({ items = [], startId }) => {
     }, [go, close]);
 
     /* ---------- player controls ---------- */
-    const ytCommand = (func) =>
-        iframeRef.current?.contentWindow?.postMessage(
-            JSON.stringify({ event: "command", func, args: [] }),
-            "*"
-        );
-
     const toggleMute = () => {
         const n = !muted;
         setMuted(n);
-        if (ytId) ytCommand(n ? "mute" : "unMute");
+        mutedRef.current = n;
+        if (ytId) {
+            if (n) playerRef.current?.mute?.();
+            else playerRef.current?.unMute?.();
+        }
         else if (videoRef.current) videoRef.current.muted = n;
     };
 
     const togglePlay = () => {
         const n = !paused;
         setPaused(n);
-        if (ytId) ytCommand(n ? "pauseVideo" : "playVideo");
+        if (ytId) {
+            if (n) playerRef.current?.pauseVideo?.();
+            else playerRef.current?.playVideo?.();
+        }
         else if (videoRef.current) n ? videoRef.current.pause() : videoRef.current.play();
     };
 
@@ -243,15 +355,10 @@ const ShortsViewer = ({ items = [], startId }) => {
 
                         {mounted &&
                             (ytId ? (
-                                <iframe
-                                    ref={iframeRef}
+                                <div
+                                    ref={ytHostRef}
                                     key={`${ytId}-${index}`}
-                                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=${muted ? 1 : 0
-                                        }&controls=0&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`}
-                                    title={item.title}
-                                    allow="autoplay; encrypted-media; picture-in-picture"
-                                    onLoad={() => setReady(true)}
-                                    className="pointer-events-none absolute inset-0 size-full"
+                                    className="pointer-events-none absolute inset-0 size-full [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:size-full"
                                 />
                             ) : (
                                 <video
@@ -281,36 +388,38 @@ const ShortsViewer = ({ items = [], startId }) => {
                             )}
                         </button>
 
-                        {/* top: gradient, progress, back, counter */}
+                        {/* top: gradient, back, loading spinner (the list is endless, so no "1 / 10" counter or progress bar) */}
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 to-transparent" />
-
-                        <div className="pointer-events-none absolute inset-x-4 top-3 h-1 overflow-hidden rounded-full bg-white/25">
-                            <div
-                                className="h-full rounded-full bg-white transition-all duration-500"
-                                style={{ width: `${((index + 1) / items.length) * 100}%` }}
-                            />
-                        </div>
 
                         <button
                             type="button"
                             onClick={close}
                             aria-label="वापस जाएं"
-                            className={`absolute left-3 top-8 flex size-10 items-center justify-center rounded-full ${glass}`}
+                            className={`absolute left-3 top-4 flex size-10 items-center justify-center rounded-full ${glass}`}
                         >
                             <ChevronLeft className="size-6" strokeWidth={1.75} />
                         </button>
 
-                        <span className="pointer-events-none absolute right-4 top-9 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-                            {index + 1} / {items.length}
-                        </span>
+                        {loading && (
+                            <span
+                                className="pointer-events-none absolute right-4 top-5 size-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                                aria-hidden
+                            />
+                        )}
 
                         {/* bottom: info + action rail */}
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-4 pb-6 pt-28">
                             <div className="flex items-end justify-between gap-4">
                                 <div className="min-w-0 flex-1">
-                                    <span className="inline-block rounded bg-primary px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white">
-                                        शॉर्ट वीडियो
-                                    </span>
+                                    <a
+                                        href={YT_CHANNEL_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-[12px] font-semibold text-white shadow transition hover:bg-red-700 active:scale-95"
+                                    >
+                                        <YouTubeIcon className="size-4" />
+                                        YouTube चैनल सब्सक्राइब करें
+                                    </a>
                                     <h1 className="mt-2 line-clamp-3 font-khand text-2xl font-semibold leading-snug text-white drop-shadow">
                                         {item.title}
                                     </h1>

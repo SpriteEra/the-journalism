@@ -60,10 +60,14 @@ export const eventNewsSchema = new mongoose.Schema({
         ref: 'UpdateStack',
         required: true,
     },
+    isPublished: { type: Boolean, default: true },
+    need_approval: { type: Boolean, default: false },
+    approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    approved_at: { type: Date },
 }, {
     timestamps: true,
 });
 
-
+eventNewsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
 const EventNews = mongoose.model('EventNews', eventNewsSchema);
 export default EventNews

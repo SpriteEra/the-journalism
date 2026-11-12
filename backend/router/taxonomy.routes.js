@@ -28,16 +28,16 @@ export async function taxonomyPublicRouter(app) {
 }
 
 export async function taxonomyAdminRouter(app) {
-    app.get('/categories', { onRequest: [...staff] }, getCategoriesAdmin);
+    app.get('/categories', getCategoriesAdmin);
     app.get('/categories/:id', { onRequest: [...staff] }, getCategoryById);
     app.post('/categories', { onRequest: [...perm(P.CATEGORY_CREATE)] }, createCategory);
     app.put('/categories/:id', { onRequest: [...perm(P.CATEGORY_UPDATE)] }, updateCategory);
     app.delete('/categories/:id', { onRequest: [...perm(P.CATEGORY_DELETE)] }, deleteCategory);
-    app.get('/states', { onRequest: [...staff] }, getStatesAdmin);
+    app.get('/states', getStatesAdmin);
     app.post('/states', { onRequest: [...perm(P.STATE_CREATE)] }, createState);
     app.put('/states/:id', { onRequest: [...perm(P.STATE_UPDATE)] }, updateState);
     app.delete('/states/:id', { onRequest: [...perm(P.STATE_DELETE)] }, deleteState);
-    app.get('/districts', { onRequest: [...staff] }, getDistrictsAdmin);
+    app.get('/districts',  getDistrictsAdmin);
     app.post('/districts', { onRequest: [...perm(P.DISTRICT_CREATE)] }, createDistrict);
     app.put('/districts/:id', { onRequest: [...perm(P.DISTRICT_UPDATE)] }, updateDistrict);
     app.delete('/districts/:id', { onRequest: [...perm(P.DISTRICT_DELETE)] }, deleteDistrict);

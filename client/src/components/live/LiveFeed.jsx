@@ -34,13 +34,45 @@ export default function LiveFeed({ afterSlug }) {
     }
   }, []);
 
+  // 1) Loads the next story when the sentinel nears the viewport (this was missing)
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !hasMore || failed) return;
-    const io = new IntersectionObserver((entries) => { if (entries[0].isIntersecting) more(); }, { rootMargin: "600px 0px" }); // start a little before the end is reached
+    const io = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) more(); },
+      { rootMargin: "600px 0px" } // start a little before the end is reached
+    );
     io.observe(el);
     return () => io.disconnect();
   }, [hasMore, failed, more, stories.length]);
+
+  // 2) Updates the URL/title as each story crosses the middle of the screen
+  useEffect(() => {
+    const articles = document.querySelectorAll("article[data-live-slug]");
+    if (!articles.length) return;
+
+    const t = document.title;
+    const suffix = t.includes(" | ") ? t.slice(t.lastIndexOf(" | ")) : "";
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const { liveSlug, liveTitle } = e.target.dataset;
+          const path = `/live/${encodeURIComponent(liveSlug)}`;
+
+          if (window.location.pathname !== path) {
+            window.history.replaceState(window.history.state, "", path);
+            if (liveTitle) document.title = liveTitle + suffix;
+          }
+        }
+      },
+      { rootMargin: "-45% 0px -50% 0px" }
+    );
+
+    articles.forEach((a) => io.observe(a));
+    return () => io.disconnect();
+  }, [stories.length]);
 
   return (
     <>

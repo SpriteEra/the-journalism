@@ -1,127 +1,75 @@
-// src/components/NotificationToast.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X, ExternalLink } from "lucide-react";
 
-const NotificationToast = ({
-  notification,
-  onClose,
-  onAction,
-  duration = 5000,
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [progress, setProgress] = useState(100);
+const TONE = {
+  urgent: { bar: "bg-danger", border: "border-l-danger", chip: "bg-danger-soft text-danger" },
+  high: { bar: "bg-warning", border: "border-l-warning", chip: "bg-warning-soft text-warning" },
+  normal: { bar: "bg-primary", border: "border-l-primary", chip: "bg-primary-soft text-primary" },
+};
 
+const NotificationToast = ({ notification, onClose, onAction, duration = 6000 }) => {
+  const [visible, setVisible] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const closing = useRef(false);
+  const tone = TONE[notification.priority] || TONE.normal;
+
+  const close = () => {
+    if (closing.current) return;
+    closing.current = true;
+    setVisible(false);
+    setTimeout(onClose, 250);
+  };
+
+  useEffect(() => { const t = requestAnimationFrame(() => setVisible(true)); return () => cancelAnimationFrame(t); }, []);
+
+  // hover or keyboard focus pauses the countdown
   useEffect(() => {
-    // Trigger slide-in animation
-    const timer = setTimeout(() => setIsVisible(true), 100);
+    if (paused) return;
+    const t = setTimeout(close, duration);
+    return () => clearTimeout(t);
+  }, [paused, duration]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Auto-hide timer
-    const hideTimer = setTimeout(() => {
-      handleClose();
-    }, duration);
-
-    // Progress bar animation
-    const progressTimer = setInterval(() => {
-      setProgress((prev) => {
-        const newProgress = prev - 100 / (duration / 100);
-        return newProgress > 0 ? newProgress : 0;
-      });
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(hideTimer);
-      clearInterval(progressTimer);
-    };
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(onClose, 300);
-  };
-
-  const handleAction = () => {
-    if (onAction) {
-      onAction();
-    }
-    handleClose();
-  };
-
-  const getPriorityStyles = () => {
-    switch (notification.priority) {
-      case "urgent":
-        return "border-danger bg-danger-soft";
-      case "high":
-        return "border-warning bg-warning-soft";
-      default:
-        return "border-primary bg-primary-soft";
-    }
-  };
+  const time = new Date(notification.createdAt || notification.timestamp || Date.now())
+    .toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div
-      className={`fixed top-4 right-4 max-w-sm w-full bg-surface rounded-lg shadow-lg border-l-4 ${getPriorityStyles()} transform transition-all duration-300 ease-in-out z-50 ${
-        isVisible ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
-      }`}
+      role="status" aria-live="polite"
+      onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}
+      className={`fixed right-3 top-3 z-[200] w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg border border-line border-l-4 bg-surface shadow-xl transition-all duration-300 ${tone.border} ${visible ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
     >
-      {/* Progress bar */}
-      <div
-        className="absolute top-0 left-0 h-1 bg-primary rounded-t transition-all duration-100 ease-linear"
-        style={{ width: `${progress}%` }}
-      />
+      {/* countdown bar: pure CSS, pauses with hover */}
+      <div className="h-1 w-full bg-surface-3">
+        <div
+          className={`h-full origin-left ${tone.bar}`}
+          style={{ animation: `toast-shrink ${duration}ms linear forwards`, animationPlayState: paused ? "paused" : "running" }}
+        />
+      </div>
+      <style>{`@keyframes toast-shrink { from { transform: scaleX(1) } to { transform: scaleX(0) } }`}</style>
 
-      <div className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 pr-2">
-            <h4 className="text-sm font-semibold text-fg mb-1">
-              {notification.title}
-            </h4>
-            <p className="text-sm text-fg-muted leading-relaxed">
-              {notification.body}
-            </p>
-
-            {/* Meta info */}
-            <div className="flex items-center justify-between mt-2">
-              <span
-                className={`text-xs px-2 py-1 rounded-full ${
-                  notification.priority === "urgent"
-                    ? "bg-danger-soft text-danger"
-                    : notification.priority === "high"
-                    ? "bg-warning-soft text-warning"
-                    : "bg-primary-soft text-primary"
-                }`}
-              >
-                {notification.category || notification.type}
-              </span>
-              <span className="text-xs text-fg-faint">
-                {new Date().toLocaleTimeString("en-IN", {
-                  timeZone: "Asia/Kolkata",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+      <div className="p-3 sm:p-4">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-semibold text-fg">{notification.title}</h4>
+            <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-fg-muted">{notification.body}</p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className={`rounded-full px-2 py-0.5 text-xs ${tone.chip}`}>{notification.category || notification.type}</span>
+              <span className="text-xs text-fg-faint">{time}</span>
             </div>
           </div>
-
-          <button
-            onClick={handleClose}
-            className="flex-shrink-0 p-1 hover:bg-surface-2 rounded-full transition-colors"
-          >
-            <X className="w-4 h-4 text-fg-faint" />
+          <button onClick={close} aria-label="Dismiss" className="shrink-0 rounded-full p-1 hover:bg-surface-2">
+            <X className="size-4 text-fg-faint" />
           </button>
         </div>
 
-        {/* Action button */}
         {notification.link && (
-          <div className="mt-3 pt-3 border-t border-line">
-            <button
-              onClick={handleAction}
-              className="w-full bg-primary text-paper text-sm py-2 px-3 rounded-md hover:bg-primary-hover transition-colors flex items-center justify-center space-x-1"
-            >
-              <span>View Details</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </div>
+          <button
+            onClick={() => { onAction?.(); close(); }}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm text-paper transition-colors hover:bg-primary-hover"
+          >
+            View details <ExternalLink className="size-3.5" />
+          </button>
         )}
       </div>
     </div>

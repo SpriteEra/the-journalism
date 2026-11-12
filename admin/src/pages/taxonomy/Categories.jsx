@@ -1,63 +1,12 @@
 import { useId, useMemo, useState } from "react";
-import { ChevronRight, ChevronsDown, ChevronsDownUp, ChevronsUpDown, Folder, FolderOpen, FolderTree, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ChevronRight, ChevronsDown, ChevronsDownUp, ChevronsUpDown, Folder, FolderOpen, FolderTree, MapPin, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { cn } from "../../lib/cn";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import RowMenu from "../../components/common/RowMenu";
 import { useApiMutation, useCategories, useDistricts, useStates } from "../../hooks/admin";
-import { Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, Field, IconButton, Input, Modal, PageHeader, Select, StatusBadge, Switch, Tabs, Textarea } from "../../components/ui";
-
-/** One modal for category / state / district. `kind` decides the fields and the endpoint. */
-function TaxonomyForm({ kind, item, categories, states, onClose }) {
-  const editing = Boolean(item?._id);
-  const nameKey = kind === "state" ? "state" : kind === "district" ? "district" : "name";
-  const [f, setF] = useState(() => ({
-    [nameKey]: item?.[nameKey] || "", displayName: item?.displayName || "", slug: item?.slug || "", description: item?.description || "",
-    parent: item?.parent?._id || item?.parent || "", state: item?.state?._id || item?.state || "", order: item?.order ?? 0,
-    showInMenu: item?.showInMenu ?? true, showOnHome: item?.showOnHome ?? false, isActive: item?.isActive ?? true,
-  }));
-  const set = (p) => setF((s) => ({ ...s, ...p }));
-  const path = kind === "category" ? "categories" : kind === "state" ? "states" : "districts";
-
-  const save = useApiMutation(() => {
-    const body = { [nameKey]: f[nameKey], isActive: f.isActive, ...(editing ? { slug: f.slug } : {}) };
-    if (kind === "category") Object.assign(body, { description: f.description, parent: f.parent || null, order: Number(f.order) || 0, showInMenu: f.showInMenu, showOnHome: f.showOnHome });
-    else Object.assign(body, { displayName: f.displayName, order: Number(f.order) || 0, ...(kind === "district" ? { state: f.state } : {}) });
-    return (editing ? httpClient.put(`/${path}/${item._id}`, body) : httpClient.post(`/${path}`, body)).then((r) => r.data);
-  }, { invalidate: ["categories", "states", "districts"], onSuccess: onClose });
-
-  const label = { category: "category", state: "state", district: "district" }[kind];
-  const topLevel = categories.filter((c) => !c.parent && c._id !== item?._id);
-  return (
-    <Modal open onClose={onClose} title={`${editing ? "Edit" : "New"} ${label}`}
-      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" form="tax-form" loading={save.isPending}>{editing ? "Save changes" : "Create"}</Button></>}>
-      <form id="tax-form" onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
-        <Field label={kind === "category" ? "Name" : `${label[0].toUpperCase()}${label.slice(1)} name`} required hint={kind !== "category" ? "Lower-case English name, e.g. uttar pradesh" : "Shown in menus. Hindi or English."}>
-          <Input value={f[nameKey]} onChange={(e) => set({ [nameKey]: e.target.value })} autoFocus data-autofocus />
-        </Field>
-        {kind !== "category" && <Field label="Display name" hint="Optional – e.g. उत्तर प्रदेश"><Input value={f.displayName} onChange={(e) => set({ displayName: e.target.value })} /></Field>}
-        {kind !== "category" && <Field label="Order" hint="Lower numbers come first. Same number: A–Z"><Input type="number" value={f.order} onChange={(e) => set({ order: e.target.value })} /></Field>}
-        {editing && <Field label="URL slug"><Input value={f.slug} onChange={(e) => set({ slug: e.target.value.toLowerCase() })} /></Field>}
-        {kind === "district" && <Field label="State" required><Select value={f.state} onChange={(e) => set({ state: e.target.value })} placeholder="Select state" required options={states.map((s) => ({ value: s._id, label: s.displayName || s.state }))} /></Field>}
-        {kind === "category" && (
-          <>
-            <Field label="Parent category" hint="Leave empty for a top-level category (sub-categories go one level down)">
-              <Select value={f.parent || ""} onChange={(e) => set({ parent: e.target.value })} options={[{ value: "", label: "-None (top level) —" }, ...topLevel.map((c) => ({ value: c._id, label: c.name }))]} />
-            </Field>
-            <Field label="Description"><Textarea rows={2} value={f.description} onChange={(e) => set({ description: e.target.value })} /></Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Order"><Input type="number" value={f.order} onChange={(e) => set({ order: e.target.value })} /></Field>
-              <div className="space-y-3 pt-1">
-                <Switch checked={f.showInMenu} onChange={(v) => set({ showInMenu: v })} label="Show in menu" />
-                <Switch checked={f.showOnHome} onChange={(v) => set({ showOnHome: v })} label="Home page section" description="Top-level categories only" />
-              </div>
-            </div>
-          </>
-        )}
-        <Switch checked={f.isActive} onChange={(v) => set({ isActive: v })} label="Active" description="Inactive items can't be chosen for new news" />
-      </form>
-    </Modal>
-  );
-}
+import { Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, IconButton, PageHeader, Select, StatusBadge, Tabs } from "../../components/ui";
 
 const CSS = `
 .cat-tree { --cat-accent: #4f46e5; }
@@ -184,7 +133,7 @@ function CategoryTree({ groups, expanded, toggle, loading, actions }) {
 const cardBtn = "inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-fg-muted transition-colors active:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
 
 /**
- * Collapsed : initial tile + name + subtitle + status
+ * Collapsed : name + subtitle + status
  * Open      : stat tiles + full-width action buttons
  * Footer strip toggles it ("View details" + double chevron).
  */
@@ -192,15 +141,11 @@ function TaxonomyCard({ title, subtitle, active, stats, children }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const toggle = () => setOpen((o) => !o);
-  const initial = (title || "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-line bg-surface">
-      {/* <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${active ? "bg-primary" : "bg-line"}`} /> */}
-
       <button type="button" onClick={toggle} aria-expanded={open} aria-controls={id}
         className="flex w-full items-center gap-3 py-3 pl-4 pr-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
-        {/* <span className={`grid size-11 shrink-0 place-items-center rounded-xl text-lg font-semibold ${active ? "bg-primary/10 text-primary" : "bg-surface-3 text-fg-faint"}`}>{initial}</span> */}
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold capitalize text-fg">{title}</p>
           {subtitle && <p className="mt-0.5 flex items-center gap-1 truncate text-xs capitalize text-fg-subtle"><MapPin className="size-3 shrink-0" aria-hidden />{subtitle}</p>}
@@ -235,9 +180,10 @@ function TaxonomyCard({ title, subtitle, active, stats, children }) {
 
 export default function Categories() {
   const { can } = usePermission();
-  const [tab, setTab] = useState("categories");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [tab, setTab] = useState(location.state?.tab || "categories");
   const [stateFilter, setStateFilter] = useState("");
-  const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set()); // ids of expanded parent categories
   const cats = useCategories(); const states = useStates(); const districts = useDistricts(stateFilter);
@@ -247,6 +193,13 @@ export default function Categories() {
         ? "state" : "district";
   const path = tab;
   const del = useApiMutation(() => httpClient.delete(`/${path}/${deleting._id}`).then((r) => r.data), { invalidate: ["categories", "states", "districts"], onSuccess: () => setDeleting(null) });
+
+  /** create / edit open the full-page editor */
+  const go = (kindKey, id, parent) => navigate(
+    id
+      ? `/dashboard/taxonomy/${kindKey}/${id}/edit`
+      : `/dashboard/taxonomy/${kindKey}/new${parent ? `?parent=${parent}` : ""}`
+  );
 
   const toggle = (id) => setExpanded((prev) => {
     const next = new Set(prev);
@@ -270,8 +223,8 @@ export default function Categories() {
     const canEdit = can(`${kindKey}.update`);
     const canDelete = can(`${kindKey}.delete`);
     const items = [
-      canAdd && { label: "Add sub-category", icon: Plus, onClick: () => setEditing({ parent: row._id }) },
-      canEdit && { label: "Edit", icon: Pencil, onClick: () => setEditing(row) },
+      canAdd && { label: "Add sub-category", icon: Plus, onClick: () => go("category", null, row._id) },
+      canEdit && { label: "Edit", icon: Pencil, onClick: () => go(kindKey, row._id) },
       canDelete && { label: "Delete", icon: Trash2, danger: true, onClick: () => setDeleting(row) },
     ].filter(Boolean);
     if (!items.length) return null;
@@ -279,8 +232,8 @@ export default function Categories() {
       <>
         {/* md and up: icon buttons */}
         <div className="hidden justify-end gap-1 md:flex">
-          {canAdd && <IconButton size="icon-sm" label="Add sub-category" onClick={() => setEditing({ parent: row._id })}><Plus className="size-4" /></IconButton>}
-          {canEdit && <IconButton size="icon-sm" label="Edit" onClick={() => setEditing(row)}><Pencil className="size-4" /></IconButton>}
+          {canAdd && <IconButton size="icon-sm" label="Add sub-category" onClick={() => go("category", null, row._id)}><Plus className="size-4" /></IconButton>}
+          {canEdit && <IconButton size="icon-sm" label="Edit" onClick={() => go(kindKey, row._id)}><Pencil className="size-4" /></IconButton>}
           {canDelete && <IconButton size="icon-sm" label="Delete" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setDeleting(row)}><Trash2 className="size-4" /></IconButton>}
         </div>
         {/* below md: one three-dot menu */}
@@ -293,7 +246,7 @@ export default function Categories() {
   const cardActions = (kindKey, row, extra) => (
     <>
       {extra}
-      {can(`${kindKey}.update`) && <button type="button" className={cardBtn} onClick={() => setEditing(row)}><Pencil className="size-4" />Edit</button>}
+      {can(`${kindKey}.update`) && <button type="button" className={cardBtn} onClick={() => go(kindKey, row._id)}><Pencil className="size-4" />Edit</button>}
       {can(`${kindKey}.delete`) && <button type="button" className={`${cardBtn} text-danger`} onClick={() => setDeleting(row)}><Trash2 className="size-4" />Delete</button>}
     </>
   );
@@ -343,18 +296,22 @@ export default function Categories() {
     districts: [districtCols, districts.data, districts, districtCard],
   }[tab];
   const [cols, rows, q, card] = current;
-
+  const reload = () => q.refetch();
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <PageHeader
         title="Categories & locations"
         description="Categories, sub-categories, states and districts used to organise and filter news."
-        actions={can(`${kind}.create`)
-          && <Button
-            leftIcon={Plus}
-            onClick={() => setEditing({})}
-          >New {kind}
-          </Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={reload} disabled={q.isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+              <RefreshCw className={cn("size-4", q.isFetching && "animate-spin")} />
+            </Button>
+            {can(`${kind}.create`) && (
+              <Button leftIcon={Plus} onClick={() => go(kind)}>New {kind}</Button>
+            )}
+          </div>
+        }
       />
       <Card
         padded={false}
@@ -389,7 +346,6 @@ export default function Categories() {
             <DataTable contained breakpoint="sm" columns={cols} rows={rows} loading={q.isLoading} mobileCard={card} empty={<EmptyState icon={FolderTree} title={`No ${tab} yet`} />} />
           )}
       </Card>
-      {editing && <TaxonomyForm kind={kind} item={editing} categories={cats.data || []} states={states.data || []} onClose={() => setEditing(null)} />}
       {deleting && <ConfirmDialog open onClose={() => setDeleting(null)} tone="danger" loading={del.isPending} onConfirm={() => del.mutate()} confirmLabel="Delete" title={`Delete “${deleting.name || deleting.displayName || deleting.state || deleting.district}”?`} message="Items used by news can't be deleted – mark them inactive instead." />}
     </div>
   );

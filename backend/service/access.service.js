@@ -1,6 +1,6 @@
 import Role from '../model/role.model.js';
 import User from '../model/user.model.js';
-import { SYSTEM_ROLES, DEFAULT_ROLE, SYSTEM_ROLE_VERSION, SYSTEM_ROLE_ADDED_IN_V2 } from '../config/permissions.js';
+import { SYSTEM_ROLES, DEFAULT_ROLE, SYSTEM_ROLE_VERSION, SYSTEM_ROLE_ADDED_IN_V3 } from '../config/permissions.js';
 import { expand, resolveEffective } from '../utils/permissions.js';
 
 /**
@@ -52,7 +52,7 @@ export const seedSystemRoles = async () => {
         // permissions introduced after this role was created (e.g. tag.create in v2) are ADDED once; nothing is removed
         let addKeys = [];
         if ((existing.defaultsVersion || 1) < SYSTEM_ROLE_VERSION) {
-            addKeys = SYSTEM_ROLE_ADDED_IN_V2[name] || [];
+            addKeys = SYSTEM_ROLE_ADDED_IN_V3[name] || [];
             patch.defaultsVersion = SYSTEM_ROLE_VERSION;
         }
         const update = { ...(Object.keys(patch).length ? { $set: patch } : {}), ...(addKeys.length ? { $addToSet: { permissions: { $each: addKeys } } } : {}) };

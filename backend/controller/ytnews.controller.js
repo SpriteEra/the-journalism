@@ -6,8 +6,13 @@ import tryCatch from "../utils/asyncFunction.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import translate from "translate-google";
 import { fetchYoutubeMeta, isShort, parseYoutubeId } from "../service/youtube.service.js";
-
-
+import { P } from "../config/permissions.js";
+import { notifyApprovers, approveHandler, approvalCleared } from "../utils/approval.js";
+const assertCanManage = (req, item) => {
+    if (req.can(P.YT_MANAGE_ANY)) return;
+    if (req.can(P.YT_MANAGE_OWN) && String(item.author) === String(req.user._id)) return;
+    throw new ErrorHandler(403, 'You can only manage your own YouTube news');
+};
 function generateNanoId(length = 5) {
     let result = '';
     for (let i = 0; i < length; i++) {
@@ -27,8 +32,9 @@ function getCurrentDate() {
 
 export const getYtNews = tryCatch(async (req, res, next) => {
     let { news_id } = req.params;
-    const ytnews = await YtNews.findOne({ news_id })
-        .select('news_id title description tags location state district videoLinkId createdAt updatedAt -_id')
+    const ytnews = await YtNews.findOne({ news_id, isDeleted: false })
+        .select('news_id title description tags location state district videoLinkId createdAt updatedAt -_id');
+    if (!ytnews) return res.status(404).json({ message: "Youtube News Not Found" });
 
     if (ytnews.isDeleted) {
         return res.status(404).json({ message: "Youtube News Not Found" })
@@ -50,6 +56,8 @@ export const getVideoNews = tryCatch(async (req, res, next) => {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
+        .populate('author', 'username')
+        .populate('approved_by', 'username')
         .select('news_id title location videoLinkId createdAt -_id');
 
     let ytnewsCount = 0;
@@ -116,6 +124,12 @@ export const getRelatedYtNews = tryCatch(async (req, res, next) => {
 export const createYtNews = tryCatch(async (req, res, next) => {
     let { title, description, tags, videoLinkId, draft } = req.body;
     const url = req.body.url || videoLinkId;
+    if (!req.can(P.YT_CREATE)) return next(new ErrorHandler(403, `Missing permission: ${P.YT_CREATE}`));
+
+    const isDraft = draft === true || draft === 'true';
+    const canPublish = req.can(P.YT_PUBLISH);
+    const publishNow = !isDraft && canPublish;
+    const needApproval = !isDraft && !canPublish;
 
     // YouTube news = long, LANDSCAPE videos added by link. The id is read from any YouTube URL and the details (title, thumbnail,
     // length) are fetched, so the editor only has to add what YouTube does not know (place, tags ...).
@@ -164,7 +178,8 @@ export const createYtNews = tryCatch(async (req, res, next) => {
     news_id += '-' + getCurrentDate() + '-' + generateNanoId();
 
     let news = new YtNews({
-        title, description, tags, videoLinkId, draft: Boolean(draft), news_id, author: req.user._id,
+        title, description, tags, videoLinkId, draft: Boolean(draft), news_id, author: req.user._id, draft: isDraft, isPublished: publishNow, need_approval: needApproval,
+        publishedAt: publishNow ? (meta?.publishedAt || new Date()) : undefined,
         ...(meta ? { thumbnail: meta.thumbnail || '', duration: meta.duration || 0, channelId: meta.channelId || '', channelTitle: meta.channelTitle || '', publishedAt: meta.publishedAt || undefined } : {}),
     })
 
@@ -181,9 +196,9 @@ export const createYtNews = tryCatch(async (req, res, next) => {
     news.update_stack = updateStack._id;
     await updateStack.save()
     await news.save()
-    res.status(200).json({ message: "Video Added successfully" })
-
-    NotificationService.sendToAdmins('Youtube News Added', `News ${news.title} has been added`, { excludeIds: [req.user._id], createdBy: req.user.username })
+    res.status(200).json({ message: needApproval ? "Video submitted for approval" : "Video Added successfully", status: isDraft ? 'draft' : needApproval ? 'pending-approval' : 'published' });
+    if (needApproval) notifyApprovers(req, { perms: [P.YT_APPROVE], label: 'YouTube news', title: news.title, link: '/dashboard/yt-news' });
+    else if (!isDraft) NotificationService.sendToAdmins('Youtube News Added', `News ${news.title} has been added`, { excludeIds: [req.user._id], createdBy: req.user.username });
 })
 
 export const getNewsYt = tryCatch(async (req, res, next) => {
@@ -192,6 +207,13 @@ export const getNewsYt = tryCatch(async (req, res, next) => {
     let query = {
         isDeleted: false
     }
+
+    if (!req.can(P.YT_MANAGE_ANY) && !req.can(P.YT_APPROVE)) query.author = req.user._id;
+
+    if (req.query.need_approval === 'true' || req.query.need_approval === 'false') {
+        query.need_approval = req.query.need_approval === 'true';
+    }
+
 
     if (state) {
         const stateArray = Array.isArray(state) ? state : [state];
@@ -222,8 +244,10 @@ export const getNewsYt = tryCatch(async (req, res, next) => {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate("author", "username")
-        .select('news_id title location activity update_stack videoLinkId createdAt _id ');
+        .populate('author', 'username fullName profile')
+        .populate('approved_by', 'username fullName profile')
+        .populate('rejected_by', 'username fullName profile')
+        .select('news_id title location activity update_stack videoLinkId createdAt draft isPublished need_approval approved_by approved_at rejected_by rejected_at rejected_reason _id');
 
     const totalNews = await YtNews.countDocuments(query)
     return res.status(200).json({ news: ytnews, total: totalNews })
@@ -233,12 +257,14 @@ export const deleteYtNews = tryCatch(async (req, res, next) => {
 
     let { id } = req.params;
     let userId = req.user?._id || "unknown";
+    console.log("hello")
+    const item = await YtNews.findOne({ news_id: id, isDeleted: false });
+    if (!item) return next(new ErrorHandler(404, "News Not Found or Already Deleted"));
+    assertCanManage(req, item);
 
-    const updated = await YtNews.findOneAndUpdate(
-        { news_id: id },
-        { $set: { isDeleted: true } },
-        { new: true }
-    );
+    const updated = await YtNews.findOneAndUpdate({ news_id: id }, { $set: { isDeleted: true } }, { new: true });
+
+
 
     if (!updated) {
         return next(new ErrorHandler(404, "News Not Found or Already Deleted"));
@@ -282,6 +308,8 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
     if (!ytnews) {
         return res.status(404).json({ message: "YtNews not found" });
     }
+
+    assertCanManage(req, ytnews);
 
     // Track changes
     const updateData = {};
@@ -332,7 +360,9 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
     // Check draft status changes
     if (draft !== undefined && draft !== ytnews.draft) {
         updateData.draft = draft;
-        changes.push(`Draft status changed to ${draft ? 'draft' : 'published'}`);
+        if (draft) { Object.assign(updateData, { isPublished: false, need_approval: false }, approvalCleared); changes.push('Moved to draft'); }
+        else if (req.can(P.YT_PUBLISH)) { Object.assign(updateData, { isPublished: true, need_approval: false }, approvalCleared); changes.push('Published'); }
+        else { Object.assign(updateData, { isPublished: false, need_approval: true }, approvalCleared); changes.push('Submitted for approval'); }
     }
 
     // If no changes detected
@@ -367,7 +397,12 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
         changes
     });
 
-    NotificationService.sendToAdmins('Youtube News Updated', `News ${ytnews.title} has been updated`, { excludeIds: [req.user._id], updatedBy: req.user.username })
+    if (updateData.need_approval) {
+        // submitted for approval: tell everyone who can approve
+        notifyApprovers(req, { perms: [P.YT_APPROVE], label: 'YouTube news', title: updatedYtNews.title, link: '/dashboard/yt-news' });
+    } else {
+        NotificationService.sendToAdmins('Youtube News Updated', `News ${ytnews.title} has been updated`, { excludeIds: [req.user._id], updatedBy: req.user.username });
+    }
 });
 
 
@@ -379,3 +414,11 @@ export const getSingleYtNewsAdmin = tryCatch(async (req, res, next) => {
 
     return res.status(200).json(ytNews)
 })
+
+export const approveYtNews = approveHandler({
+    Model: YtNews,
+    find: (req) => ({ news_id: req.params.id }),
+    perm: P.YT_APPROVE,
+    label: 'YouTube news',
+    link: () => '/dashboard/yt-news',
+});

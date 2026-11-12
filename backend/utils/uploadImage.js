@@ -62,7 +62,6 @@ export const deleteImage = async (imageUrl) => {
         const response = await axios.delete(process.env.IMG_URL + '/deleteImage', {
             params: { url: imageUrl }
         });
-        console.log('Image deleted successfully:', response.data);
         return response.data; // { message: 'Image deleted successfully.' }
     } catch (error) {
         console.error('Failed to delete image:', error.message);

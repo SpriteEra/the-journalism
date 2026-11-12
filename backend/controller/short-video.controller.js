@@ -14,6 +14,7 @@ import { syncYoutube, getSyncStatus, parseYoutubeId, fetchYoutubeMeta, isShort }
 import { setPublicCache } from '../utils/cache.js';
 import { buildTaxonomyFilter, escapeRegex, findTaxonomyByName, resolveNewsTaxonomy } from '../utils/newsTaxonomy.js';
 import { resolveNewsTags } from '../utils/newsTags.js';
+import { notifyApprovers, notifyAuthor, logApproval, approvalCleared } from '../utils/approval.js';
 
 const LIST = 'title slug kind sourceType thumbnail duration videoLinkId videoUrl hlsUrl publishedAt tags -_id';
 const PUBLIC = { isDeleted: false, draft: false, isPublished: true };
@@ -45,7 +46,7 @@ const pushStack = (id, userId, description) => id && UpdateStack.updateOne(
 const readTaxonomy = async (req, existing) => {
     const b = req.body || {};
     const tax = await resolveNewsTaxonomy(b, { requireCategory: false, existing });
-    const tg = b.tags === undefined ? null : await resolveNewsTags(b.tags, { canCreate: req.can(P.TAG_CREATE), userId: req.user._id, existing: existing?.tags });
+    const tg = b.tags === undefined ? null : await resolveNewsTags(b.tags, { canCreate: req.can(P.TOPIC_CREATE), userId: req.user._id, existing: existing?.tags });
     return { tax, tg };
 };
 
@@ -107,11 +108,43 @@ export const getShortVideoBySlug = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, video: rest, more, seo: videoPageSeo(v) });
 });
 
+/**
+ * GET /short-videos/:slug/next?exclude=a,b,c&limit=5
+ * Next shorts for the endless viewer: same tags first, then same category, then newest.
+ * Anything in `exclude` (already shown) and the current slug is never returned.
+ */
+export const getNextShortVideos = tryCatch(async (req, res) => {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 5, 1), 10);
+    const slug = String(req.params.slug).toLowerCase();
+    const seen = new Set(
+        String(req.query.exclude || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean).slice(-200),
+    );
+    seen.add(slug);
+
+    const cur = await ShortVideo.findOne({ slug, ...PUBLIC }).select('tags category kind').lean();
+    if (!cur) throw new ErrorHandler(404, 'Video not found');
+
+    const picked = [];
+    const take = async (extra) => {
+        const need = limit - picked.length;
+        if (need <= 0) return;
+        const rows = await ShortVideo.find({ ...PUBLIC, kind: cur.kind, ...extra, slug: { $nin: [...seen] } })
+            .sort({ publishedAt: -1, _id: -1 }).limit(need).select(LIST).populate(TAGS_POPULATE).lean();
+        rows.forEach((r) => { seen.add(r.slug); picked.push(r); });
+    };
+
+    if (cur.tags?.length) await take({ tags: { $in: cur.tags } });          // 1. same tags
+    if (cur.category?.length) await take({ category: { $in: cur.category } }); // 2. same category
+    await take({});                                                           // 3. anything newest
+
+    res.status(200).json({ success: true, videos: picked, hasMore: picked.length === limit });
+});
+
 /** Latest videos of every kind merged by date: legacy YtNews + ShortVideo. ?limit=20 (max 100) */
 export const getLatestShortVideos = tryCatch(async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
     const [yt, vids] = await Promise.all([
-        YtNews.find({ isDeleted: false, draft: false }).sort({ createdAt: -1 }).limit(limit).select('news_id title videoLinkId thumbnail duration createdAt publishedAt -_id').lean(),
+        YtNews.find({ isDeleted: false, draft: false, isPublished: { $ne: false } }).sort({ createdAt: -1 }).limit(limit).select('news_id title videoLinkId thumbnail duration createdAt publishedAt -_id').lean(),
         ShortVideo.find(PUBLIC).sort({ publishedAt: -1, _id: -1 }).limit(limit).select(LIST).lean(),
     ]);
     const all = [
@@ -167,10 +200,12 @@ export const uploadShortVideo = tryCatch(async (req, res) => {
             category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district, tags: tg?.ids || [],
             draft, isPublished: publishNow, publishedAt: publishNow ? new Date() : undefined,
             author: req.user._id, seo: sanitizeSeo(b.seo) || {},
+            need_approval: !draft && !publishNow,
         });
         doc.update_stack = (await stackFor(doc._id, req.user._id, `Video uploaded (${statusLabel(publishNow, draft)})`))._id;
         await doc.save();
         res.status(201).json({ success: true, message: publishNow ? 'Video published' : 'Video saved', video: doc });
+        if (doc.need_approval) notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: `/dashboard/review/short/${doc.slug}` });
     } finally {
         // (the upload plugin also removes temp files after the response; this frees disk earlier on errors)
         [req.files?.video, req.files?.thumbnail].forEach((f) => f?.tempFilePath && fs.promises.unlink(f.tempFilePath).catch(() => { }));
@@ -204,22 +239,24 @@ export const addYoutubeShortVideo = tryCatch(async (req, res) => {
         category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district, tags: tg?.ids || [],
         draft, isPublished: publishNow, publishedAt: publishNow ? (meta.publishedAt || new Date()) : undefined,
         author: req.user._id, seo: sanitizeSeo(b.seo) || {},
+        need_approval: !draft && !publishNow,
     });
     doc.update_stack = (await stackFor(doc._id, req.user._id, `YouTube ${kind} added by link (${statusLabel(publishNow, draft)})`))._id;
     await doc.save();
     res.status(201).json({ success: true, message: publishNow ? 'Video published' : 'Video saved', video: doc });
+    if (doc.need_approval) notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: `/dashboard/review/short/${doc.slug}` });
 });
 
 // ═════════════════════ ADMIN: manage ═════════════════════
 /** GET /admin/short-videos?kind=&sourceType=&pending=true&search=&category=&subCategory=&state=&district=&tag=&page=&limit= */
 export const getShortVideosAdmin = tryCatch(async (req, res) => {
     const { page, limit, skip } = paging(req, 100);
-    const seeAll = req.can(P.VIDEO_MANAGE_ANY);
+    const seeAll = req.can(P.VIDEO_MANAGE_ANY) || req.can(P.VIDEO_APPROVE);
     const q = { isDeleted: false };
     if (!seeAll) q.author = req.user._id;
     if (KINDS.includes(req.query.kind)) q.kind = req.query.kind;
     if (SOURCES.includes(req.query.sourceType)) q.sourceType = req.query.sourceType;
-    if (req.query.pending === 'true') q.isPublished = false;
+    if (req.query.pending === 'true') q.need_approval = true;
     const { filter, empty } = await buildTaxonomyFilter({
         category: qList(req.query, 'category'), subCategory: qList(req.query, 'subCategory'),
         state: qList(req.query, 'state'), district: qList(req.query, 'district'), tag: qList(req.query, 'tag'),
@@ -234,8 +271,18 @@ export const getShortVideosAdmin = tryCatch(async (req, res) => {
         q.$and = [...(q.$and || []), { $or: or }];
     }
     const [items, total] = await Promise.all([
-        ShortVideo.find(q).sort({ createdAt: -1 }).skip(skip).limit(limit)
-            .populate('author', 'username').populate({ path: 'category', select: 'name slug -_id' }).populate({ path: 'tags', select: 'title slug -_id' }).lean(),
+        ShortVideo
+            .find(q)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('author', 'username fullName profile')
+            .populate('approved_by', 'username fullName profile')
+            .populate('rejected_by', 'username fullName profile')
+            .populate({ path: 'category', select: 'name slug -_id' })
+            .populate({ path: 'tags', select: 'title slug -_id' })
+            .lean(),
+
         ShortVideo.countDocuments(q),
     ]);
     res.status(200).json({ success: true, items, total, page, limit });
@@ -275,7 +322,7 @@ export const updateShortVideo = tryCatch(async (req, res) => {
         changes.push('categories / location');
     }
     if (b.tags !== undefined) {
-        const tg = await resolveNewsTags(b.tags, { canCreate: req.can(P.TAG_CREATE), userId: req.user._id, existing: v.tags });
+        const tg = await resolveNewsTags(b.tags, { canCreate: req.can(P.TOPIC_CREATE), userId: req.user._id, existing: v.tags });
         v.tags = tg.ids; changes.push('tags');
     }
     const seo = sanitizeSeo(b.seo);
@@ -287,20 +334,32 @@ export const updateShortVideo = tryCatch(async (req, res) => {
     }
     if (b.draft !== undefined) {
         v.draft = toBool(b.draft);
+        Object.assign(v, approvalCleared);          // new submission or draft: old approval AND old rejection are gone
+        v.need_approval = false;
         if (v.draft) v.isPublished = false;
         else if (req.can(P.VIDEO_PUBLISH)) { v.isPublished = true; v.publishedAt = v.publishedAt || new Date(); }
-        else v.isPublished = false;                                  // waits for an approver
-        changes.push(v.draft ? 'moved to draft' : (v.isPublished ? 'published' : 'submitted for approval'));
+        else { v.isPublished = false; v.need_approval = true; }
+        changes.push(v.draft ? 'moved to draft' : v.isPublished ? 'published' : 'submitted for approval');
     }
-    if (b.approve !== undefined && toBool(b.approve)) {              // an approver publishes somebody's pending video
-        if (!req.can(P.VIDEO_MANAGE_ANY)) throw new ErrorHandler(403, `Missing permission: ${P.VIDEO_MANAGE_ANY}`);
-        v.isPublished = true; v.draft = false; v.publishedAt = v.publishedAt || new Date(); v.approvedBy = req.user._id;
+    if (b.approve !== undefined && toBool(b.approve)) {
+        if (!req.can(P.VIDEO_APPROVE))
+            throw new ErrorHandler(403, `Missing permission: ${P.VIDEO_APPROVE}`);
+        if (String(v.author) === String(req.user._id))
+            throw new ErrorHandler(403, 'You cannot approve your own item. Ask another approver');
+        Object.assign(v, { isPublished: true, draft: false, need_approval: false, approved_by: req.user._id, approved_at: new Date() });
+        v.publishedAt = v.publishedAt || new Date();
         changes.push('approved');
     }
     if (!changes.length) return res.status(200).json({ success: true, message: 'No changes detected', video: v });
     await v.save();
     pushStack(v.update_stack, req.user._id, `Video updated (${changes.join(', ')})`);
     res.status(200).json({ success: true, message: 'Video updated', video: v, changes });
+    if (v.need_approval && changes.includes('submitted for approval'))
+        notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: `/dashboard/review/short/${doc.slug}` });
+    if (changes.includes('approved')) {
+        logApproval(v.update_stack, req);
+        notifyAuthor(req, { author: v.author }, { label: 'Short video', title: v.title, link: `/dashboard/review/short/${v.slug}` });
+    }
 });
 
 export const deleteShortVideo = tryCatch(async (req, res) => {

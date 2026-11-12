@@ -4,6 +4,7 @@ import { getNews12MonthAnalytics, getNews1MonthAnalytics, getNewsMonthlyClickAna
 import {
     getApproval, getCacheStatus, getDashboard, getHeatmap, getOverview, getReporters, getTaxonomy, getTimeseries, getTopArticles, refreshAnalytics,
 } from '../controller/analytics.admin.controller.js';
+import { getLiveBreakdown, getLiveContent, getLiveSummary } from '../controller/analytics.live.controller.js';
 
 // mounted at /api/v1/admin
 const view = [isAuthenticated, requirePermission(P.ANALYTICS_VIEW)];
@@ -25,6 +26,11 @@ async function analyticsRouter(app) {
     app.get('/analytics/top-articles', { onRequest: [...view] }, getTopArticles);
     app.get('/analytics/cache-status', { onRequest: [...view] }, getCacheStatus);
     app.post('/analytics/refresh', { onRequest: [isAuthenticated, requirePermission(P.ANALYTICS_REFRESH)] }, refreshAnalytics);
+    app.get('/analytics/live/summary', { onRequest: [...view] }, getLiveSummary);
+    app.get('/analytics/live/content', { onRequest: [...view] }, getLiveContent);
+    app.get('/analytics/live/breakdown', { onRequest: [...view] }, getLiveBreakdown);
+
+
     // ── original endpoints (same URLs, now permission-protected and cached) ──
     app.get('/news-today-view', { onRequest: [...view] }, getNewsViewCountToday);
     app.get('/get-news-analytics-monthly', { onRequest: [...view] }, getNews1MonthAnalytics);

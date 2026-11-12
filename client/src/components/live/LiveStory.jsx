@@ -31,7 +31,7 @@ export default function LiveStory({ live, first = false }) {
   return (
     <>
       {!first && <NextStoryDivider />}
-      <article className={first ? "" : "pt-4"} data-live-slug={live.slug}>
+      <article className={first ? "" : "pt-4"} data-live-slug={live.slug} data-live-title={title}>
         <LiveReadBeacon slug={live.slug} first={first} />
         <div className="mb-2 flex items-center gap-2">
           {isLive ? (

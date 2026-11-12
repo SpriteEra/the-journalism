@@ -2,15 +2,16 @@ import { isAuthenticated, requireAnyPermission, requirePermission } from "../mid
 import { P } from "../config/permissions.js";
 
 import { clearFeatured, createNewsByReporter, searchNewsForLinking, deleteNewsAdmin, getFeaturedAdmin, getNewsAuthors, getNewsByReporter, getSingleNewsReporter, updateNewsByReporter } from "../controller/news.controller.js";
-import { createYtNews, deleteYtNews, getNewsYt, getSingleYtNewsAdmin, updateYtNews } from "../controller/ytnews.controller.js";
+import { approveYtNews, createYtNews, deleteYtNews, getNewsYt, getSingleYtNewsAdmin, updateYtNews } from "../controller/ytnews.controller.js";
 import { Createnews, Deletenews, getBreakingNewsAdmin, Updatenews } from "../controller/breaking.news.controller.js";
 import { createAdvertisement, deleteAdvertisement, extendExpiryMainAdvertisement, getAdminAdvertisement, getAdminSingleAdvertisement, updateAdvertisement, updateAdvertisementOrder, updateMainExpiredAdvertisement } from "../controller/advertisement.controller.js";
 import { archiveAdminNotification, assignRole, blockUnblockUser, Createuser, getUserDetail, setUserPermissions, deleteAdminNotification, Deleteuser, getAdminNotifications, getAdminNotificationStats, GetUser, getUsers, markAdminNotificationAsRead, markAllAdminNotificationsAsRead, resetPassword, sendOtp, updateTrust, updateUser } from "../controller/admin.controller.js";
 import { createScheduleNews, deleteScheduleNews, getScheduleNews, getScheduleNewsByReporters, publishScheduleNews, updateScheduledNews } from "../controller/schedulenews.controller.js";
-import { createEventNews, deleteEventNews, getEventNewsByReporter, getSingleEventNews, updateEventNews } from "../controller/event.controller.js";
+import { approveEventNews, createEventNews, deleteEventNews, getEventNewsByReporter, getSingleEventNews, updateEventNews } from "../controller/event.controller.js";
 import { createPanchang, deletePanchang, getAllPanchang } from "../controller/panchang.controller.js";
 import { getTrashData, getUpdateStack, RestoreTrashedItem, TrashItemDetailViews } from "../controller/trash.controller.js";
-import { addPhoto, createGalleryNews, deleteGalleryNews, deletePhoto, getGalleryNewsByReporter, getGalleryNewsSingleByReporter, publishDraftGalleryNews, updateGalleryNews, updatePhoto } from "../controller/gallerynews.controller.js";
+import { addPhoto, approveGalleryNews, createGalleryNews, deleteGalleryNews, deletePhoto, getGalleryNewsByReporter, getGalleryNewsSingleByReporter, publishDraftGalleryNews, updateGalleryNews, updatePhoto } from "../controller/gallerynews.controller.js";
+import { approveItem, getReviewCount, getReviewItem, getReviewQueue, rejectItem, resubmitItem } from "../controller/review.controller.js";
 
 
 const auth = isAuthenticated;
@@ -57,11 +58,12 @@ export async function adminRoutes(app) {
     app.delete("/delete-scheduled-news/:id", { onRequest: [auth, need(P.NEWS_SCHEDULE)] }, deleteScheduleNews);
     app.put('/publish-scheduled-news', { onRequest: [auth, need(P.NEWS_SCHEDULE, P.NEWS_PUBLISH)] }, publishScheduleNews);
     // video news
-    app.get('/yt-news', { onRequest: [auth, need(P.YT_MANAGE)] }, getNewsYt);
-    app.post('/create-yt-news', { onRequest: [auth, need(P.YT_MANAGE)] }, createYtNews);
-    app.delete('/delete-yt-news/:id', { onRequest: [auth, need(P.YT_MANAGE)] }, deleteYtNews);
-    app.put('/update-yt-news/:id', { onRequest: [auth, need(P.YT_MANAGE)] }, updateYtNews);
-    app.get('/yt-news/:video_id', { onRequest: [auth, need(P.YT_MANAGE)] }, getSingleYtNewsAdmin);
+    app.get('/yt-news', { onRequest: [auth, anyOf(P.YT_CREATE, P.YT_MANAGE_OWN, P.YT_MANAGE_ANY, P.YT_APPROVE)] }, getNewsYt);
+    app.post('/create-yt-news', { onRequest: [auth, need(P.YT_CREATE)] }, createYtNews);
+    app.patch('/yt-news/:id/approve', { onRequest: [auth, need(P.YT_APPROVE)] }, approveYtNews);
+    app.delete('/delete-yt-news/:id', { onRequest: [auth, anyOf(P.YT_MANAGE_OWN, P.YT_MANAGE_ANY)] }, deleteYtNews);   // ownership is checked inside (assertCanManage)
+    app.put('/update-yt-news/:id', { onRequest: [auth, anyOf(P.YT_MANAGE_OWN, P.YT_MANAGE_ANY)] }, updateYtNews);
+    app.get('/yt-news/:video_id', { onRequest: [auth, anyOf(P.YT_MANAGE_OWN, P.YT_MANAGE_ANY)] }, getSingleYtNewsAdmin);
     // breaking news
     app.get('/get-breaking-news', { onRequest: [auth, need(P.BREAKING_MANAGE)] }, getBreakingNewsAdmin);
     app.post('/add-breaking-news', { onRequest: [auth, need(P.BREAKING_MANAGE)] }, Createnews);
@@ -71,6 +73,7 @@ export async function adminRoutes(app) {
     app.post('/create-gallery-news', { onRequest: [auth, need(P.GALLERY_CREATE)] }, createGalleryNews);
     app.get('/gallery-news', { onRequest: [auth, anyOf(P.GALLERY_MANAGE_OWN, P.GALLERY_MANAGE_ANY)] }, getGalleryNewsByReporter);
     app.get('/gallery-news/:news_id', { onRequest: [auth, anyOf(P.GALLERY_MANAGE_OWN, P.GALLERY_MANAGE_ANY)] }, getGalleryNewsSingleByReporter);
+    app.patch('/gallery-news/:news_id/approve', { onRequest: [auth, need(P.GALLERY_MANAGE_ANY)] }, approveGalleryNews);
     app.put('/update-gallery-news/:news_id', { onRequest: [auth, anyOf(P.GALLERY_MANAGE_OWN, P.GALLERY_MANAGE_ANY)] }, updateGalleryNews);
     app.put('/publish-gallery-news/:news_id', { onRequest: [auth, anyOf(P.GALLERY_MANAGE_OWN, P.GALLERY_MANAGE_ANY)] }, publishDraftGalleryNews);
     app.delete('/delete-gallery-news/:news_id', { onRequest: [auth, anyOf(P.GALLERY_MANAGE_OWN, P.GALLERY_MANAGE_ANY)] }, deleteGalleryNews);
@@ -91,6 +94,7 @@ export async function adminRoutes(app) {
     app.post('/create-event-news', { onRequest: [auth, need(P.EVENT_CREATE)] }, createEventNews);
     app.delete('/delete-event-news/:news_id', { onRequest: [auth, need(P.EVENT_MANAGE_ANY)] }, deleteEventNews);
     app.get('/get-single-event-news/:news_id', { onRequest: [auth, anyOf(P.EVENT_MANAGE_OWN, P.EVENT_MANAGE_ANY)] }, getSingleEventNews);
+    app.patch('/event-news/:news_id/approve', { onRequest: [auth, need(P.EVENT_MANAGE_ANY)] }, approveEventNews);
     app.put('/update-event-news', { onRequest: [auth, anyOf(P.EVENT_MANAGE_OWN, P.EVENT_MANAGE_ANY)] }, updateEventNews);
     // reporters
     app.get('/reporters', { onRequest: [auth, need(P.USER_VIEW)] }, getUsers);
@@ -121,4 +125,12 @@ export async function adminRoutes(app) {
     app.patch('/notifications/:notificationId/archive', { onRequest: [isAuthenticated] }, archiveAdminNotification);
     app.delete('/notifications/:notificationId', { onRequest: [isAuthenticated] }, deleteAdminNotification);
     app.get('/update-stack/:updateStackId', { onRequest: [isAuthenticated] }, getUpdateStack);
+
+    // review queue
+    app.get('/review-queue', { onRequest: [auth, anyOf(P.NEWS_APPROVE, P.YT_APPROVE, P.VIDEO_APPROVE, P.LIVE_APPROVE)] }, getReviewQueue);
+    app.get('/review/:type/:id', { onRequest: [auth] }, getReviewItem);               // reviewer or author, checked inside
+    app.patch('/review/:type/:id/approve', { onRequest: [auth] }, approveItem);       // permission per type, checked inside
+    app.patch('/review/:type/:id/reject', { onRequest: [auth] }, rejectItem);
+    app.patch('/review/:type/:id/resubmit', { onRequest: [auth] }, resubmitItem);
+    app.get('/review-queue/count', { onRequest: [auth, anyOf(P.NEWS_APPROVE, P.YT_APPROVE, P.VIDEO_APPROVE, P.LIVE_APPROVE)] }, getReviewCount);
 }

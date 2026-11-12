@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { History, Pencil, Plus, RotateCcw, TextSearch, Trash2, Youtube } from "lucide-react";
+import { BadgeCheck, History, Pencil, Plus, RefreshCw, RotateCcw, TextSearch, Trash2, Youtube } from "lucide-react";
+import { cn } from "../lib/cn";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import httpClient from "../api/httpClient";
@@ -12,6 +13,8 @@ import RowActions from "../components/common/RowActions";
 import RowMenu from "../components/common/RowMenu";
 import VideoCard, { VideoThumb } from "../components/video/Videocard";
 import { Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, PageHeader, Pagination, SearchInput, StatusBadge } from "../components/ui";
+import usePermission from "../hooks/usePermission";
+import ApprovalInfoModal, { ApprovalBadge, approvalState, hasApprovalInfo } from "../components/common/ApprovalInfoModal";
 
 const EMPTY_FILTERS = { district: [], state: [], location: "", createdAt: "", search: "" };
 
@@ -23,6 +26,13 @@ const Videos = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { can } = usePermission();
+
+  // only people who can approve may open the approval popup
+  const canReview = can("yt.approve");
+  const [approval, setApproval] = useState(null);
+  // hide the plain status badge while the item is waiting for approval
+  const showStatus = (item) => approvalState(item) !== "pending";
 
   const [selectedOptions, setSelectedOptions] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
@@ -36,7 +46,7 @@ const Videos = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isShowUpdatedStack, setIsShowUpdatedStack] = useState(false);
 
-  const { data, isPending, isError, error, refetch } = useFetchVideos({
+  const { data, isPending, isFetching, isError, error, refetch } = useFetchVideos({
     page,
     limit,
     filters: appliedFilters,
@@ -99,6 +109,12 @@ const Videos = () => {
       }}
       actions={[
         {
+          label: "Approval details",
+          icon: BadgeCheck,
+          hidden: (r) => !canReview || !hasApprovalInfo(r),
+          onClick: (r) => setApproval(r),
+        },
+        {
           label: "History",
           icon: History,
           onClick: (r) => {
@@ -124,10 +140,9 @@ const Videos = () => {
     />
   );
 
-  const typeBadge = () => <Badge tone="primary">Video</Badge>;
   const sourceBadge = () => <Badge tone="info" size="sm">YouTube · link</Badge>;
 
-  // sm and up: the table, unchanged
+  // sm and up: the table
   const columns = [
     {
       key: "title",
@@ -143,9 +158,17 @@ const Videos = () => {
         </div>
       ),
     },
-    { key: "kind", header: "Type", cell: typeBadge },
     { key: "source", header: "Source", cell: sourceBadge },
-    { key: "status", header: "Status", cell: (item) => <StatusBadge status={videoStatus(item)} /> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (item) => (
+        <div className="flex flex-col items-start gap-1.5">
+          {showStatus(item) && <StatusBadge status={videoStatus(item)} />}
+          <ApprovalBadge item={item} onClick={canReview ? setApproval : undefined} />
+        </div>
+      ),
+    },
     { key: "by", header: "By", cell: (item) => item.author?.username || <span className="text-fg-faint">auto</span> },
     { key: "reads", header: "Reads", cell: (item) => <span className="tabular-nums">{item.activity?.total_reads ?? 0}</span> },
     { key: "actions", header: "Actions", align: "right", cell: rowActions },
@@ -161,9 +184,9 @@ const Videos = () => {
       views={item.activity?.total_reads ?? 0}
     >
       <div className="flex flex-wrap items-center gap-2">
-        {typeBadge()}
         {sourceBadge()}
-        <StatusBadge status={videoStatus(item)} />
+        {showStatus(item) && <StatusBadge status={videoStatus(item)} />}
+        <ApprovalBadge item={item} onClick={canReview ? setApproval : undefined} />
       </div>
       <p className="text-sm text-fg-muted">By {item.author?.username || "auto"}</p>
       {rowActions(item)}
@@ -176,7 +199,11 @@ const Videos = () => {
         title="YouTube news"
         description="Long landscape videos added from YouTube."
         actions={
-          <>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+            </Button>
+
             {/* md and up: normal buttons */}
             <div className="hidden items-center gap-2 md:flex">
               <Button leftIcon={Youtube} variant="outline" onClick={() => navigate("/dashboard/short-videos")}>
@@ -198,7 +225,7 @@ const Videos = () => {
                 ]}
               />
             </div>
-          </>
+          </div>
         }
       />
 
@@ -291,6 +318,11 @@ const Videos = () => {
         isOpen={isShowUpdatedStack}
         onClose={() => setIsShowUpdatedStack(false)}
         stack_id={id}
+      />
+      <ApprovalInfoModal
+        item={canReview ? approval : null}
+        onClose={() => setApproval(null)}
+        reviewTo={approval ? `/dashboard/review/yt/${approval.news_id}` : undefined}
       />
     </div>
   );

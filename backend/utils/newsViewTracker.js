@@ -5,6 +5,7 @@ import NewsViewAnalytics from "../model/newsView.analytics.modal.js";
 import YtNews from "../model/yt-news.models.js";
 import ShortVideo from "../model/short-video.model.js";
 import LiveNews from "../model/live.news.model.js";
+import { trackRead } from "../service/readTracker.js";          // NEW
 
 const BLOCKED_BOTS = ["bot", "spider", "crawler", "curl", "postman", "wget", "python", "axios"];
 const isDuplicateKey = (e) => e?.code === 11000;
@@ -28,6 +29,7 @@ const viewerHash = (req) => {
     return { userAgent, ipHash: crypto.createHash("sha256").update(fingerprint).digest("hex") };
 };
 
+/** doc must carry { _id, author, category, state } (see incrementCount) so the hourly stats need no extra query. */
 export const trackView = async (req, type, doc, id) => {
     const viewer = viewerHash(req);
     if (!viewer) return;
@@ -45,6 +47,9 @@ export const trackView = async (req, type, doc, id) => {
                 { _id: doc._id },
                 { $inc: { "activity.total_reads": 1, "activity.total_today_count": 1 } }
             );
+            // NEW: same moment, same condition -> the hourly numbers always match total_today_count.
+            // `id` is the news_id (news, yt) or the slug (short, live): the same key SOURCES uses to find the title again.
+            trackRead({ type, id: String(id), author: doc.author, category: doc.category, state: doc.state, at: now.getTime() });
         }
     } catch (e) {
         if (!isDuplicateKey(e)) console.error(`[trackView:${type}] NewsView failed:`, e);
@@ -52,7 +57,7 @@ export const trackView = async (req, type, doc, id) => {
 
     // 2) 24-hour analytics: runs even if step 1 failed
     try {
-        const r = await NewsViewAnalytics.collection.updateOne(key, { $setOnInsert: { type, createdAt: now } }, { upsert: true });
+        await NewsViewAnalytics.collection.updateOne(key, { $setOnInsert: { type, createdAt: now } }, { upsert: true });
     } catch (e) {
         if (!isDuplicateKey(e)) console.error(`[trackView:${type}] Analytics failed:`, e);
     }

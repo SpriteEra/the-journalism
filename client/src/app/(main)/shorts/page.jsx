@@ -27,7 +27,14 @@ export default async function ShortsPage({ searchParams }) {
                         <li key={s.id}>
                             <Link href={s.href} className="group block">
                                 <div className="relative aspect-[9/16] w-full overflow-hidden bg-gray-200">
-                                    <Image src={s.image} alt={s.title} fill priority={i < 6} sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 170px" className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                                    <Image
+                                        src={s.image}
+                                        alt={s.title}
+                                        fill
+                                        priority={i < 6}
+                                        unoptimized={process.env.NODE_ENV === 'development'}
+                                        sizes="(max-width: 640px) 40vw, (max-width: 1024px) 20vw, 170px"
+                                        className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
                                     <span aria-hidden className="absolute left-1/2 top-1/2 flex h-6 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg bg-[#FF3D00] lg:h-7 lg:w-10"><Play className="size-3 fill-white text-white lg:size-4" /></span>
                                 </div>
                                 <h2 className="mt-2 line-clamp-2 font-khand text-lg font-semibold leading-snug text-black group-hover:text-primary">{s.title}</h2>

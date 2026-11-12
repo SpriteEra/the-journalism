@@ -1,7 +1,7 @@
 import { addDays, istDay, istEndOfDay } from "../../lib/time";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Ban, IdCard, KeyRound, ListChecks, MoreHorizontal, Pencil, ShieldCheck, Trash2, Unlock, UserPlus, Users } from "lucide-react";
+import { Ban, IdCard, KeyRound, ListChecks, MoreHorizontal, Pencil, ShieldCheck, Trash2, Unlock, UserPlus, Users, RefreshCw } from "lucide-react";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation, usePermissionCatalog, useRoles, useUserDetail, useUsers } from "../../hooks/admin";
@@ -12,6 +12,7 @@ import {
 } from "../../components/ui";
 import PasswordResetReporter from "./PasswordResetReporter";
 import RowMenu from "../../components/common/RowMenu";
+import cn from "../../lib/cn";
 
 const roleOptions = (roles = []) => roles.filter((r) => r.isActive).map((r) => ({ value: r.name, label: r.displayName || r.name }));
 
@@ -128,7 +129,7 @@ export default function Reporters() {
   const [params, setParams] = useState({ page: 1, limit: 10, search: "", role: "all", status: "all" });
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState(null);       // { type, user }
-  const { data, isLoading, error, refetch } = useUsers(params);
+  const { data, isLoading, isFetching, error, refetch } = useUsers(params);
   const { data: roles = [] } = useRoles();
   const patch = (p) => setParams((s) => ({ ...s, page: 1, ...p }));
   const close = () => setDialog(null);
@@ -189,6 +190,9 @@ export default function Reporters() {
         description="Everyone who can sign in to the panel. Roles decide what they can do; permissions can be fine-tuned per person."
         actions={
           <>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+            </Button>
             {/* md and up: normal buttons */}
             <div className="hidden items-center gap-2 md:flex">
               {can("role.view") && <Button as={Link} to="/dashboard/roles" variant="outline" leftIcon={ShieldCheck}>Roles</Button>}

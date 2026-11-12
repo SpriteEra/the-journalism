@@ -49,6 +49,17 @@ export { shortVideoStats };
 const sumMedia = (Model, match, viewsField = '$activity.total_reads') =>
     Model.aggregate([{ $match: match }, { $group: { _id: null, n: { $sum: 1 }, views: { $sum: viewsField } } }]).then((r) => ({ published: r[0]?.n || 0, views: r[0]?.views || 0 }));
 
+// live counter of one collection; $gt:0 lets the partial index serve it
+export const sumToday = (Model) => Model.aggregate([
+    { $match: { 'activity.total_today_count': { $gt: 0 } } },
+    { $group: { _id: null, n: { $sum: '$activity.total_today_count' } } },
+]).then((r) => r[0]?.n || 0);
+
+const todayCounters = async () => {
+    const [news, yt, shorts, liveN] = await Promise.all([sumToday(News), sumToday(YtNews), sumToday(ShortVideo), sumToday(LiveNews)]);
+    return { total: news + yt + shorts + liveN, news, yt, shorts, live: liveN };
+};
+
 // reads that actually happened in the range (nightly snapshot, all content)
 const snapshotReads = (s, e) => MonthNewsCount.aggregate([
     { $match: { year: { $gte: s.getFullYear(), $lte: e.getFullYear() } } },
@@ -244,17 +255,72 @@ export const heatmap = async ({ start, end }) => {
 
 // ───────────────────────── top articles ─────────────────────────
 export const topArticles = async ({ start, end }, limit = 10, by = 'views') => {
-    const sortField = by === 'recent' ? 'post_time' : 'activity.total_reads';
-    return News.find(live(start, end)).sort({ [sortField]: -1 }).limit(limit)
+    const today = by === 'today';
+    const filter = today
+        ? { isDeleted: false, isPublished: true, draft: false, 'activity.total_today_count': { $gt: 0 } }
+        : live(start, end);
+    const sortField = today ? 'activity.total_today_count' : by === 'recent' ? 'post_time' : 'activity.total_reads';
+    return News.find(filter).sort({ [sortField]: -1 }).limit(limit)
         .populate('author', 'username -_id').populate('category', 'name slug -_id')
         .select('news_id title banner post_time activity.total_reads activity.total_today_count author category -_id').lean();
 };
-
 // ───────────────────────── everything the admin home needs, in one payload ─────────────────────────
-export const dashboard = async (range) => {
+const dashboardFull = async (range) => {
     const [ov, ts, cats, states, districts, reps, appr, hm, top, quiet, tags] = await Promise.all([
         overview(range), timeseries(range), categoryTree(range), byDimension(range, 'state', 10), byDimension(range, 'district', 10),
         reporters(range, 'views', 10), approval(range), heatmap(range), topArticles(range, 10), quietCategories(range), byDimension(range, 'tag', 15),
     ]);
     return { overview: ov, timeseries: ts, categories: cats, states, districts, reporters: reps, approval: appr, heatmap: hm, topArticles: top, quietCategories: quiet, tags };
 };
+
+// ───────────────────────── TODAY (live, lean) ─────────────────────────
+// one pass over today's stories: hourly buckets + totals + active reporters
+const hourly = async ({ start, end }) => {
+    const rows = await News.aggregate([
+        { $match: live(start, end) },
+        { $group: { _id: { $hour: { date: '$post_time', timezone: TZ } }, stories: { $sum: 1 }, reads: { $sum: '$activity.total_reads' }, authors: { $addToSet: '$author' } } },
+    ]);
+    const m = new Map(rows.map((r) => [r._id, r]));
+    const authors = new Set();
+    rows.forEach((r) => r.authors.forEach((a) => authors.add(String(a))));
+    return {
+        byHour: Array.from({ length: 24 }, (_, h) => ({ hour: String(h).padStart(2, '0'), stories: m.get(h)?.stories || 0, reads: m.get(h)?.reads || 0 })),
+        published: rows.reduce((a, r) => a + r.stories, 0),
+        views: rows.reduce((a, r) => a + r.reads, 0),
+        activeReporters: authors.size,
+    };
+};
+
+// same payload shape as dashboardFull, so the UI needs no second code path
+const dashboardToday = async (range) => {
+    const { start, end } = range;
+    const [h, counters, gallery, events, yt, shortVideos, liveN, cats, states, reps, appr, top] = await Promise.all([
+        hourly(range),
+        todayCounters(),
+        sumMedia(GalleryNews, { isDeleted: false, isPublished: true, post_time: { $gte: start, $lte: end } }),
+        sumMedia(EventNews, { isDeleted: false, draft: false, post_time: { $gte: start, $lte: end } }),
+        sumMedia(YtNews, { isDeleted: false, draft: false, createdAt: { $gte: start, $lte: end } }),
+        shortVideoStats(null, start, end),
+        sumMedia(LiveNews, { isDeleted: false, status: { $in: ['live', 'ended'] }, post_time: { $gte: start, $lte: end } }),
+        byDimension(range, 'category', 6),
+        byDimension(range, 'state', 6),
+        reporters(range, 'published', 6),
+        approval(range),
+        topArticles(range, 6, 'today'),
+    ]);
+    return {
+        overview: {
+            news: {
+                published: h.published, views: h.views, avgViews: round(h.published ? h.views / h.published : 0),
+                activeReporters: h.activeReporters, readsInRange: counters.total, change: {},
+            },
+            todayReads: counters,
+            otherContent: { gallery, events, youtubeVideos: yt, shortVideos, liveNews: liveN },
+        },
+        byHour: h.byHour,
+        categories: cats, states, reporters: reps, approval: appr, topArticles: top,
+        timeseries: { series: [] }, heatmap: null, districts: [], tags: [], quietCategories: [],
+    };
+};
+
+export const dashboard = (range) => (range.isToday ? dashboardToday(range) : dashboardFull(range));

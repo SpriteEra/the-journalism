@@ -2,7 +2,7 @@ import httpClient from '../api/httpClient'
 import { useQuery } from "@tanstack/react-query";
 import { cleanParams } from "../lib/api";
 const fetchNews = async ({ queryKey }) => {
-  const [_key, { page, limit, draft, need_approval, filters }] = queryKey;
+  const [_key, { page, limit, draft, need_approval, rejected, filters }] = queryKey;
 
   const { category, subCategory, district, state, location, createdAt, search, tag, from, to, author } = filters;
 
@@ -28,9 +28,9 @@ const fetchNews = async ({ queryKey }) => {
   return data;
 };
 
-export const useFetchNews = ({ page, need_approval = false, limit, draft = false, filters }) => {
+export const useFetchNews = ({ page, need_approval = false, rejected = false, limit, draft = false, filters }) => {
   return useQuery({
-    queryKey: ['news', { page, limit, draft, filters, need_approval }],
+    queryKey: ['news', { page, limit, draft, filters, need_approval, rejected }],
     queryFn: fetchNews,
     placeholderData: (previous) => previous,
     staleTime: 1000 * 60 * 2,
@@ -55,7 +55,8 @@ export const useFetchScheduleNews = ({ page, limit }) => {
     staleTime: 1000 * 60 * 2,
   });
 };
-
+export const fetchScheduledNews = (news_id, { preview = false } = {}) =>
+  httpClient.get("/get-scheduled-news", { params: { news_id, ...(preview ? { preview: true } : {}) } }).then((r) => r.data.news);
 
 const fetchBreakingNews = async ({ queryKey }) => {
   const [_key, { page, limit, search }] = queryKey;

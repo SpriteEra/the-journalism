@@ -91,42 +91,89 @@ export default function Modal({ open, onClose, title, description, size = "md", 
 }
 
 /** Side panel (filters, detail views). side="right|left" */
-export function Drawer({ open, onClose, title, description, side = "right", width = "max-w-md", footer, children }) {
+
+export function Drawer({
+  open,
+  onClose,
+  title,
+  description,
+  side = "right",
+  width = "max-w-md",
+  footer,
+  children,
+}) {
   const panelRef = useRef(null);
   const titleId = useId();
+
   useOverlay({ open, onClose, panelRef });
+
   if (!open) return null;
+
+  // Support both Tailwind classes and CSS widths like "500px"
+  const isCustomWidth = /^\d+(\.\d+)?(px|rem|vw|%)$/.test(width);
+
   return createPortal(
     <div className="fixed inset-0 z-50" role="presentation">
-      <div className="absolute inset-0 animate-fade-in bg-overlay" onClick={onClose} aria-hidden />
+      <div
+        className="absolute inset-0 animate-fade-in bg-overlay"
+        onClick={onClose}
+        aria-hidden
+      />
+
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
+        style={isCustomWidth ? { width, maxWidth: "100vw" } : undefined}
         className={cn(
           "absolute inset-y-0 flex w-full flex-col border-line bg-surface shadow-pop outline-none",
-          width,
-          side === "right" ? "right-0 animate-slide-in-right border-l" : "left-0 animate-slide-in-left border-r"
+          !isCustomWidth && width,
+          side === "right"
+            ? "right-0 animate-slide-in-right border-l"
+            : "left-0 animate-slide-in-left border-r"
         )}
       >
         <div className="relative flex items-start justify-between gap-4 border-b border-line bg-linear-to-r from-primary-soft/60 to-transparent px-5 py-4">
           <div className="min-w-0">
-            {title && <h2 id={titleId} className="max-sm:text-xl text-lg font-semibold text-fg">{title}</h2>}
-            {description && <p className="mt-0.5 text-xs max-sm:leading-snug sm:text-sm text-fg-subtle">{description}</p>}
+            {title && (
+              <h2 id={titleId} className="max-sm:text-xl text-lg font-semibold text-fg">
+                {title}
+              </h2>
+            )}
+            {description && (
+              <p className="mt-0.5 text-xs max-sm:leading-snug sm:text-sm text-fg-subtle">
+                {description}
+              </p>
+            )}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle transition-colors hover:bg-surface-3 hover:text-fg focus-ring">
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle transition-colors hover:bg-surface-3 hover:text-fg focus-ring"
+          >
             <X className="size-4.5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">{footer}</div>}
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {children}
+        </div>
+
+        {footer && (
+          <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body
   );
 }
+
 
 const CONFIRM_ICON = { danger: Trash2, warning: AlertTriangle, primary: HelpCircle, success: CheckCircle2 };
 const CONFIRM_RING = { danger: "bg-danger-soft text-danger ring-danger-soft/60", warning: "bg-warning-soft text-warning ring-warning-soft/60", primary: "bg-primary-soft text-primary ring-primary-soft/60", success: "bg-success-soft text-success ring-success-soft/60" };

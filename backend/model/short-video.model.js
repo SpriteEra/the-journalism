@@ -54,7 +54,6 @@ const shortVideoSchema = new Schema({
     isPublished: { type: Boolean, default: true },                 // false = waiting for approval
     isDeleted: { type: Boolean, default: false },
     publishedAt: { type: Date },                                   // YouTube date, or the moment we published; drives ordering
-    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
 
     activity: {
         total_reads: { type: Number, default: 0 },
@@ -62,7 +61,12 @@ const shortVideoSchema = new Schema({
     },
     seo: { type: seoSchema, default: () => ({}) },
     author: { type: Schema.Types.ObjectId, ref: 'User' },         // empty for auto-imported items
-    update_stack: { type: Schema.Types.ObjectId, ref: 'UpdateStack' },
+    need_approval: { type: Boolean, default: false },
+    approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    approved_at: { type: Date },
+    rejected_reason: { type: String, default: '', maxLength: 300 },
+    rejected_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    rejected_at: { type: Date },
 }, { timestamps: true });
 
 shortVideoSchema.pre('validate', function () {
@@ -96,5 +100,9 @@ shortVideoSchema.index({ author: 1, isDeleted: 1, createdAt: -1 });
 shortVideoSchema.index({ author: 1, isPublished: 1, publishedAt: -1 }, { partialFilterExpression: { isDeleted: false } });
 // admin "waiting for approval" queue
 shortVideoSchema.index({ isDeleted: 1, isPublished: 1, createdAt: -1 });
-
+shortVideoSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
+shortVideoSchema.index(
+    { 'activity.total_today_count': -1 },
+    { partialFilterExpression: { 'activity.total_today_count': { $gt: 0 } } }
+);
 export default mongoose.model('ShortVideo', shortVideoSchema);

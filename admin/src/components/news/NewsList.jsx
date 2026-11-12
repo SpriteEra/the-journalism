@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { FilterX, LayoutGrid, Newspaper, Plus, Rows3, SlidersHorizontal, UserRound } from "lucide-react";
+import { FilterX, LayoutGrid, Newspaper, Plus, RefreshCw, Rows3, SlidersHorizontal, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient";
@@ -39,12 +39,13 @@ export default function NewsList({ title, description, draft = false, needApprov
   const [filterOpen, setFilterOpen] = useState(false);
   const [stack, setStack] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [rejectedOnly, setRejectedOnly] = useState(false);
   const [layout, setLayout] = useState(() => { try { return localStorage.getItem(VIEW_KEY) || "grid"; } catch { return "grid"; } });
 
   const seeAll = can("news.view.all");
   const authors = useNewsAuthors(seeAll);
   const cats = useCategories(); const states = useStates(); const districts = useDistricts();
-  const { data, isPending, isFetching, isError, error, refetch } = useFetchNews({ page, limit, draft, need_approval: needApproval, filters: applied });
+  const { data, isPending, isFetching, isError, error, refetch } = useFetchNews({ page, limit, draft, need_approval: needApproval, rejected: draft && rejectedOnly, filters: applied });
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [page]);
   useEffect(() => { try { localStorage.setItem(VIEW_KEY, layout); } catch { /* ignore */ } }, [layout]);
@@ -107,7 +108,18 @@ export default function NewsList({ title, description, draft = false, needApprov
 
   return (
     <div className="flex flex-1 flex-col">
-      <PageHeader title={title} description={description} actions={writeBtn} />
+      <PageHeader
+        title={title}
+        description={description}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label={t("Reload")} title={t("Reload")} className="!px-2.5">
+              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+            </Button>
+            {writeBtn}
+          </div>
+        }
+      />
 
       <Card padded={false} className="mb-2 overflow-visible rounded-lg">
         <div className="flex gap-1.5 p-1 items-center sm:p-2.5">
@@ -128,7 +140,11 @@ export default function NewsList({ title, description, draft = false, needApprov
             />
           </form>
           <div className="flex items-center gap-1 sm:gap-2">
-
+            {draft && (
+              <Button variant={rejectedOnly ? "primary" : "outline"} onClick={() => { setRejectedOnly((v) => !v); go(1); }} className="px-2 sm:flex-none">
+                {t("Rejected")}
+              </Button>
+            )}
             <Button
               variant="outline"
               leftIcon={SlidersHorizontal}
@@ -205,7 +221,7 @@ export default function NewsList({ title, description, draft = false, needApprov
           <Card className="flex min-h-[max(20rem,calc(100dvh-26rem))] items-center">
             <EmptyState
               icon={Newspaper}
-              title={t(emptyText)}
+              title={draft && rejectedOnly ? t("No rejected stories") : t(emptyText)}
               description={active ? t("Try clearing the filters.") : undefined} action={!active ? writeBtn || null : <Button variant="outline" onClick={() => { setSearch(""); apply(EMPTY); }}>{t("Clear all")}</Button>}
             />
           </Card>

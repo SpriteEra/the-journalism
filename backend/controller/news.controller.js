@@ -34,6 +34,7 @@ import { attachPrimaryName } from "../utils/primaryRoutes.js";
 import { trackView, VIEW_TYPES } from "../utils/newsViewTracker.js";
 import liveNewsModel from "../model/live.news.model.js";
 import tagModel from "../model/tag.model.js";
+import { approvalCleared, approvedNow, notifyApprovers } from "../utils/approval.js";
 
 const PUBLIC_Q = { draft: false, isPublished: true, isDeleted: false };
 const CARD_FIELDS = 'news_id slug primaryRoute.slug title description location post_time banner isVideo -_id author';
@@ -198,13 +199,14 @@ export const getNewses = tryCatch(async (req, res) => {
 });
 export const incrementCount = tryCatch(async (req, res, next) => {
     const { type, id } = req.params;
-    console.log("incrementCount", type, id);
     const cfg = VIEW_TYPES[type];
     if (!cfg) return next(new ErrorHandler(400, "Invalid type"));
-    const doc = await cfg.Model.findOne(cfg.where(id)).select("_id").lean();
+
+    // author / category / state are needed by the hourly analytics (trackRead)
+    const doc = await cfg.Model.findOne(cfg.where(id)).select("_id author category state").lean();
     if (!doc) return next(new ErrorHandler(404, "Not found"));
 
-    trackView(req, type, doc, id);   // no await: the reader doesn't wait for counting
+    trackView(req, type, doc, id).catch(() => { });   // no await: the reader doesn't wait for counting
     return res.status(200).json({ success: true });
 });
 
@@ -339,7 +341,7 @@ export const getSingleNews = tryCatch(async (req, res, next) => {
         settings: seoData,
     };
 
-    const latest_news = await News.find({ news_id: { $ne: news_id }, draft: false })
+    const latest_news = await News.find({ ...PUBLIC_Q, news_id: { $ne: news_id } })
         .sort({ post_time: -1 }).limit(1).select('news_id title post_time -_id');
 
     // canonicalPath: where this story lives. A link with a wrong / old section (?path=/wrong/news/<slug>) still opens the story;
@@ -689,7 +691,7 @@ export const createNewsByReporter = tryCatch(async (req, res) => {
     }
 
     // existing tags are looked up (id / slug / title / alias); unknown titles are created when the caller has tag.create
-    const tg = await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TAG_CREATE), userId: authorId, requireTag: !draft });
+    const tg = await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TOPIC_CREATE), userId: authorId, requireTag: !draft });
     const news_id = `${await makeSlug(title)}-${getCurrentDate()}-${generateNanoId()}`;
     const news = new News({
         title, description, content: content ?? [], tags: tg.ids, keywords: keywords ?? { hi: [], en: [] }, aiGeneratedTags: aiGeneratedTags ?? [], banner, location: location ?? '',
@@ -711,16 +713,24 @@ export const createNewsByReporter = tryCatch(async (req, res) => {
     if (featured) await unfeatureOthers(news._id);
     onNewsChanged();
 
-    res.status(200).json({ success: true, message: 'News Created Successfully', news_id, status: draft ? 'draft' : needApproval ? 'pending-approval' : 'published' });
+    res.status(200).json({
+        success: true,
+        pending: needApproval,
+        message: needApproval ? 'Sent for approval. It will be published once an authorized person approves it.' : draft ? 'Draft saved' : 'News Created Successfully',
+        news_id, status: draft ? 'draft' : needApproval ? 'pending-approval' : 'published',
+    });
 
     if (!draft) {
         (async () => {
             try {
-                NotificationService.sendNewsNotification({ title: news.title, author: req.user?.username }, 'newsAdded', {
-                    body: `"${news.title}" ${needApproval ? 'submitted for Approval' : 'Published'}`,
-                    link: `/dashboard/news/${news._id}`, title: 'New News Added',
-                    targetRole: await approverRoles(), excludeIds: [req.user._id],
-                });
+                if (needApproval) {
+                    notifyApprovers(req, { perms: [P.NEWS_APPROVE], label: 'News', title: news.title, link: `/dashboard/review/news/${news.news_id}` });
+                } else {
+                    NotificationService.sendNewsNotification({ title: news.title, author: req.user?.username }, 'newsAdded', {
+                        body: `"${news.title}" Published`, link: `/dashboard/news/${news._id}`, title: 'New News Added',
+                        targetRole: await approverRoles(), excludeIds: [req.user._id],
+                    });
+                }
                 if (publishVal) {
                     await User.updateOne({ _id: authorId }, { $inc: { 'account_info.total_news': 1 } });
                     if (sendNotification) await sendNewsNotification(news);
@@ -797,7 +807,7 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     if (description !== undefined && description !== news.description) { updateData.description = description; changes.push('Description updated'); }
     if (content !== undefined && JSON.stringify(contentBlocks(content)) !== JSON.stringify(contentBlocks(news.content))) { updateData.content = content; changes.push('Content updated'); }
     if (tagItems) {
-        const tg = await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TAG_CREATE), userId: actorId, existing: news.tags, requireTag: !isDraft });
+        const tg = await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TOPIC_CREATE), userId: actorId, existing: news.tags, requireTag: !isDraft });
         if (!sameIds(tg.ids, news.tags)) { updateData.tags = tg.ids; changes.push(`Tags updated (${tg.docs.map((d) => d.title).join(', ')})`); }
     }
     if (keywords && !sameKeywords(keywords, news.keywords)) { updateData.keywords = keywords; changes.push(`Keywords updated (${keywords.hi.length} Hindi, ${keywords.en.length} English)`); }
@@ -835,18 +845,17 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     // ── draft / approval / publish state machine ──
     const now = new Date();
     if (isDraft) {
-        if (!news.draft) { updateData.draft = true; updateData.isPublished = false; updateData.need_approval = false; changes.push('Moved back to draft'); }
-    } else if (news.need_approval) {                          // pending review
+        if (!news.draft) { Object.assign(updateData, { draft: true, isPublished: false, need_approval: false }, approvalCleared); changes.push('Moved back to draft'); }
+    } else if (news.need_approval) {
         if (canApprove) {
-            Object.assign(updateData, { draft: false, need_approval: false, isPublished: true, approved_by: actorId, post_time: news.post_time || now });
-            changes.push('News Approved By Admin');
+            Object.assign(updateData, { draft: false, need_approval: false, isPublished: true, post_time: news.post_time || now }, approvedNow(req));
+            changes.push(`News Approved By ${req.user.username}`);     // the stack now names the approver
         } else if (news.draft) { updateData.draft = false; }
-    } else if (news.draft || !news.post_time) {              // draft -> live (or pending, if the caller may not publish)
+    } else if (news.draft || !news.post_time) {
         updateData.draft = false;
-        if (canPublish) { Object.assign(updateData, { isPublished: true, need_approval: false, post_time: news.post_time || now }); changes.push('Published'); }
-        else { Object.assign(updateData, { isPublished: false, need_approval: true }); changes.push('Submitted for approval'); }
+        if (canPublish) { Object.assign(updateData, { isPublished: true, need_approval: false, post_time: news.post_time || now }, approvalCleared); changes.push('Published'); }
+        else { Object.assign(updateData, { isPublished: false, need_approval: true }, approvalCleared); changes.push('Submitted for approval'); }
     }
-
     let uploadedBanner = null;
     if (bannerFile) {
         try { uploadedBanner = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
@@ -869,11 +878,16 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     await stackPush(news.update_stack, actorId, changes.join(', '));
     onNewsChanged();
 
-    res.status(200).json({ success: true, message: 'News updated successfully', news, changes });
+    const submitted = changes.includes('Submitted for approval');
+    res.status(200).json({
+        success: true, submitted,
+        message: submitted ? 'Sent for approval. It will be published once an authorized person approves it.' : 'News updated successfully',
+        news, changes,
+    });
 
     (async () => {
         try {
-            const approved = changes.includes('News Approved By Admin');
+            const approved = changes.some((c) => c.startsWith('News Approved By'));
             if (becameLive) {
                 await User.updateOne({ _id: news.author }, { $inc: { 'account_info.total_news': 1 } });
                 if (shouldNotify) await sendNewsNotification(news);
@@ -887,9 +901,13 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
                         link: `/news/${news.news_id}`,
                     });
             }
-            await NotificationService.sendNewsNotification(
-                { updatedBy: req.user.username, title: news.title, link: `/dashboard/news/${news.news_id}` }, 'newsUpdated',
-                { targetRole: await approverRoles(), ...(approved ? { message: 'News Verified' } : {}), excludeIds: [actorId] });
+            if (changes.includes('Submitted for approval')) {
+                notifyApprovers(req, { perms: [P.NEWS_APPROVE], label: 'News', title: news.title, link: `/dashboard/review/news/${news.news_id}` });
+            } else {
+                await NotificationService.sendNewsNotification(
+                    { updatedBy: req.user.username, title: news.title, link: `/dashboard/news/${news.news_id}` }, 'newsUpdated',
+                    { targetRole: await approverRoles(), ...(approved ? { message: 'News Verified' } : {}), excludeIds: [actorId] });
+            }
         } catch (err) { console.error('News update notification failed:', err); }
     })();
 });
@@ -953,11 +971,12 @@ export const getNewsByReporter = tryCatch(async (req, res) => {
         News.find(query)
             .populate('author', 'username fullName email profile')
             .populate('approved_by', 'username email')
+            .populate('rejected_by', 'username')
             .populate('category', 'name slug -_id').populate('subCategory', 'name slug -_id')
             .populate('state', 'state displayName slug -_id').populate('district', 'district displayName slug -_id')
             .populate('tags', 'title slug -_id')
             .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 })
-            .select('news_id title description draft banner createdAt activity isPublished update_stack need_approval post_time category subCategory state district tags keywords author approved_by -_id').lean(),
+            .select('news_id title description draft banner createdAt activity isPublished update_stack need_approval approved_by approved_at rejected_reason rejected_by rejected_at post_time category subCategory state district tags keywords author -_id').lean(),
         News.countDocuments(query),
     ]);
     return res.status(200).json({ news, total, page, limit });

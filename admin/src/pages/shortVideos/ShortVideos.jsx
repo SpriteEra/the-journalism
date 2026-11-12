@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { CheckCircle2, Link2, Pencil, Plus, PlaySquare, Trash2, Upload, Youtube } from "lucide-react";
+import { BadgeCheck, Link2, Pencil, Plus, PlaySquare, RefreshCw, Trash2, Upload, Youtube } from "lucide-react";
+import { cn } from "../../lib/cn";
 import { useNavigate } from "react-router-dom";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
@@ -10,23 +11,26 @@ import { siteUrl } from "../../lib/share";
 import RowActions from "../../components/common/RowActions";
 import RowMenu from "../../components/common/RowMenu";
 import VideoCard, { VideoThumb } from "../../components/video/Videocard";
-// import VideoCard, { VideoThumb } from "../../components/common/VideoCard";
+import ApprovalInfoModal, { ApprovalBadge, approvalState, hasApprovalInfo } from "../../components/common/ApprovalInfoModal";
 
 const SOURCE = { youtube_auto: ["info", "YouTube · auto"], youtube_manual: ["info", "YouTube · link"], upload: ["accent", "Uploaded"] };
 
 const isPortrait = (v) => v.kind === "short" || (v.height && v.width && v.height > v.width);
 const status = (v) => (v.draft ? "draft" : v.isPublished ? "published" : "pending");
 const dateOf = (v) => fmtISTDateTime(v.publishedAt || v.createdAt);
+// hide the plain status badge while the item is waiting for approval
+const showStatus = (v) => approvalState(v) !== "pending";
 
 export default function ShortVideos() {
   const { can } = usePermission();
   const navigate = useNavigate();
+  const canReview = can("video.approve");           // only approvers can open the approval popup
   const [params, setParams] = useState({ page: 1, limit: 20, kind: "all", sourceType: "all", pending: "", search: "" });
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
-  const { data, isLoading, error, refetch } = useShortVideos(params);
+  const [approval, setApproval] = useState(null);   // the row whose approval popup is open
+  const { data, isLoading, isFetching, error, refetch } = useShortVideos(params);
   const patch = (p) => setParams((s) => ({ ...s, page: 1, ...p }));
-  const approve = useApiMutation((v) => httpClient.put(`/short-videos/${v.slug}`, { approve: true }).then((r) => r.data), { invalidate: ["short-videos"], success: "Approved and published" });
   const del = useApiMutation(() => httpClient.delete(`/short-videos/${deleting.slug}`).then((r) => r.data), { invalidate: ["short-videos"], onSuccess: () => setDeleting(null) });
 
   // one definition, used by the table row AND the collapsed card
@@ -35,7 +39,7 @@ export default function ShortVideos() {
       row={v}
       share={{ url: (r) => siteUrl(`/shorts/${r.slug}`), title: (r) => r.title }}
       actions={[
-        { label: "Approve & publish", icon: CheckCircle2, hidden: (r) => !(can("video.manage.any") && !r.isPublished && !r.draft), onClick: (r) => approve.mutate(r) },
+        { label: "Approval details", icon: BadgeCheck, hidden: (r) => !canReview || !hasApprovalInfo(r), onClick: (r) => setApproval(r) },
         { label: "Edit", icon: Pencil, onClick: (r) => navigate(`${r.slug}/edit`) },
         { label: "Delete", icon: Trash2, danger: true, onClick: (r) => setDeleting(r) },
       ]}
@@ -45,7 +49,7 @@ export default function ShortVideos() {
   const typeBadge = (v) => <Badge tone={v.kind === "short" ? "accent" : "primary"}>{v.kind === "short" ? "Short" : "Video"}</Badge>;
   const sourceBadge = (v) => <Badge tone={SOURCE[v.sourceType]?.[0]} size="sm">{SOURCE[v.sourceType]?.[1]}</Badge>;
 
-  // sm and up: the table, unchanged
+  // sm and up: the table
   const columns = [
     {
       key: "title", header: "Video", primary: true, cell: (v) => (
@@ -53,16 +57,23 @@ export default function ShortVideos() {
           <VideoThumb src={v.thumbnail} portrait={isPortrait(v)} duration={v.duration} />
           <div>
             <p className="line-clamp-2 max-w-xs font-medium text-fg lg:text-base">{v.title}</p>
-            <p className="mt-0.5 text-xs text-fg-subtle">{v.activity?.total_reads ?? v.views ?? 0} views</p>
+            <span className="text-xs">{dateOf(v)}</span>
           </div>
         </div>
       ),
     },
     { key: "kind", header: "Type", cell: typeBadge },
     { key: "source", header: "Source", cell: sourceBadge },
-    { key: "status", header: "Status", cell: (v) => <StatusBadge status={status(v)} /> },
+    {
+      key: "status", header: "Status", cell: (v) => (
+        <div className="flex flex-col items-start gap-1.5">
+          {showStatus(v) && <StatusBadge status={status(v)} />}
+          <ApprovalBadge item={v} onClick={canReview ? setApproval : undefined} />
+        </div>
+      ),
+    },
     { key: "by", header: "By", cell: (v) => v.author?.username || <span className="text-fg-faint">auto</span> },
-    { key: "date", header: "Published", cell: (v) => <span className="text-xs">{dateOf(v)}</span> },
+    { key: "date", header: "Reads", cell: (v) => <span className="text-xs">{v.activity?.total_reads ?? 0}</span> },
     { key: "actions", header: "Actions", align: "right", cell: rowActions },
   ];
 
@@ -79,7 +90,8 @@ export default function ShortVideos() {
       <div className="flex flex-wrap items-center gap-2">
         {typeBadge(v)}
         {sourceBadge(v)}
-        <StatusBadge status={status(v)} />
+        {showStatus(v) && <StatusBadge status={status(v)} />}
+        <ApprovalBadge item={v} onClick={canReview ? setApproval : undefined} />
       </div>
       <p className="text-sm text-fg-muted">By {v.author?.username || "auto"}</p>
       {rowActions(v)}
@@ -91,31 +103,38 @@ export default function ShortVideos() {
       <PageHeader
         title="Shorts videos"
         description="YouTube links and your own uploads (stored on Cloudflare) in one place."
-        actions={can("video.create") && (
-          <>
-            <div className="hidden items-center gap-2 md:flex">
-              <Button variant="outline" leftIcon={Youtube} onClick={() => navigate("/dashboard/videos")}>YouTube Video</Button>
-              <Button variant="outline" leftIcon={Youtube} onClick={() => navigate("/dashboard/short-videos/new?mode=youtube")}>YouTube Short link</Button>
-              <Button leftIcon={Upload} onClick={() => navigate("/dashboard/short-videos/new?mode=upload")}>Upload</Button>
-            </div>
-            <div className="md:hidden">
-              <RowMenu
-                variant="filled"
-                icon={Plus}
-                items={[
-                  { label: "YouTube Video", icon: Youtube, onClick: () => navigate("/dashboard/videos") },
-                  { label: "YouTube Short link", icon: Link2, onClick: () => navigate("/dashboard/short-videos/new?mode=youtube") },
-                  { label: "Upload short", icon: Upload, onClick: () => navigate("/dashboard/short-videos/new?mode=upload") },
-                ]}
-              />
-            </div>
-          </>
-        )}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+            </Button>
+            {can("video.create") && (
+              <>
+                <div className="hidden items-center gap-2 md:flex">
+                  <Button variant="outline" leftIcon={Youtube} onClick={() => navigate("/dashboard/videos")}>YouTube Video</Button>
+                  <Button variant="outline" leftIcon={Youtube} onClick={() => navigate("/dashboard/short-videos/new?mode=youtube")}>YouTube Short link</Button>
+                  <Button leftIcon={Upload} onClick={() => navigate("/dashboard/short-videos/new?mode=upload")}>Upload</Button>
+                </div>
+                <div className="md:hidden">
+                  <RowMenu
+                    variant="filled"
+                    icon={Plus}
+                    items={[
+                      { label: "YouTube Video", icon: Youtube, onClick: () => navigate("/dashboard/videos") },
+                      { label: "YouTube Short link", icon: Link2, onClick: () => navigate("/dashboard/short-videos/new?mode=youtube") },
+                      { label: "Upload short", icon: Upload, onClick: () => navigate("/dashboard/short-videos/new?mode=upload") },
+                    ]}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        }
       />
 
-      {data?.items && params.pending !== "true" && data.items.some((v) => !v.isPublished && !v.draft) && can("video.manage.any") && (
+      {/* {canReview && data?.items && params.pending !== "true" && data.items.some((v) => v.need_approval) && (
         <Alert tone="warning" className="mb-4" title="Some videos are waiting for approval" action={<Button size="sm" variant="outline" onClick={() => patch({ pending: "true" })}>Show pending</Button>} />
-      )}
+      )} */}
 
       <Card padded={false} className="flex min-h-0 flex-1 flex-col overflow-hidden max-sm:border-none max-sm:bg-transparent max-sm:p-0">
         <div className="flex items-center gap-2 border-line sm:justify-between sm:gap-3 sm:border-b sm:p-4">
@@ -163,6 +182,11 @@ export default function ShortVideos() {
       </Card>
 
       {deleting && <ConfirmDialog open onClose={() => setDeleting(null)} tone="danger" loading={del.isPending} onConfirm={() => del.mutate()} confirmLabel="Delete" title="Delete this video?" message={`“${deleting.title}” will be removed from the website.`} />}
+      <ApprovalInfoModal
+        item={canReview ? approval : null}
+        onClose={() => setApproval(null)}
+        reviewTo={approval ? `/dashboard/review/short/${approval.slug}` : undefined}
+      />
     </div>
   );
 }

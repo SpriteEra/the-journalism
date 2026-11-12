@@ -179,6 +179,15 @@ export async function getShort(slug) {
   return { short: toShort(r.video), more: (r.more || []).map(toShort).filter(Boolean), seo: r.seo || {} };
 }
 
+/** shorts to continue with after `slug`: related first, never one of `exclude`. Not cached (depends on what was already shown). */
+export async function getNextShorts(slug, { exclude = [], limit = 5 } = {}) {
+  const r = await safe(
+    apiGet(`/short-videos/${encodeURIComponent(slug)}/next`, { params: { exclude: exclude.join(","), limit }, revalidate: 0 }),
+    { videos: [], hasMore: false },
+  );
+  return { items: (r.videos || []).map(toShort).filter(Boolean), hasMore: Boolean(r.hasMore) };
+}
+
 export async function getVideos({ page = 1, limit = 12 } = {}) {
   const r = await safe(apiGet("/yt/video-news", { params: { page, limit }, revalidate: TTL.list() }), { news: [], total: 0 });
   return { items: (r.news || []).map(toVideo).filter(Boolean), total: r.total ?? r.news?.length ?? 0 };

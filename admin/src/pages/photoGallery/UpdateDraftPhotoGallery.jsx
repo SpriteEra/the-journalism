@@ -155,7 +155,6 @@ const UpdateDraftPhotoGallery = () => {
   };
 
   const updatePhoto = async () => {
-    console.log(editPhoto);
     if (validatePhoto(editPhoto)) {
       try {
         setLoadingStates((prev) => ({
@@ -188,12 +187,12 @@ const UpdateDraftPhotoGallery = () => {
           prev.map((photo) =>
             photo.id === editingPhotoId
               ? {
-                  ...photo,
-                  title: editPhoto.title,
-                  description: editPhoto.description,
-                  image: editPhoto.preview || editPhoto.originalImage,
-                  file: editPhoto.file || photo.file,
-                }
+                ...photo,
+                title: editPhoto.title,
+                description: editPhoto.description,
+                image: editPhoto.preview || editPhoto.originalImage,
+                file: editPhoto.file || photo.file,
+              }
               : photo
           )
         );
@@ -584,9 +583,8 @@ const UpdateDraftPhotoGallery = () => {
             <div className="h-6 w-px bg-surface-3"></div>
 
             <button
-              className={`btn-blue bg-gradient-to-r max-sm:text-sm from-success to-success border-success flex items-center sm:gap-1 h-full ${
-                loadingStates.finalUpdate ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`btn-blue bg-gradient-to-r max-sm:text-sm from-success to-success border-success flex items-center sm:gap-1 h-full ${loadingStates.finalUpdate ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               onClick={handlePublish}
               disabled={loadingStates.finalUpdate}
             >
@@ -605,9 +603,8 @@ const UpdateDraftPhotoGallery = () => {
 
             {article && !article?.published && (
               <button
-                className={`btn-blue-outline bg-surface hover:bg-surface-2 text-fg-muted border border-line-strong flex gap-1 items-center max-sm:text-sm ${
-                  isSavingDraft ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`btn-blue-outline bg-surface hover:bg-surface-2 text-fg-muted border border-line-strong flex gap-1 items-center max-sm:text-sm ${isSavingDraft ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 onClick={handleSaveAsDraft}
                 disabled={isSavingDraft}
               >
@@ -809,11 +806,10 @@ const UpdateDraftPhotoGallery = () => {
                 </button>
                 <button
                   onClick={addPhoto}
-                  className={`px-4 py-2 bg-success hover:bg-success text-paper rounded-lg transition-colors flex items-center gap-2 ${
-                    loadingStates.addingPhoto
+                  className={`px-4 py-2 bg-success hover:bg-success text-paper rounded-lg transition-colors flex items-center gap-2 ${loadingStates.addingPhoto
                       ? "opacity-50 cursor-not-allowed"
                       : ""
-                  }`}
+                    }`}
                   disabled={loadingStates.addingPhoto}
                 >
                   {loadingStates.addingPhoto ? (
@@ -880,11 +876,10 @@ const UpdateDraftPhotoGallery = () => {
                 </button>
                 <button
                   onClick={updatePhoto}
-                  className={`px-4 py-2 bg-warning hover:bg-warning text-paper rounded-lg transition-colors flex items-center gap-2 ${
-                    loadingStates.updatingPhoto === editingPhotoId
+                  className={`px-4 py-2 bg-warning hover:bg-warning text-paper rounded-lg transition-colors flex items-center gap-2 ${loadingStates.updatingPhoto === editingPhotoId
                       ? "opacity-50 cursor-not-allowed"
                       : ""
-                  }`}
+                    }`}
                   disabled={loadingStates.updatingPhoto === editingPhotoId}
                 >
                   {loadingStates.updatingPhoto === editingPhotoId ? (
@@ -921,12 +916,11 @@ const UpdateDraftPhotoGallery = () => {
                     <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => startEditPhoto(photo)}
-                        className={`p-1.5 bg-warning text-paper rounded-full hover:bg-warning transition-colors shadow-lg ${
-                          loadingStates.updatingPhoto === photo.id ||
-                          loadingStates.deletingPhoto === photo.id
+                        className={`p-1.5 bg-warning text-paper rounded-full hover:bg-warning transition-colors shadow-lg ${loadingStates.updatingPhoto === photo.id ||
+                            loadingStates.deletingPhoto === photo.id
                             ? "opacity-50 cursor-not-allowed"
                             : ""
-                        }`}
+                          }`}
                         title="Edit photo"
                         disabled={
                           loadingStates.updatingPhoto === photo.id ||
@@ -937,12 +931,11 @@ const UpdateDraftPhotoGallery = () => {
                       </button>
                       <button
                         onClick={() => removePhoto(photo.id)}
-                        className={`p-1.5 bg-danger text-paper rounded-full hover:bg-danger transition-colors shadow-lg ${
-                          loadingStates.deletingPhoto === photo.id ||
-                          loadingStates.updatingPhoto === photo.id
+                        className={`p-1.5 bg-danger text-paper rounded-full hover:bg-danger transition-colors shadow-lg ${loadingStates.deletingPhoto === photo.id ||
+                            loadingStates.updatingPhoto === photo.id
                             ? "opacity-50 cursor-not-allowed"
                             : ""
-                        }`}
+                          }`}
                         title="Delete photo"
                         disabled={
                           loadingStates.deletingPhoto === photo.id ||
@@ -959,17 +952,17 @@ const UpdateDraftPhotoGallery = () => {
                     {/* Loading overlay for photo operations */}
                     {(loadingStates.updatingPhoto === photo.id ||
                       loadingStates.deletingPhoto === photo.id) && (
-                      <div className="absolute inset-0 bg-ink/50 flex items-center justify-center">
-                        <div className="bg-surface px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                          <span className="text-sm font-medium text-fg">
-                            {loadingStates.updatingPhoto === photo.id
-                              ? "Updating..."
-                              : "Deleting..."}
-                          </span>
+                        <div className="absolute inset-0 bg-ink/50 flex items-center justify-center">
+                          <div className="bg-surface px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                            <span className="text-sm font-medium text-fg">
+                              {loadingStates.updatingPhoto === photo.id
+                                ? "Updating..."
+                                : "Deleting..."}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     {/* Edit indicator */}
                     {editingPhotoId === photo.id &&
                       !loadingStates.updatingPhoto && (

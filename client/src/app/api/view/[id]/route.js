@@ -19,10 +19,8 @@ export async function POST(request, { params }) {
   };
 
   try {
-    console.log(`[ReadBeacon:${type}] ${id} from ${forwarded["x-forwarded-for"] || forwarded["x-real-ip"] || "unknown"} / ${forwarded["user-agent"]}`);
     try {
       const data = await apiGet(`/news/increment-count/${type}/${encodeURIComponent(id)}`, { revalidate: 0, timeout: 4000, headers: forwarded });
-      console.log(`[ReadBeacon:${type}] ${id} result:`, data);
     } catch (e) {
       console.error(`[ReadBeacon:${type}] ${id} FAILED:`, e?.status ?? "", e?.message ?? e);
     }

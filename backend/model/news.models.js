@@ -101,10 +101,6 @@ export const newsSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    approved_by: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
     isDeleted: {
         default: false,
         type: Boolean,
@@ -133,11 +129,12 @@ export const newsSchema = new mongoose.Schema({
         until: { type: Date },
         setBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
-    // need approval -> those which is added by reporter but need to approval   
-    need_approval: {
-        type: Boolean,
-        default: false,
-    },
+    need_approval: { type: Boolean, default: false },          // already there on News
+    approved_by: { type: Schema.Types.ObjectId, ref: 'User' }, // already there on News
+    approved_at: { type: Date },
+    rejected_reason: { type: String, default: '', maxLength: 300 },
+    rejected_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    rejected_at: { type: Date },
 }, {
     timestamps: true, // Mongoose will automatically create createdAt and updatedAt fields
 });
@@ -202,7 +199,10 @@ newsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 });
 // (tags are references now, so they are not part of the text index; tag names are matched through the Tag collection)
 newsSchema.index({ 'featured.isFeatured': 1, 'featured.until': 1 });
 newsSchema.index({ title: "text", description: "text", 'keywords.hi': "text", 'keywords.en': "text" });
-
+newsSchema.index(
+    { 'activity.total_today_count': -1 },
+    { partialFilterExpression: { 'activity.total_today_count': { $gt: 0 } } }
+);
 // ── Business rules that must hold for every saved document ───────────────────
 // A published (non-draft) news needs at least one category. The check runs for new documents and whenever the
 // category list or the draft flag changes, so old rows are never blocked by unrelated saves (views counter, etc.).

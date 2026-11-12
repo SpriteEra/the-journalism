@@ -1,8 +1,10 @@
-import { ALL_PERMISSION_KEYS, TRUSTED_PERMISSIONS, WILDCARD } from '../config/permissions.js';
+import { ALL_PERMISSION_KEYS, TRUSTED_PERMISSIONS, WILDCARD, RETIRED_PERMISSIONS } from '../config/permissions.js';
 import ErrorHandler from './errorHandler.js';
 
 const KEY_SET = new Set(ALL_PERMISSION_KEYS);
 const MODULES = new Set(ALL_PERMISSION_KEYS.map((k) => k.split('.')[0]));
+
+const RETIRED = new Set(RETIRED_PERMISSIONS);
 
 /** `news.*` -> prefix "news." ; returns null when the entry is not a group wildcard */
 const groupPrefix = (entry) => (entry.endsWith('.*') ? entry.slice(0, -1) : null);
@@ -39,7 +41,8 @@ export const expand = (entries = []) => {
  */
 export const validatePermissionList = (list, { allowGroupWildcard = true, field = 'permissions' } = {}) => {
     if (!Array.isArray(list)) throw new ErrorHandler(400, `${field} must be an array`);
-    const clean = [...new Set(list.map((p) => String(p).trim().toLowerCase()).filter(Boolean))];
+    const clean = [...new Set(list.map((p) => String(p).trim().toLowerCase()).filter(Boolean))]
+        .filter((p) => !RETIRED.has(p));
     const bad = clean.filter((p) => p !== WILDCARD && !isConcreteKey(p) && !(allowGroupWildcard && isGroupWildcard(p)));
     if (clean.includes(WILDCARD)) throw new ErrorHandler(400, `"*" cannot be assigned. Only the built-in admin role has full access`);
     if (bad.length) throw new ErrorHandler(400, `Unknown permission(s) in ${field}: ${bad.join(', ')}`);

@@ -7,7 +7,7 @@ import { fmtDate } from "../../lib/api";
 import { handleImageError } from "../../utils/imageError";
 import { Avatar, Badge, Button, IconButton, Menu, MenuItem, MenuSeparator } from "../ui";
 
-export const statusOf = (n, draft) => (draft ? { tone: "neutral", label: "Draft" } : n.need_approval ? { tone: "warning", label: "Needs approval" } : n.isPublished === false ? { tone: "neutral", label: "Unpublished" } : { tone: "success", label: "Published" });
+export const statusOf = (n, draft) => (n.rejected_at && !n.need_approval ? { tone: "danger", label: "Rejected" } : draft ? { tone: "neutral", label: "Draft" } : n.need_approval ? { tone: "warning", label: "Needs approval" } : n.isPublished === false ? { tone: "neutral", label: "Unpublished" } : { tone: "success", label: "Published" });
 
 function ShareMenu({ item }) {
   const { t } = useTranslation();
@@ -33,8 +33,18 @@ export default function NewsCard({ item: n, layout = "grid", draft, needApproval
   const authorName = n.author?.fullName || n.author?.username;
   const kwCount = (n.keywords?.hi?.length || 0) + (n.keywords?.en?.length || 0);
   const grid = layout === "grid";
-  const editLabel = needApproval ? t("Review") : t("Edit");
+  const rejected = Boolean(n.rejected_at) && !n.need_approval;
+  const editLabel = needApproval ? t("Review") : rejected ? t("Fix & resubmit") : t("Edit");
 
+  const rejectedBox = rejected && (
+    <div className="rounded-lg border border-danger/20 bg-danger-soft px-2.5 py-2 text-xs">
+      <p className="font-semibold text-danger">
+        {t("Rejected")}{n.rejected_by?.username ? ` ${t("by")} ${n.rejected_by.username}` : ""} · {fmtDate(n.rejected_at, true)}
+      </p>
+      {n.rejected_reason && <p className="mt-0.5 line-clamp-3 whitespace-pre-line text-fg-muted">{n.rejected_reason}</p>}
+      <Link to={`/dashboard/review/news/${n.news_id}`} className="mt-1 inline-block font-medium text-danger hover:underline">{t("View details & apply again")}</Link>
+    </div>
+  );
   const badges = (
     <div className="flex flex-wrap gap-1.5">
       {(n.category || []).slice(0, 2).map((c) => <Badge key={c.slug} tone="accent" size="sm">{c.name}</Badge>)}
@@ -79,6 +89,7 @@ export default function NewsCard({ item: n, layout = "grid", draft, needApproval
 
         <div className="flex min-w-0 flex-1 flex-col gap-2 px-1 py-1.5 sm:py-2">
           {title}
+          {rejectedBox}
           {badges}
           {meta}
         </div>
@@ -122,6 +133,7 @@ export default function NewsCard({ item: n, layout = "grid", draft, needApproval
       </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-1 sm:gap-2 p-2 sm:p-4">
         {title}
+        {rejectedBox}
         {/* {badges} */}
         <div className="mt-auto sm:pt-1">{meta}</div>
         <div className="mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 border-t border-line pt-1.5 sm:pt-3">

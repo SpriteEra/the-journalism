@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
+import { KeyRound, Lock, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation, usePermissionCatalog, useRoles } from "../../hooks/admin";
 import httpClient from "../../api/httpClient";
@@ -8,21 +8,50 @@ import { cn } from "../../lib/cn";
 
 const blank = { name: "", displayName: "", description: "", isActive: true, permissions: [] };
 
-/** Grouped permission picker. Keys you do not hold yourself are locked (you cannot hand out more than you have). */
-function PermissionPicker({ catalog, value, onChange, mine, isSuper, disabled }) {
+/**
+ * Grouped permission picker with search.
+ * Keys you do not hold yourself are locked (you cannot hand out more than you have).
+ * `query` filters by permission label, permission key or group name.
+ */
+function PermissionPicker({ catalog, value, onChange, mine, isSuper, disabled, query = "" }) {
   const set = new Set(value);
   const allowed = (k) => isSuper || mine.has(k);
   const toggle = (k) => { const n = new Set(set); n.has(k) ? n.delete(k) : n.add(k); onChange([...n]); };
-  const toggleGroup = (items, on) => {
+  const toggleItems = (items, on) => {
     const n = new Set(set);
     items.filter((i) => allowed(i.key)).forEach((i) => (on ? n.add(i.key) : n.delete(i.key)));
     onChange([...n]);
   };
+
+  const q = query.trim().toLowerCase();
+  const groups = useMemo(
+    () =>
+      catalog
+        .map((g) => {
+          const groupHit = g.group.toLowerCase().includes(q);
+          const items = !q || groupHit
+            ? g.items
+            : g.items.filter((i) => i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q));
+          return { ...g, items };
+        })
+        .filter((g) => g.items.length),
+    [catalog, q]
+  );
+
+  if (!groups.length) {
+    return (
+      <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-fg-subtle">
+        No permissions match “{query}”
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3 sm:space-y-4">
-      {catalog.map((g) => {
+      {groups.map((g) => {
         const usable = g.items.filter((i) => allowed(i.key));
         const selected = g.items.filter((i) => set.has(i.key)).length;
+        const selectedUsable = usable.filter((i) => set.has(i.key)).length;
         return (
           <fieldset key={g.group} className="overflow-hidden rounded-xl border border-line">
             <legend className="sr-only">{g.group}</legend>
@@ -32,8 +61,8 @@ function PermissionPicker({ catalog, value, onChange, mine, isSuper, disabled })
                 <span className="ml-2 rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium tabular-nums text-fg-subtle">{selected}/{g.items.length}</span>
               </p>
               {!disabled && usable.length > 0 && (
-                <button type="button" className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-primary hover:bg-primary-soft" onClick={() => toggleGroup(g.items, selected < usable.length)}>
-                  {selected < usable.length ? "Select all" : "Clear"}
+                <button type="button" className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-primary hover:bg-primary-soft" onClick={() => toggleItems(g.items, selectedUsable < usable.length)}>
+                  {selectedUsable < usable.length ? "Select all" : "Clear"}
                 </button>
               )}
             </div>
@@ -56,6 +85,7 @@ function RoleForm({ role, onClose }) {
   const { data: cat, isLoading } = usePermissionCatalog();
   const [form, setForm] = useState(() => (editing ? { ...role } : blank));
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const mine = useMemo(() => new Set(cat?.mine || []), [cat]);
 
@@ -86,12 +116,33 @@ function RoleForm({ role, onClose }) {
         <Field label="Description"><Textarea rows={2} value={form.description} onChange={(e) => set({ description: e.target.value })} maxLength={200} /></Field>
         {editing && !role.isSystem && <Switch checked={form.isActive} onChange={(v) => set({ isActive: v })} label="Role is active" description="Disabled roles lock out everyone who has them" />}
         {error && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
+
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-fg">Permissions</p>
           <Badge tone="primary" size="sm">{form.permissions.length} selected</Badge>
         </div>
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-faint" aria-hidden />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} // Enter must not submit the form
+            placeholder="Search permissions (e.g. news, schedule, live)…"
+            aria-label="Search permissions"
+            className="pl-9 pr-9"
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search"
+              className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-fg-subtle hover:bg-surface-2">
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+
         {isLoading ? <Skeleton className="h-60 w-full" /> : (
-          <PermissionPicker catalog={cat?.groups || []} value={form.permissions} onChange={(permissions) => set({ permissions })} mine={mine} isSuper={isSuper} />
+          <PermissionPicker catalog={cat?.groups || []} value={form.permissions} onChange={(permissions) => set({ permissions })} mine={mine} isSuper={isSuper} query={query} />
         )}
       </form>
     </Modal>
@@ -114,19 +165,26 @@ function DeleteRole({ role, roles, onClose }) {
 
 export default function Roles() {
   const { can } = usePermission();
-  const { data: roles = [], isLoading, error, refetch } = useRoles();
+  const { data: roles = [], isLoading, isFetching, error, refetch } = useRoles();
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
   return (
     <>
       <PageHeader title="Roles & permissions" description="Create roles for your newsroom and choose exactly what each one can do."
-        actions={can("role.create") && (
-          <>
-            <Button className="hidden sm:inline-flex" leftIcon={Plus} onClick={() => setEditing({})}>New role</Button>
-            <Button className="sm:hidden" size="icon" aria-label="New role" onClick={() => setEditing({})}><Plus className="size-5" /></Button>
-          </>
-        )} />
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">
+              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
+            </Button>
+            {can("role.create") && (
+              <>
+                <Button className="hidden sm:inline-flex" leftIcon={Plus} onClick={() => setEditing({})}>New role</Button>
+                <Button className="sm:hidden" size="icon" aria-label="New role" onClick={() => setEditing({})}><Plus className="size-5" /></Button>
+              </>
+            )}
+          </div>
+        } />
       {error ? <ErrorState error={error} onRetry={refetch} /> : isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}</div>
       ) : !roles.length ? <Card><EmptyState icon={KeyRound} title="No roles yet" /></Card> : (
