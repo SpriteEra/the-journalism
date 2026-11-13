@@ -78,10 +78,12 @@ export const PERMISSIONS = {
     // DISTRICT_CREATE: 'district.create',
     // DISTRICT_UPDATE: 'district.update',
     // DISTRICT_DELETE: 'district.delete',
-    TOPIC_CREATE: 'tag.create',           // create a tag (also lets news forms create a tag on the fly)
+
+    TOPIC_VIEW: 'tag.view',               // open the tag management list / details (admin screen)
+    TOPIC_CREATE: 'tag.create',
     TOPIC_UPDATE: 'tag.update',
     TOPIC_DELETE: 'tag.delete',
-    TOPIC_MERGE: 'tag.merge',             // merge duplicate tags into one
+    TOPIC_MERGE: 'tag.merge',
 
     // ── site tools ──────────────────────────────────────────────────────────
     HOME_SECTION_MANAGE: 'homeSection.manage',
@@ -217,6 +219,7 @@ export const PERMISSION_CATALOG = [
     {
         group: 'Topics',
         items: [
+            [P.TOPIC_VIEW, 'View the topics management list'],
             [P.TOPIC_CREATE, 'Create topics (also from the news form)'],
             [P.TOPIC_UPDATE, 'Edit topics'],
             [P.TOPIC_DELETE, 'Delete topics'],
@@ -315,5 +318,5 @@ export const DEFAULT_ROLE = 'reporter';
 export const RETIRED_PERMISSIONS = Object.freeze([
     'event.create', 'event.manage.own', 'event.manage.any', 'event.publish', 'event.approve', 'event.category.manage',
     'gallery.create', 'gallery.manage.own', 'gallery.manage.any', 'gallery.publish', 'gallery.approve',
-    'breaking.manage', 'panchang.manage', 'district.create', 'district.update', 'district.delete', 'yt.manage',
+    'breaking.manage', 'panchang.manage', 'district.create', 'district.update', 'district.delete', 'yt.manage', 'topic.create', 'topic.update', 'topic.delete', 'topic.merge',
 ]);

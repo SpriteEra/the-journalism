@@ -12,11 +12,19 @@ import { emitLive } from '../sockets/liveSocket.js';
 import { NotificationService } from '../service/NotificationService.js';
 import { assertPermission } from '../middleware/Authentication.js';
 import { notifyApprovers, notifyAuthor, logStack } from '../utils/approval.js';
-import { applyStatus } from './live.news.controller.js';      // `applyStatus` must be exported there (adjust the path to your file)
+import { applyStatus } from './live.news.controller.js';
+import { PUBLIC_Q } from '../utils/publicQuery.js';
+import { setReadsLive } from '../utils/readLive.js';          // analytics (optional, only if ReadHour has the `live` flag)
 
 const ytThumb = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const COMMON = 'author createdAt updatedAt need_approval approved_by approved_at rejected_reason rejected_at update_stack';
-const goLive = (d) => { d.isPublished = true; d.draft = false; };
+
+/** sets exactly the PUBLIC_Q fields, only on models that have them (live news derives them from `status` in its pre-save hook) */
+const goLive = (d) => {
+    for (const [k, v] of Object.entries(PUBLIC_Q)) {
+        if (d.schema.path(k)) d.set(k, v);
+    }
+};
 
 /**
  * everything that differs between the content types lives here
@@ -28,7 +36,9 @@ const SOURCES = {
         label: 'News', perm: P.NEWS_APPROVE, manage: P.NEWS_UPDATE_ANY, Model: News, find: (id) => ({ news_id: id }), select: `news_id title banner ${COMMON}`,
         idOf: (d) => d.news_id, thumb: (d) => d.banner,
         apply: (d) => { goLive(d); d.post_time = d.post_time || new Date(); },
-        afterApprove: async (d, firstTime) => { if (firstTime) await User.updateOne({ _id: d.author }, { $inc: { 'account_info.total_news': 1 } }); onNewsChanged(); },
+        afterApprove: async (d, firstTime) => {
+            if (firstTime) await User.updateOne({ _id: d.author }, { $inc: { 'account_info.total_news': 1 } });
+        },
     },
     yt: {
         label: 'YouTube news', perm: P.YT_APPROVE, manage: P.YT_MANAGE_ANY, Model: YtNews, find: (id) => ({ news_id: id }), select: `news_id title thumbnail videoLinkId ${COMMON}`,
@@ -49,9 +59,9 @@ const SOURCES = {
         },
         afterApprove: (d) => { if (d.status === 'live') emitLive('__all__', 'live_started', { slug: d.slug, title: d.title }); },
     },
-    // gallery / event: when you re-enable them, add:
+    // gallery / event: when you re-enable them, import the models, add rejected_* fields to both schemas, then add:
     // gallery: { label: 'Gallery', perm: P.GALLERY_APPROVE, manage: P.GALLERY_MANAGE_ANY, Model: GalleryNews, find: (id) => ({ news_id: id }), select: `news_id title photos ${COMMON}`, idOf: (d) => d.news_id, thumb: (d) => d.photos?.[0]?.image, apply: (d) => { goLive(d); d.post_time = d.post_time || new Date(); } },
-    // event:   { label: 'Event', perm: P.EVENT_APPROVE, manage: P.EVENT_MANAGE_ANY, Model: EventNews, find: (id) => ({ news_id: id }), select: `news_id title banner ${COMMON}`, idOf: (d) => d.news_id, thumb: (d) => d.banner, apply: same as gallery },
+    // event:   { label: 'Event', perm: P.EVENT_APPROVE, manage: P.EVENT_MANAGE_ANY, Model: EventNews, find: (id) => ({ news_id: id }), select: `news_id title banner ${COMMON}`, idOf: (d) => d.news_id, thumb: (d) => d.banner, apply: (d) => { goLive(d); d.post_time = d.post_time || new Date(); } },
 };
 
 const sourceOf = (req) => {
@@ -119,11 +129,16 @@ export const approveItem = tryCatch(async (req, res) => {
     const doc = await loadDoc(req, src);
     if (isOwner(req, doc)) throw new ErrorHandler(403, 'You cannot approve your own item. Ask another approver');
     if (!doc.need_approval) throw new ErrorHandler(400, 'Nothing to approve here');
+
     const firstTime = !doc.post_time;
     Object.assign(doc, { need_approval: false, approved_by: req.user._id, approved_at: new Date(), rejected_reason: '', rejected_by: null, rejected_at: null });
     src.apply(doc);
     await doc.save();
     await src.afterApprove?.(doc, firstTime);
+
+    onNewsChanged();                                                                            // every type, once
+    setReadsLive(req.params.type, src.idOf(doc), Boolean(doc.isPublished)).catch(console.error); // analytics
+
     logStack(doc.update_stack, req, `Approved by ${req.user.username}`);
     res.status(200).json({ success: true, message: `${src.label} approved`, approved_at: doc.approved_at });
     notifyAuthor(req, doc, { label: src.label, title: doc.title, link: pageLink(req.params.type, src, doc) });
@@ -133,15 +148,26 @@ export const approveItem = tryCatch(async (req, res) => {
 export const rejectItem = tryCatch(async (req, res) => {
     const src = sourceOf(req);
     assertPermission(req, src.perm);
+
     const reason = String(req.body?.reason || '').trim();
     if (reason.length < 5) throw new ErrorHandler(400, 'Write a reason (at least 5 characters) so the author knows what to fix');
     if (reason.length > 300) throw new ErrorHandler(400, 'The reason can have at most 300 characters');
+
     const doc = await loadDoc(req, src);
     if (!doc.need_approval) throw new ErrorHandler(400, 'Nothing to reject here');
-    Object.assign(doc, { need_approval: false, approved_by: null, approved_at: null, rejected_reason: reason, rejected_by: req.user._id, rejected_at: new Date() });
+
+    Object.assign(doc, {
+        need_approval: false, approved_by: null, approved_at: null,
+        rejected_reason: reason, rejected_by: req.user._id, rejected_at: new Date(),
+    });
     if (doc.schema.path('draft')) doc.draft = true;                 // back to the author's drafts
     if (doc.schema.path('isPublished')) doc.isPublished = false;
+    if (doc.schema.path('status')) doc.status = 'draft';            // live news (requestedStatus is kept for the edit form)
     await doc.save({ validateBeforeSave: false });
+
+    onNewsChanged();
+    setReadsLive(req.params.type, src.idOf(doc), false).catch(console.error);   // analytics
+
     logStack(doc.update_stack, req, `Rejected by ${req.user.username}: ${reason}`);
     res.status(200).json({ success: true, message: `${src.label} sent back to the author` });
 
@@ -169,7 +195,6 @@ export const resubmitItem = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, message: 'Sent for approval again' });
     notifyApprovers(req, { perms: [src.perm], label: src.label, title: doc.title, link: pageLink(req.params.type, src, doc) });
 });
-
 
 /** GET /review-queue/count: how many items wait for THIS person (only the types they may approve, never their own items) */
 export const getReviewCount = tryCatch(async (req, res) => {

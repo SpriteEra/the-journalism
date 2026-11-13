@@ -13,6 +13,7 @@ const LatestNews = async ({
     const list = items ?? (await getLatest({ limit })).items;
     if (!list.length) return null;
 
+
     return (
         <section
             aria-label={title}
@@ -26,8 +27,8 @@ const LatestNews = async ({
 
             {/* List */}
             <ul className="divide-y divide-black/5">
-                {list.map((item) => (
-                    <li key={item.id} className="first:pt-0 py-2.5 lg:py-3 first:pb-3 last:pb-2">
+                {list.map((item, index) => (
+                    <li key={index} className="first:pt-0 py-2.5 lg:py-3 first:pb-3 last:pb-2">
                         <Link href={item.href} className="group flex items-center gap-3">
                             <div className="relative h-[68px] lg:h-[58px] w-22 lg:w-20 shrink-0 overflow-hidden rounded-xs bg-gray-200">
                                 <Image

@@ -21,6 +21,8 @@ export const ytWatchUrl = (id) => (id ? `https://www.youtube.com/watch?v=${id}` 
 export const ytShortsUrl = (id) => (id ? `https://www.youtube.com/shorts/${id}` : "");
 
 export const newsPath = (n) => {
+  if (n.href)
+    return n.href;
   if (!n) return "/";
   const section = n.primaryRoute?.slug;
   if (n.slug && section) return `/${section}/news/${n.slug}`;

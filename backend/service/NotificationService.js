@@ -276,7 +276,7 @@ export class NotificationService {
         return await this.sendNotification({
             title: template.title,
             body: template.body,
-            link: options.link || `/news/${newsData._id}`,
+            link: options.link,
             targetRole: options.targetRole || 'all',
             targetIds: options.targetIds || [],
             excludeIds: options.excludeIds || [], // New exclude functionality

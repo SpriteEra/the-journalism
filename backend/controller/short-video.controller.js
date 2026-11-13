@@ -5,25 +5,20 @@ import UpdateStack from '../model/updatedstack.model.js';
 import tryCatch from '../utils/asyncFunction.js';
 import ErrorHandler from '../utils/errorHandler.js';
 import { P } from '../config/permissions.js';
-import { makeSlug, uniqueSlug, parseJSON, toBool } from '../utils/slug.js';
-import { sanitizeSeo, resolveSeo, assembleJsonLd, videoLd } from '../utils/seo.js';
+import { makeSlug, uniqueSlug, toBool } from '../utils/slug.js';
+import { sanitizeSeo } from '../utils/seo.js';
 import { uploadImage, deleteImage, uploadVideoFromPath } from '../utils/uploadImage.js';
 import { probeVideo, captureThumbnail } from '../utils/videoProbe.js';
-import { seoConfig, videoUrlFor } from '../config/seo.config.js';
 import { syncYoutube, getSyncStatus, parseYoutubeId, fetchYoutubeMeta, isShort } from '../service/youtube.service.js';
-import { setPublicCache } from '../utils/cache.js';
 import { buildTaxonomyFilter, escapeRegex, findTaxonomyByName, resolveNewsTaxonomy } from '../utils/newsTaxonomy.js';
 import { resolveNewsTags } from '../utils/newsTags.js';
 import { notifyApprovers, notifyAuthor, logApproval, approvalCleared } from '../utils/approval.js';
-
-const LIST = 'title slug kind sourceType thumbnail duration videoLinkId videoUrl hlsUrl publishedAt tags -_id';
-const PUBLIC = { isDeleted: false, draft: false, isPublished: true };
 const KINDS = ['short', 'video'];
 export const MAX_SHORT_SECONDS = 180;
 const SOURCES = ['youtube_auto', 'youtube_manual', 'upload'];
-const ytThumb = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const fileBuffer = async (f) => (f.tempFilePath ? fs.promises.readFile(f.tempFilePath) : f.data);
-const TAGS_POPULATE = { path: 'tags', select: 'title slug -_id' };
+const reviewLink = (slug) => `/dashboard/review/short/${slug}`;
+
 const TAXONOMY_POPULATE = [
     { path: 'category', select: 'name slug' }, { path: 'subCategory', select: 'name slug parent' },
     { path: 'state', select: 'state slug displayName' }, { path: 'district', select: 'district slug displayName state' },
@@ -49,111 +44,6 @@ const readTaxonomy = async (req, existing) => {
     const tg = b.tags === undefined ? null : await resolveNewsTags(b.tags, { canCreate: req.can(P.TOPIC_CREATE), userId: req.user._id, existing: existing?.tags });
     return { tax, tg };
 };
-
-const videoPageSeo = (v) => {
-    const url = videoUrlFor(v);
-    const thumb = v.thumbnail || (v.videoLinkId ? ytThumb(v.videoLinkId) : '');
-    const tagTitles = (v.tags || []).map((t) => t.title).filter(Boolean);
-    const meta = resolveSeo({ seo: v.seo || {}, title: v.title, description: v.description, image: thumb, url, ogType: 'video.other', publishedTime: v.publishedAt, tags: tagTitles.length ? tagTitles : v.keywords });
-    const base = seoConfig.siteUrl();
-    const jsonLd = assembleJsonLd(
-        videoLd({
-            title: v.title, description: v.description, thumbnail: thumb, url, uploadDate: v.publishedAt, duration: v.duration,
-            embedUrl: v.videoLinkId ? `https://www.youtube.com/embed/${v.videoLinkId}` : undefined,
-            contentUrl: v.videoUrl || undefined,
-        }),
-        { seo: v.seo || {}, breadcrumbs: [{ name: 'Home', url: base || '/' }, { name: v.kind === 'short' ? 'Shorts' : 'Videos', url: `${base}/${v.kind === 'short' ? 'shorts' : 'videos'}` }, { name: v.title, url }] },
-    );
-    return { meta, jsonLd };
-};
-
-// ═════════════════════ PUBLIC ═════════════════════
-/**
- * GET /short-videos?kind=short|video&source=youtube|upload&category=&subCategory=&state=&district=&tag=&page=&limit=
- * category / subCategory / state / district / tag accept an id or a slug (or several).
- */
-export const getShortVideos = tryCatch(async (req, res) => {
-    const { page, limit, skip } = paging(req);
-    const q = { ...PUBLIC };
-    if (KINDS.includes(req.query.kind))
-        q.kind = req.query.kind;
-    if (req.query.source === 'upload')
-        q.sourceType = 'upload';
-    else if (req.query.source === 'youtube')
-        q.sourceType = { $in: ['youtube_auto', 'youtube_manual'] };
-
-    const { filter, empty } = await buildTaxonomyFilter({
-        category: qList(req.query, 'category'), subCategory: qList(req.query, 'subCategory'),
-        state: qList(req.query, 'state'), district: qList(req.query, 'district'), tag: qList(req.query, 'tag'),
-    });
-
-    if (empty) return res.status(200).json({ success: true, videos: [], hasMore: false, page, limit });
-
-    const rows = await ShortVideo.find({ ...q, ...filter }).sort({ publishedAt: -1, _id: -1 }).skip(skip).limit(limit + 1).select(LIST).populate(TAGS_POPULATE).lean();
-
-    setPublicCache(res, 60);
-
-    res.status(200).json({ success: true, videos: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
-});
-
-export const getShortVideoBySlug = tryCatch(async (req, res) => {
-    const v = await ShortVideo.findOneAndUpdate(
-        { slug: String(req.params.slug).toLowerCase(), ...PUBLIC },
-        { $inc: { 'activity.total_reads': 1, 'activity.total_today_count': 1 } }, { new: true },
-    ).populate(TAXONOMY_POPULATE).lean();
-    if (!v) throw new ErrorHandler(404, 'Video not found');
-    const more = await ShortVideo.find({ ...PUBLIC, kind: v.kind, _id: { $ne: v._id }, publishedAt: { $lt: v.publishedAt || new Date() } })
-        .sort({ publishedAt: -1 }).limit(v.kind === 'short' ? 5 : 6).select(LIST).populate(TAGS_POPULATE).lean();
-    const { seo: _seo, ...rest } = v;
-    res.status(200).json({ success: true, video: rest, more, seo: videoPageSeo(v) });
-});
-
-/**
- * GET /short-videos/:slug/next?exclude=a,b,c&limit=5
- * Next shorts for the endless viewer: same tags first, then same category, then newest.
- * Anything in `exclude` (already shown) and the current slug is never returned.
- */
-export const getNextShortVideos = tryCatch(async (req, res) => {
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 5, 1), 10);
-    const slug = String(req.params.slug).toLowerCase();
-    const seen = new Set(
-        String(req.query.exclude || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean).slice(-200),
-    );
-    seen.add(slug);
-
-    const cur = await ShortVideo.findOne({ slug, ...PUBLIC }).select('tags category kind').lean();
-    if (!cur) throw new ErrorHandler(404, 'Video not found');
-
-    const picked = [];
-    const take = async (extra) => {
-        const need = limit - picked.length;
-        if (need <= 0) return;
-        const rows = await ShortVideo.find({ ...PUBLIC, kind: cur.kind, ...extra, slug: { $nin: [...seen] } })
-            .sort({ publishedAt: -1, _id: -1 }).limit(need).select(LIST).populate(TAGS_POPULATE).lean();
-        rows.forEach((r) => { seen.add(r.slug); picked.push(r); });
-    };
-
-    if (cur.tags?.length) await take({ tags: { $in: cur.tags } });          // 1. same tags
-    if (cur.category?.length) await take({ category: { $in: cur.category } }); // 2. same category
-    await take({});                                                           // 3. anything newest
-
-    res.status(200).json({ success: true, videos: picked, hasMore: picked.length === limit });
-});
-
-/** Latest videos of every kind merged by date: legacy YtNews + ShortVideo. ?limit=20 (max 100) */
-export const getLatestShortVideos = tryCatch(async (req, res) => {
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
-    const [yt, vids] = await Promise.all([
-        YtNews.find({ isDeleted: false, draft: false, isPublished: { $ne: false } }).sort({ createdAt: -1 }).limit(limit).select('news_id title videoLinkId thumbnail duration createdAt publishedAt -_id').lean(),
-        ShortVideo.find(PUBLIC).sort({ publishedAt: -1, _id: -1 }).limit(limit).select(LIST).lean(),
-    ]);
-    const all = [
-        ...yt.map((v) => ({ type: 'youtube', id: v.news_id, title: v.title, thumbnail: v.thumbnail || ytThumb(v.videoLinkId), videoLinkId: v.videoLinkId, duration: v.duration, date: v.publishedAt || v.createdAt })),
-        ...vids.map((v) => ({ type: v.kind, id: v.slug, source: v.sourceType, title: v.title, thumbnail: v.thumbnail || (v.videoLinkId ? ytThumb(v.videoLinkId) : ''), videoLinkId: v.videoLinkId, videoUrl: v.videoUrl, hlsUrl: v.hlsUrl, duration: v.duration, date: v.publishedAt })),
-    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
-    setPublicCache(res, 60);
-    res.status(200).json({ success: true, videos: all });
-});
 
 // ═════════════════════ ADMIN: create ═════════════════════
 const canPublishNow = (req, draft) => !draft && req.can(P.VIDEO_PUBLISH);
@@ -203,9 +93,14 @@ export const uploadShortVideo = tryCatch(async (req, res) => {
             need_approval: !draft && !publishNow,
         });
         doc.update_stack = (await stackFor(doc._id, req.user._id, `Video uploaded (${statusLabel(publishNow, draft)})`))._id;
+
         await doc.save();
+
         res.status(201).json({ success: true, message: publishNow ? 'Video published' : 'Video saved', video: doc });
-        if (doc.need_approval) notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: `/dashboard/review/short/${doc.slug}` });
+        if (publishNow) onNewsChanged();
+
+        if (doc.need_approval) notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: reviewLink(doc.slug) });
+
     } finally {
         // (the upload plugin also removes temp files after the response; this frees disk earlier on errors)
         [req.files?.video, req.files?.thumbnail].forEach((f) => f?.tempFilePath && fs.promises.unlink(f.tempFilePath).catch(() => { }));
@@ -244,7 +139,12 @@ export const addYoutubeShortVideo = tryCatch(async (req, res) => {
     doc.update_stack = (await stackFor(doc._id, req.user._id, `YouTube ${kind} added by link (${statusLabel(publishNow, draft)})`))._id;
     await doc.save();
     res.status(201).json({ success: true, message: publishNow ? 'Video published' : 'Video saved', video: doc });
-    if (doc.need_approval) notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: `/dashboard/review/short/${doc.slug}` });
+
+    if (publishNow) onNewsChanged();
+
+    if (doc.need_approval)
+        notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: reviewLink(doc.slug) });
+
 });
 
 // ═════════════════════ ADMIN: manage ═════════════════════
@@ -332,9 +232,9 @@ export const updateShortVideo = tryCatch(async (req, res) => {
         v.thumbnail = await uploadImage(await fileBuffer(req.files.thumbnail), req.files.thumbnail.name, 'video-thumbs');
         changes.push('thumbnail');
     }
-    if (b.draft !== undefined) {
+    if (b.draft !== undefined && toBool(b.draft) !== v.draft) {
         v.draft = toBool(b.draft);
-        Object.assign(v, approvalCleared);          // new submission or draft: old approval AND old rejection are gone
+        Object.assign(v, approvalCleared);
         v.need_approval = false;
         if (v.draft) v.isPublished = false;
         else if (req.can(P.VIDEO_PUBLISH)) { v.isPublished = true; v.publishedAt = v.publishedAt || new Date(); }
@@ -354,11 +254,12 @@ export const updateShortVideo = tryCatch(async (req, res) => {
     await v.save();
     pushStack(v.update_stack, req.user._id, `Video updated (${changes.join(', ')})`);
     res.status(200).json({ success: true, message: 'Video updated', video: v, changes });
+    onNewsChanged();                                                   // ← add
     if (v.need_approval && changes.includes('submitted for approval'))
-        notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: doc.title, link: `/dashboard/review/short/${doc.slug}` });
+        notifyApprovers(req, { perms: [P.VIDEO_APPROVE], label: 'Short video', title: v.title, link: reviewLink(v.slug) });
     if (changes.includes('approved')) {
         logApproval(v.update_stack, req);
-        notifyAuthor(req, { author: v.author }, { label: 'Short video', title: v.title, link: `/dashboard/review/short/${v.slug}` });
+        notifyAuthor(req, { author: v.author }, { label: 'Short video', title: v.title, link: reviewLink(v.slug) });
     }
 });
 
@@ -368,6 +269,7 @@ export const deleteShortVideo = tryCatch(async (req, res) => {
     await v.save();
     pushStack(v.update_stack, req.user._id, 'Video deleted');
     res.status(200).json({ success: true, message: 'Video deleted' });
+    onNewsChanged();
 });
 
 // POST /admin/short-videos/sync  { backfillPages?: 1-20, channels?: ["UC..."] }

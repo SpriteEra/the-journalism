@@ -1,10 +1,10 @@
-import { getLatestNews, fetchOnlyToday, fetchStateNewsDistrictWise, getGoogleNewsXMLData, getLiteratureNews, getNewses, getNewsInfiniteScroll, getNewsXMLData, getRelatedNews, getSingleNews, searchNews, incrementCount } from '../controller/news.controller.js';
-import { getAuthorNews, getAuthorPublic } from '../controller/author.controller.js';
+import { fetchOnlyToday, fetchStateNewsDistrictWise, getGoogleNewsXMLData, getLiteratureNews, getNewses, getNewsInfiniteScroll, getNewsXMLData } from '../controller/news.controller.js';
+// import { getAuthorNews, getAuthorPublic } from '../controller/author.controller.js';
 import { getBreakingNews } from '../controller/breaking.news.controller.js';
 import { getEventNews, getEventNewsByCateogry, getRandomEventNews, incrementEventNewsCount } from '../controller/event.controller.js';
 import { getClientPanchang } from '../controller/panchang.controller.js';
 import { getGalleryNews, getGalleryNewsSingle, getRelatedGalleryNews } from '../controller/gallerynews.controller.js';
-import { findStateNews, getFeaturedPublic, getHomeNews } from '../controller/public.controller.js';
+import { findStateNews } from '../controller/public.controller.js';
 
 
 
@@ -19,19 +19,19 @@ export default newsRouter;
 
 async function newsRouter(app) {
     app.post('/get-news-query', getNewses);
-    app.get('/home', getHomeNews);
-    app.get('/latest', getLatestNews);
-    app.get('/featured', getFeaturedPublic);
-    app.get('/authors/:username', getAuthorPublic);
-    app.get('/authors/:username/news', getAuthorNews);
+    // app.get('/home', getHomeNews);
+    // app.get('/latest', getLatestNews);
+    // app.get('/featured', getFeaturedPublic);
+    // app.get('/authors/:username', getAuthorPublic);
+    // app.get('/authors/:username/news', getAuthorNews);
     app.get('/literature', getLiteratureNews);
-    app.get('/related-news/:news_id', getRelatedNews);
-    app.get('/increment-count/:type/:id', incrementCount);
+    // app.get('/related-news/:news_id', getRelatedNews);
+    // app.get('/increment-count/:type/:id', incrementCount);
     app.get("/fetch-state-news", fetchStateNewsDistrictWise);
     app.get("/fetch-all-state-news", findStateNews);
-    app.get('/get/:news_id', getSingleNews);
+    // app.get('/get/:news_id', getSingleNews);
     app.get('/:news_id/scroll', getNewsInfiniteScroll);
-    app.get('/search-news', searchNews);
+    // app.get('/search-news', searchNews);
     app.get('/sitemap-news', getNewsXMLData);
     app.get('/google-news-sitemap', getGoogleNewsXMLData);
     app.get('/breaking-news', getBreakingNews);

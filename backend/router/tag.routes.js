@@ -18,12 +18,11 @@ export async function tagPublicRouter(app) {
 }
 
 export async function tagAdminRouter(app) {
-    // 'suggest' is registered before '/tags/:id' on purpose
     app.get('/tags/suggest', suggestTags);
-    app.get('/tags', { onRequest: [...perm(P.TAXONOMY_VIEW)] }, getTagsAdmin);
-    app.get('/tags/:id', { onRequest: [...perm(P.TAXONOMY_VIEW)] }, getTagAdmin);
-    app.post('/tags', { onRequest: [...perm(P.TAG_CREATE)] }, createTagAdmin);
-    app.put('/tags/:id', { onRequest: [...perm(P.TAG_UPDATE)] }, updateTagAdmin);
-    app.post('/tags/:id/merge', { onRequest: [...perm(P.TAG_MERGE)] }, mergeTagAdmin);
-    app.delete('/tags/:id', { onRequest: [...perm(P.TAG_DELETE)] }, deleteTagAdmin);
+    app.get('/tags', { onRequest: [...perm(P.TOPIC_VIEW)] }, getTagsAdmin);
+    app.get('/tags/:id', { onRequest: [...perm(P.TOPIC_VIEW)] }, getTagAdmin);
+    app.post('/tags', { onRequest: [...perm(P.TOPIC_CREATE)] }, createTagAdmin);
+    app.put('/tags/:id', { onRequest: [...perm(P.TOPIC_UPDATE)] }, updateTagAdmin);
+    app.post('/tags/:id/merge', { onRequest: [...perm(P.TOPIC_MERGE)] }, mergeTagAdmin);
+    app.delete('/tags/:id', { onRequest: [...perm(P.TOPIC_DELETE)] }, deleteTagAdmin);
 }

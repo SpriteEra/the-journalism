@@ -27,10 +27,10 @@ import pushNotificationRouter from './router/notification.routes.js';
 import SpriteEraServiceRouter from './router/spriteera.service.routes.js';
 import { taxonomyPublicRouter, taxonomyAdminRouter } from './router/taxonomy.routes.js';
 import { tagPublicRouter, tagAdminRouter } from './router/tag.routes.js';
-import { livePublicRouter, liveAdminRouter } from './router/live.news.routes.js';
+import { liveAdminRouter } from './router/live.news.routes.js';
 import reporterPerformanceRouter from './router/reporter.performance.routes.js';
 import roleRouter from './router/role.routes.js';
-import { shortVideoPublicRouter, shortVideoAdminRouter, shortVideoUploadRouter } from './router/short-video.routes.js';
+import { shortVideoAdminRouter, shortVideoUploadRouter } from './router/short-video.routes.js';
 import { seoRootRouter, seoApiRouter } from './router/seo.routes.js';
 import activityLog from './plugins/activityLog.js';
 import activityLogRouter from './router/activitylog.routes.js';
@@ -38,6 +38,7 @@ import rateLimit from '@fastify/rate-limit';
 import { logger as appLogger } from './utils/logger.js';
 
 import { loggerOptions } from './utils/logger.js';
+import PublicRouter from './router/public.routes.js';
 // the allowed browser origins. Outside production the usual local dev servers are allowed too, so a missing .env value never shows up
 // as a mysterious "CORS error".
 const DEV_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'];
@@ -115,10 +116,10 @@ export async function buildApp({ logger, sockets = true } = {}) {
     app.register(seoApiRouter, { prefix: '/api/v1/seo' });
     app.register(taxonomyPublicRouter, { prefix: '/api/v1/taxonomy' });
     app.register(tagPublicRouter, { prefix: '/api/v1/tags' });
-    app.register(livePublicRouter, { prefix: '/api/v1/live' });
-    app.register(shortVideoPublicRouter, { prefix: '/api/v1/short-videos' });
+    // app.register(shortVideoPublicRouter, { prefix: '/api/v1/short-videos' });
 
     app.register(newsRouter, { prefix: '/api/v1/news' });
+    app.register(PublicRouter, { prefix: '/api/v1/' });
     app.register(pushNotificationRouter, { prefix: '/api/v1' });
     app.register(YtRouter, { prefix: '/api/v1/yt' });
     app.register(AdvertisementRoutes, { prefix: '/api/v1/ads' });

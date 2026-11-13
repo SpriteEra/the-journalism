@@ -31,11 +31,13 @@ export default async function ArticleView({ data }) {
   if (sectionName) breadcrumb.push({ label: sectionName, href: categoryPath(route.slug || section?.slug) });
 
   const topics = (article.tags || []).map((t) => ({ label: t.title, href: topicPath(t.slug) }));
+
   const media = article.isVideo && article.video
     ? { type: "video", src: article.video, poster: article.banner, alt: article.title }
     : article.banner
       ? { type: "image", src: article.banner, alt: article.title, caption: article.imageRef ? `फोटो: ${article.imageRef}` : undefined }
       : null;
+
   const published = article.post_time || article.createdAt;
 
   // more stories of the same section (never the story itself)

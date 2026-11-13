@@ -10,12 +10,10 @@ import Trash from "../model/trash.model.js";
 import moment from "moment-timezone";
 import ScheduleNews from "../model/scheduleNews.model.js";
 import mongoose from "mongoose";
-import cron from "node-cron";
 import Category from "../model/category.model.js";
 import State from "../model/state.model.js";
 import District from "../model/district.model.js";
-import { sanitizeSeo, resolveSeo, assembleJsonLd, newsArticleLd } from "../utils/seo.js";
-import { buildUrl, seoConfig } from "../config/seo.config.js";
+import { sanitizeSeo, } from "../utils/seo.js";
 import { cached, setPublicCache } from "../utils/cache.js";
 import { makeSlug } from "../utils/slug.js";
 import { P } from "../config/permissions.js";
@@ -27,13 +25,10 @@ import { onNewsChanged } from "../utils/newsCache.js";
 import { keywordClauses, parseKeywords, sameKeywords } from "../utils/newsKeywords.js";
 import { currentFeatured, parseFeatured, prepareFeature, unfeatureOthers } from "../utils/featured.js";
 import { parseRelatedIds, resolveRelated } from "../utils/relatedNews.js";
-import { makeNewsSlug, needsRedirect, newsPath, newsUrl, parsePrimaryInput, pickPrimary } from "../utils/newsRoute.js";
+import { makeNewsSlug, newsPath, parsePrimaryInput, pickPrimary } from "../utils/newsRoute.js";
 import HomeSection from "../model/homesection.model.js";
 import { resolveFilter } from "./homesection.controller.js";
 import { attachPrimaryName } from "../utils/primaryRoutes.js";
-import { trackView, VIEW_TYPES } from "../utils/newsViewTracker.js";
-import liveNewsModel from "../model/live.news.model.js";
-import tagModel from "../model/tag.model.js";
 import { approvalCleared, approvedNow, notifyApprovers } from "../utils/approval.js";
 
 const PUBLIC_Q = { draft: false, isPublished: true, isDeleted: false };
@@ -52,17 +47,7 @@ const toCard = (n) => ({
     author: n.author,
 });
 
-const toLiveCard = (n) => ({
-    id: String(n._id),
-    title: n.title,
-    description: n.caption || '',
-    image: n.image || '',
-    href: `/live/${n.slug}`,            // change to your real live-blog route
-    isVideo: false,
-    isLive: n.status === 'live',
-    location: '',
-    publishedAt: n.post_time || n.startTime,
-});
+
 const toCards = (rows) => rows.map(toCard);
 const clampInt = (v, def, min, max) => Math.min(Math.max(parseInt(v) || def, min), max);
 const toBool = (v) => v === true || v === 'true';
@@ -197,59 +182,59 @@ export const getNewses = tryCatch(async (req, res) => {
     const news = toCards(rows);
     return res.status(200).json(body.iscount ? { news, total } : news);
 });
-export const incrementCount = tryCatch(async (req, res, next) => {
-    const { type, id } = req.params;
-    const cfg = VIEW_TYPES[type];
-    if (!cfg) return next(new ErrorHandler(400, "Invalid type"));
+// export const incrementCount = tryCatch(async (req, res, next) => {
+//     const { type, id } = req.params;
+//     const cfg = VIEW_TYPES[type];
+//     if (!cfg) return next(new ErrorHandler(400, "Invalid type"));
 
-    // author / category / state are needed by the hourly analytics (trackRead)
-    const doc = await cfg.Model.findOne(cfg.where(id)).select("_id author category state").lean();
-    if (!doc) return next(new ErrorHandler(404, "Not found"));
+//     // author / category / state are needed by the hourly analytics (trackRead)
+//     const doc = await cfg.Model.findOne(cfg.where(id)).select("_id author category state").lean();
+//     if (!doc) return next(new ErrorHandler(404, "Not found"));
 
-    trackView(req, type, doc, id).catch(() => { });   // no await: the reader doesn't wait for counting
-    return res.status(200).json({ success: true });
-});
+//     trackView(req, type, doc, id).catch(() => { });   // no await: the reader doesn't wait for counting
+//     return res.status(200).json({ success: true });
+// });
 
-export const getRelatedNews = tryCatch(async (req, res, next) => {
-    let { is_literature = false } = req.query;      // incrementVal removed
-    const { news_id } = req.params;
+// export const getRelatedNews = tryCatch(async (req, res, next) => {
+//     let { is_literature = false } = req.query;      // incrementVal removed
+//     const { news_id } = req.params;
 
-    const news = await News.findOne({ news_id }).select('tags category subCategory').lean();
+//     const news = await News.findOne({ news_id }).select('tags category subCategory').lean();
 
-    if (!news) return next(new ErrorHandler(404, "News not found"));
+//     if (!news) return next(new ErrorHandler(404, "News not found"));
 
-    const or = [];
-    if (news.tags?.length) or.push({ tags: { $in: news.tags } });
-    if (news.category?.length) or.push({ category: { $in: news.category } });
-    if (news.subCategory?.length) or.push({ subCategory: { $in: news.subCategory } });
+//     const or = [];
+//     if (news.tags?.length) or.push({ tags: { $in: news.tags } });
+//     if (news.category?.length) or.push({ category: { $in: news.category } });
+//     if (news.subCategory?.length) or.push({ subCategory: { $in: news.subCategory } });
 
-    const query = { ...PUBLIC_Q, is_literature: toBool(is_literature), news_id: { $ne: news_id } };
-    if (or.length) query.$or = or;
+//     const query = { ...PUBLIC_Q, is_literature: toBool(is_literature), news_id: { $ne: news_id } };
+//     if (or.length) query.$or = or;
 
-    let relatedNews = await News.find(query).limit(6).sort({ post_time: -1 })
-        .select('news_id slug primaryRoute.slug title banner -_id post_time updatedAt').lean();
+//     let relatedNews = await News.find(query).limit(6).sort({ post_time: -1 })
+//         .select('news_id slug primaryRoute.slug title banner -_id post_time updatedAt').lean();
 
-    if (relatedNews.length === 0) {
-        relatedNews = await News.aggregate([
-            { $match: { isPublished: true, isDeleted: false, draft: false, news_id: { $ne: news_id } } },
-            { $sample: { size: 6 } },
-            { $project: { _id: 0, news_id: 1, slug: 1, 'primaryRoute.slug': 1, title: 1, banner: 1, post_time: 1, updatedAt: 1 } },
-        ]);
-    }
-    return res.status(200).json(relatedNews.map((n) => ({ ...n, path: newsPath(n) })));
-});
+//     if (relatedNews.length === 0) {
+//         relatedNews = await News.aggregate([
+//             { $match: { isPublished: true, isDeleted: false, draft: false, news_id: { $ne: news_id } } },
+//             { $sample: { size: 6 } },
+//             { $project: { _id: 0, news_id: 1, slug: 1, 'primaryRoute.slug': 1, title: 1, banner: 1, post_time: 1, updatedAt: 1 } },
+//         ]);
+//     }
+//     return res.status(200).json(relatedNews.map((n) => ({ ...n, path: newsPath(n) })));
+// });
 
 /** Latest news by date (post_time desc). GET /news/latest?page=&limit=&state=&district=&category=&subCategory=  (id or slug) */
-export const getLatestNews = tryCatch(async (req, res) => {
-    const page = clampInt(req.query.page, 1, 1, 100000);
-    const limit = clampInt(req.query.limit, 12, 1, 50);
-    const { filter, empty } = await buildTaxonomyFilter(req.query);
-    if (empty) return res.status(200).json({ success: true, news: [], hasMore: false, page, limit });
-    const rows = await News.find({ ...PUBLIC_Q, ...filter }).sort({ post_time: -1, _id: -1 }).skip((page - 1) * limit).limit(limit + 1)
-        .select('news_id slug primaryRoute.slug title description banner location post_time tags -_id').populate({ path: 'tags', select: 'title slug -_id' }).lean();
-    setPublicCache(res, 30);
-    res.status(200).json({ success: true, news: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
-});
+// export const getLatestNews = tryCatch(async (req, res) => {
+//     const page = clampInt(req.query.page, 1, 1, 100000);
+//     const limit = clampInt(req.query.limit, 12, 1, 50);
+//     const { filter, empty } = await buildTaxonomyFilter(req.query);
+//     if (empty) return res.status(200).json({ success: true, news: [], hasMore: false, page, limit });
+//     const rows = await News.find({ ...PUBLIC_Q, ...filter }).sort({ post_time: -1, _id: -1 }).skip((page - 1) * limit).limit(limit + 1)
+//         .select('news_id slug primaryRoute.slug title description banner location post_time tags -_id').populate({ path: 'tags', select: 'title slug -_id' }).lean();
+//     setPublicCache(res, 30);
+//     res.status(200).json({ success: true, news: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
+// });
 
 const FEATURED_SELECT = 'news_id slug primaryRoute.kind primaryRoute.ref primaryRoute.slug primaryRoute.name title description banner post_time featured isVideo author -_id ';
 
@@ -296,59 +281,59 @@ export const clearFeatured = tryCatch(async (req, res) => {
     return res.status(200).json({ success: true, cleared: r.modifiedCount });
 });
 
-export const getSingleNews = tryCatch(async (req, res, next) => {
-    // the param is the story's slug (new URLs) or its news_id (old URLs)
-    const key = String(req.params.news_id || '').slice(0, 200);
-    const news = await News.findOne({ $or: [{ slug: key }, { news_id: key }] })
-        .select('news_id slug primaryRoute title description content tags banner location post_time contentUpdatedAt createdAt updatedAt imageRef isVideo isPublished isDeleted draft video ref_reporter seo relatedNews category subCategory state district author -_id')
-        .populate(TAXONOMY_POPULATE)
-        .populate('author', 'fullName about designation profile profileUrl username')
-        .populate({ path: 'relatedNews', match: { draft: false, isPublished: true, isDeleted: false }, select: 'news_id slug primaryRoute.slug title banner -_id' })
-        .lean();
+// export const getSingleNews = tryCatch(async (req, res, next) => {
+//     // the param is the story's slug (new URLs) or its news_id (old URLs)
+//     const key = String(req.params.news_id || '').slice(0, 200);
+//     const news = await News.findOne({ $or: [{ slug: key }, { news_id: key }] })
+//         .select('news_id slug primaryRoute title description content tags banner location post_time contentUpdatedAt createdAt updatedAt imageRef isVideo isPublished isDeleted draft video ref_reporter seo relatedNews category subCategory state district author -_id')
+//         .populate(TAXONOMY_POPULATE)
+//         .populate('author', 'fullName about designation profile profileUrl username')
+//         .populate({ path: 'relatedNews', match: { draft: false, isPublished: true, isDeleted: false }, select: 'news_id slug primaryRoute.slug title banner -_id' })
+//         .lean();
 
-    if (!news) return next(new ErrorHandler(404, "News not found"));
-    if (news.draft || news.isDeleted || !news.isPublished) return res.status(400).json({ message: "News not available" });
+//     if (!news) return next(new ErrorHandler(404, "News not found"));
+//     if (news.draft || news.isDeleted || !news.isPublished) return res.status(400).json({ message: "News not available" });
 
-    const convertToIST = (date) => new Date(new Date(date).getTime() + (5.5 * 60 * 60 * 1000));
-    const { seo: seoData = {}, relatedNews: relatedDocs = [], ...newsRest } = news;
-    const tagTitles = (news.tags || []).map((t) => t.title);      // populated tags -> plain titles for meta keywords / JSON-LD
-    const article = {
-        ...newsRest,
-        news_post_time: convertToIST(news.post_time),
-        news_update_time: convertToIST(news.contentUpdatedAt || news.createdAt),
-        related: (relatedDocs || []).filter(Boolean).map((r) => ({ news_id: r.news_id, title: r.title, banner: r.banner, path: newsPath(r) })),     // internal links, with the canonical path
-        post_time: news.post_time,
-        updatedAt: news.updatedAt,
-    };
+//     const convertToIST = (date) => new Date(new Date(date).getTime() + (5.5 * 60 * 60 * 1000));
+//     const { seo: seoData = {}, relatedNews: relatedDocs = [], ...newsRest } = news;
+//     const tagTitles = (news.tags || []).map((t) => t.title);      // populated tags -> plain titles for meta keywords / JSON-LD
+//     const article = {
+//         ...newsRest,
+//         news_post_time: convertToIST(news.post_time),
+//         news_update_time: convertToIST(news.contentUpdatedAt || news.createdAt),
+//         related: (relatedDocs || []).filter(Boolean).map((r) => ({ news_id: r.news_id, title: r.title, banner: r.banner, path: newsPath(r) })),     // internal links, with the canonical path
+//         post_time: news.post_time,
+//         updatedAt: news.updatedAt,
+//     };
 
-    // breadcrumb + JSON-LD section use the first category, and the first sub-category that sits under it
-    const primary = news.category?.[0];
-    const primarySub = (news.subCategory || []).find((s) => String(s.parent) === String(primary?._id)) || news.subCategory?.[0];
-    const section = primary?.name;
-    const breadcrumbs = [{ name: 'Home', url: seoConfig.siteUrl() || '/' }];
-    if (primary) breadcrumbs.push({ name: primary.name, url: buildUrl('category', { slug: primary.slug }) });
-    if (primarySub) breadcrumbs.push({ name: primarySub.name, url: buildUrl('category', { slug: primarySub.slug }) });
-    const news_id = news.news_id;
-    const url = newsUrl(news);
-    breadcrumbs.push({ name: seoData.breadcrumbTitle || news.title, url });
+//     // breadcrumb + JSON-LD section use the first category, and the first sub-category that sits under it
+//     const primary = news.category?.[0];
+//     const primarySub = (news.subCategory || []).find((s) => String(s.parent) === String(primary?._id)) || news.subCategory?.[0];
+//     const section = primary?.name;
+//     const breadcrumbs = [{ name: 'Home', url: seoConfig.siteUrl() || '/' }];
+//     if (primary) breadcrumbs.push({ name: primary.name, url: buildUrl('category', { slug: primary.slug }) });
+//     if (primarySub) breadcrumbs.push({ name: primarySub.name, url: buildUrl('category', { slug: primarySub.slug }) });
+//     const news_id = news.news_id;
+//     const url = newsUrl(news);
+//     breadcrumbs.push({ name: seoData.breadcrumbTitle || news.title, url });
 
-    const seo = {
-        meta: resolveSeo({ seo: seoData, title: news.title, description: news.description, image: news.banner, url, ogType: 'article', publishedTime: news.post_time, modifiedTime: news.contentUpdatedAt || news.updatedAt, section, tags: tagTitles, author: news.ref_reporter || undefined }),
-        jsonLd: assembleJsonLd(
-            newsArticleLd({ seo: seoData, title: news.title, description: news.description, image: news.banner, url, published: news.post_time, modified: news.contentUpdatedAt || news.updatedAt, author: news.ref_reporter, section, keywords: tagTitles }),
-            { seo: seoData, breadcrumbs },
-        ),
-        settings: seoData,
-    };
+//     const seo = {
+//         meta: resolveSeo({ seo: seoData, title: news.title, description: news.description, image: news.banner, url, ogType: 'article', publishedTime: news.post_time, modifiedTime: news.contentUpdatedAt || news.updatedAt, section, tags: tagTitles, author: news.ref_reporter || undefined }),
+//         jsonLd: assembleJsonLd(
+//             newsArticleLd({ seo: seoData, title: news.title, description: news.description, image: news.banner, url, published: news.post_time, modified: news.contentUpdatedAt || news.updatedAt, author: news.ref_reporter, section, keywords: tagTitles }),
+//             { seo: seoData, breadcrumbs },
+//         ),
+//         settings: seoData,
+//     };
 
-    const latest_news = await News.find({ ...PUBLIC_Q, news_id: { $ne: news_id } })
-        .sort({ post_time: -1 }).limit(1).select('news_id title post_time -_id');
+//     const latest_news = await News.find({ ...PUBLIC_Q, news_id: { $ne: news_id } })
+//         .sort({ post_time: -1 }).limit(1).select('news_id title post_time -_id');
 
-    // canonicalPath: where this story lives. A link with a wrong / old section (?path=/wrong/news/<slug>) still opens the story;
-    // needsRedirect tells the site to 301 to canonicalPath.
-    const canonicalPath = newsPath(news);
-    return res.status(200).json({ news: article, latest_news: latest_news[0], seo, canonicalPath, canonicalUrl: url, needsRedirect: needsRedirect(news, req.query.path) });
-});
+//     // canonicalPath: where this story lives. A link with a wrong / old section (?path=/wrong/news/<slug>) still opens the story;
+//     // needsRedirect tells the site to 301 to canonicalPath.
+//     const canonicalPath = newsPath(news);
+//     return res.status(200).json({ news: article, latest_news: latest_news[0], seo, canonicalPath, canonicalUrl: url, needsRedirect: needsRedirect(news, req.query.path) });
+// });
 
 export const fetchOnlyToday = tryCatch(async (req, res, next) => {
     // Get start & end of today in IST
@@ -414,87 +399,87 @@ const tolerantPattern = (s) => {
     return out;
 };
 
-export const searchNews = tryCatch(async (req, res) => {
-    const search = String(req.query.search || '').trim().slice(0, 150);
-    const page = clampInt(req.query.page, 1, 1, 100000);
-    const limit = clampInt(req.query.limit, 20, 1, 50);
-    const TAG_LIMIT = 5;
+// export const searchNews = tryCatch(async (req, res) => {
+//     const search = String(req.query.search || '').trim().slice(0, 150);
+//     const page = clampInt(req.query.page, 1, 1, 100000);
+//     const limit = clampInt(req.query.limit, 20, 1, 50);
+//     const TAG_LIMIT = 5;
 
-    const query = { ...PUBLIC_Q };
-    let tokenRx = [];
-    let phraseRx = null;
+//     const query = { ...PUBLIC_Q };
+//     let tokenRx = [];
+//     let phraseRx = null;
 
-    if (search) {
-        const tokens = search.split(/\s+/).filter(Boolean).slice(0, 8);           // every word must appear, in any order
-        tokenRx = tokens.map((t) => new RegExp(tolerantPattern(t), 'i'));
-        phraseRx = new RegExp(tolerantPattern(search), 'i');
+//     if (search) {
+//         const tokens = search.split(/\s+/).filter(Boolean).slice(0, 8);           // every word must appear, in any order
+//         tokenRx = tokens.map((t) => new RegExp(tolerantPattern(t), 'i'));
+//         phraseRx = new RegExp(tolerantPattern(search), 'i');
 
-        const tax = await findTaxonomyByName(phraseRx);
+//         const tax = await findTaxonomyByName(phraseRx);
 
-        // each word may match title, location, news_id (English slug) or keywords
-        const tokenClause = (rx) => ({ $or: [{ title: rx }, { location: rx }, { news_id: rx }, ...keywordClauses(rx)] });
-        const or = [{ $and: tokenRx.map(tokenClause) }];
+//         // each word may match title, location, news_id (English slug) or keywords
+//         const tokenClause = (rx) => ({ $or: [{ title: rx }, { location: rx }, { news_id: rx }, ...keywordClauses(rx)] });
+//         const or = [{ $and: tokenRx.map(tokenClause) }];
 
-        if (tax.tags.length) or.push({ tags: { $in: tax.tags } });
-        if (tax.category.length) or.push({ category: { $in: tax.category } });
-        if (tax.subCategory.length) or.push({ subCategory: { $in: tax.subCategory } });
-        if (tax.state.length) or.push({ state: { $in: tax.state } });
-        if (tax.district.length) or.push({ district: { $in: tax.district } });
-        query.$or = or;
-    }
+//         if (tax.tags.length) or.push({ tags: { $in: tax.tags } });
+//         if (tax.category.length) or.push({ category: { $in: tax.category } });
+//         if (tax.subCategory.length) or.push({ subCategory: { $in: tax.subCategory } });
+//         if (tax.state.length) or.push({ state: { $in: tax.state } });
+//         if (tax.district.length) or.push({ district: { $in: tax.district } });
+//         query.$or = or;
+//     }
 
-    // live blogs + topic tags: only on page 1 and only when searching, so paging of normal news stays correct
-    const wantExtras = Boolean(search) && page === 1;
+//     // live blogs + topic tags: only on page 1 and only when searching, so paging of normal news stays correct
+//     const wantExtras = Boolean(search) && page === 1;
 
-    const [rows, total, liveRows, tagRows] = await Promise.all([
-        News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
-        News.countDocuments(query),
-        wantExtras
-            ? liveNewsModel.find({
-                isDeleted: false,
-                status: { $in: ['live', 'ended'] },
-                $and: tokenRx.map((rx) => ({ $or: [{ title: rx }, { slug: rx }, { tags: rx }] })),
-            }).sort({ post_time: -1 }).limit(5).select('title slug image caption status post_time startTime').lean()
-            : Promise.resolve([]),
-        wantExtras && phraseRx
-            ? tagModel.find({
-                isDeleted: false, isActive: true, mergedInto: null,
-                $or: [{ title: phraseRx }, { aliases: phraseRx }],
-            }).sort({ isFeatured: -1, title: 1 }).limit(TAG_LIMIT).select('title slug image').lean()
-            : Promise.resolve([]),
-    ]);
+//     const [rows, total, liveRows, tagRows] = await Promise.all([
+//         News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
+//         News.countDocuments(query),
+//         wantExtras
+//             ? liveNewsModel.find({
+//                 isDeleted: false,
+//                 status: { $in: ['live', 'ended'] },
+//                 $and: tokenRx.map((rx) => ({ $or: [{ title: rx }, { slug: rx }, { tags: rx }] })),
+//             }).sort({ post_time: -1 }).limit(5).select('title slug image caption status post_time startTime').lean()
+//             : Promise.resolve([]),
+//         wantExtras && phraseRx
+//             ? tagModel.find({
+//                 isDeleted: false, isActive: true, mergedInto: null,
+//                 $or: [{ title: phraseRx }, { aliases: phraseRx }],
+//             }).sort({ isFeatured: -1, title: 1 }).limit(TAG_LIMIT).select('title slug image').lean()
+//             : Promise.resolve([]),
+//     ]);
 
-    // tags: direct matches first, then fill up to 5 from the most used tags of the top matching stories
-    let tags = tagRows;
-    if (wantExtras && tags.length < TAG_LIMIT) {
-        const top = await News.find(query).sort({ post_time: -1 }).limit(30).select('tags -_id').lean();
+//     // tags: direct matches first, then fill up to 5 from the most used tags of the top matching stories
+//     let tags = tagRows;
+//     if (wantExtras && tags.length < TAG_LIMIT) {
+//         const top = await News.find(query).sort({ post_time: -1 }).limit(30).select('tags -_id').lean();
 
-        const freq = new Map();
-        for (const n of top) for (const id of n.tags || []) freq.set(String(id), (freq.get(String(id)) || 0) + 1);
+//         const freq = new Map();
+//         for (const n of top) for (const id of n.tags || []) freq.set(String(id), (freq.get(String(id)) || 0) + 1);
 
-        const have = new Set(tags.map((t) => String(t._id)));
-        const ids = [...freq.entries()]
-            .filter(([id]) => !have.has(id))
-            .sort((a, b) => b[1] - a[1])                 // most used first
-            .slice(0, TAG_LIMIT * 2)                     // spare ones, in case some are inactive / merged
-            .map(([id]) => id);
+//         const have = new Set(tags.map((t) => String(t._id)));
+//         const ids = [...freq.entries()]
+//             .filter(([id]) => !have.has(id))
+//             .sort((a, b) => b[1] - a[1])                 // most used first
+//             .slice(0, TAG_LIMIT * 2)                     // spare ones, in case some are inactive / merged
+//             .map(([id]) => id);
 
-        if (ids.length) {
-            const extra = await tagModel.find({ _id: { $in: ids }, isDeleted: false, isActive: true, mergedInto: null })
-                .select('title slug image').lean();
-            const order = new Map(ids.map((id, i) => [id, i]));
-            extra.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
-            tags = [...tags, ...extra];
-        }
-    }
+//         if (ids.length) {
+//             const extra = await tagModel.find({ _id: { $in: ids }, isDeleted: false, isActive: true, mergedInto: null })
+//                 .select('title slug image').lean();
+//             const order = new Map(ids.map((id, i) => [id, i]));
+//             extra.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+//             tags = [...tags, ...extra];
+//         }
+//     }
 
-    return res.status(200).json({
-        news: toCards(rows),
-        total,
-        live: liveRows.map(toLiveCard),
-        tags: tags.slice(0, TAG_LIMIT).map((t) => ({ id: String(t._id), title: t.title, slug: t.slug, image: t.image || '' })),
-    });
-});
+//     return res.status(200).json({
+//         news: toCards(rows),
+//         total,
+//         live: liveRows.map(toLiveCard),
+//         tags: tags.slice(0, TAG_LIMIT).map((t) => ({ id: String(t._id), title: t.title, slug: t.slug, image: t.image || '' })),
+//     });
+// });
 
 export const getNewsInfiniteScroll = tryCatch(async (req, res, next) => {
     const { news_id } = req.params;
@@ -898,7 +883,7 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
                     {
                         targetIds: [news.author], title: approved ? 'News Verified By Admin' : 'News Updated By Admin',
                         body: approved ? `"${news.title}" has been verified by admin` : `"${news.title}" has been updated by admin`,
-                        link: `/news/${news.news_id}`,
+                        link: `/dashboard/news/${news.news_id}`,
                     });
             }
             if (changes.includes('Submitted for approval')) {
@@ -1058,8 +1043,11 @@ export const deleteNewsAdmin = tryCatch(async (req, res) => {
     (async () => {
         try {
             if (!isOwner) {
-                await NotificationService.sendNewsNotification({ title: news.title, author: req.user?.username }, 'newsDeleted',
-                    { title: 'News Deleted By Admin', deletedBy: req.user?.username, targetIds: [news.author._id] });
+                await NotificationService.sendNewsNotification(
+                    { title: news.title, author: req.user?.username },
+                    'newsDeleted',
+                    { title: 'News Deleted By Admin', deletedBy: req.user?.username, targetIds: [news.author._id] }
+                );
             }
             await NotificationService.sendNewsNotification({ title: news.title, author: req.user?.username }, 'newsDeleted', {
                 link: '/dashboard/trash', title: `News Deleted By ${req.user.role === 'admin' ? 'Admin' : 'Repoter'}`,

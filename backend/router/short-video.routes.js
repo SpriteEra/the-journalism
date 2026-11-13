@@ -1,9 +1,9 @@
 import { isAuthenticated, requireAnyPermission, requirePermission } from '../middleware/Authentication.js';
 import { P } from '../config/permissions.js';
 import {
-    getShortVideos, getShortVideoBySlug, getLatestShortVideos, uploadShortVideo, addYoutubeShortVideo,
+    uploadShortVideo, addYoutubeShortVideo,
     getShortVideosAdmin, getShortVideoAdmin, updateShortVideo, deleteShortVideo, runYoutubeSync, youtubeSyncStatus,
-    getNextShortVideos,
+
 } from '../controller/short-video.controller.js';
 
 const create = [isAuthenticated, requirePermission(P.VIDEO_CREATE)];
@@ -15,12 +15,12 @@ const sync = [isAuthenticated, requirePermission(P.VIDEO_SYNC)];
 const maxMb = () => parseInt(process.env.MAX_VIDEO_MB) || 300;
 
 // /api/v1/short-videos  (public) -'/latest' is registered before '/:slug'
-export async function shortVideoPublicRouter(app) {
-    app.get('/latest', getLatestShortVideos);
-    app.get('/', getShortVideos);
-    app.get('/:slug/next', getNextShortVideos);
-    app.get('/:slug', getShortVideoBySlug);
-}
+// export async function shortVideoPublicRouter(app) {
+//     app.get('/latest', getLatestShortVideos);
+//     app.get('/', getShortVideos);
+//     app.get('/:slug/next', getNextShortVideos);
+//     app.get('/:slug', getShortVideoBySlug);
+// }
 
 // /api/v1/admin/short-videos
 export async function shortVideoAdminRouter(app) {

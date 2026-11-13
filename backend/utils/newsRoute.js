@@ -62,6 +62,7 @@ export const pickPrimary = async ({ input, categoryIds = [], subCategoryIds = []
 };
 
 export const newsPath = (n) => (n?.slug && n?.primaryRoute?.slug ? `/${n.primaryRoute.slug}/news/${n.slug}` : `/news/${n?.news_id ?? ''}`);
+
 export const newsUrl = (n) => `${seoConfig.siteUrl()}${newsPath(n)}`;
 
 /** Does a requested path (e.g. "/politics/news/abc") already match the canonical one? */

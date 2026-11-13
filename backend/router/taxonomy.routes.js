@@ -17,10 +17,10 @@ const staff = perm(P.TAXONOMY_VIEW); // anybody who fills the news form needs th
 
 export async function taxonomyPublicRouter(app) {
     // mounted at /api/v1/taxonomy  (no login)
-    app.get('/categories', getCategoryTree);
-    app.get('/categories/:slug', getCategoryBySlug);
-    app.get('/states', getStates);
-    app.get('/states/:slug', getStateBySlug);
+    // app.get('/categories', getCategoryTree);
+    // app.get('/categories/:slug', getCategoryBySlug);
+    // app.get('/states', getStates);
+    // app.get('/states/:slug', getStateBySlug);
 
     app.get('/districts/:slug', getDistrictBySlug);
     app.get('/home-sections', getHomeSectionsPublic);          // ordered home page sections + their latest news
@@ -37,7 +37,7 @@ export async function taxonomyAdminRouter(app) {
     app.post('/states', { onRequest: [...perm(P.STATE_CREATE)] }, createState);
     app.put('/states/:id', { onRequest: [...perm(P.STATE_UPDATE)] }, updateState);
     app.delete('/states/:id', { onRequest: [...perm(P.STATE_DELETE)] }, deleteState);
-    app.get('/districts',  getDistrictsAdmin);
+    app.get('/districts', getDistrictsAdmin);
     app.post('/districts', { onRequest: [...perm(P.DISTRICT_CREATE)] }, createDistrict);
     app.put('/districts/:id', { onRequest: [...perm(P.DISTRICT_UPDATE)] }, updateDistrict);
     app.delete('/districts/:id', { onRequest: [...perm(P.DISTRICT_DELETE)] }, deleteDistrict);

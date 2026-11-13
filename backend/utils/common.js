@@ -1,0 +1,1 @@
+export const clampInt = (v, def, min, max) => Math.min(Math.max(parseInt(v) || def, min), max);

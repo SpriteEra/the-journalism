@@ -134,13 +134,29 @@ function LiveForm({ live }) {
     e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("Choose an image file");
+
+    // 1. show the picked image immediately (blob URL, no waiting)
+    const quick = URL.createObjectURL(file);
+    setCover({ file, preview: quick, base64: "", busy: true });
+    setDirty(true);
+
     try {
-      const small = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true });
+      // 2. compress in the background
+      const small = await imageCompression(file, {
+        maxSizeMB: 0.8,
+        maxWidthOrHeight: 1600,
+        initialQuality: 0.8,
+        useWebWorker: true,
+      });
+      // 3. base64 is only needed for the local draft copy
       const base64 = await fileToBase64(small);
-      setCover({ file: small, preview: base64, base64 });
-      setDirty(true);
+      // ignore the result if the user picked another image meanwhile
+      setCover((c) => (c.preview === quick ? { file: small, preview: quick, base64, busy: false } : c));
       setNeedsSave(true);
-    } catch { toast.error("Could not read this image"); }
+    } catch {
+      setCover((c) => (c.preview === quick ? { ...c, busy: false } : c)); // keep the original file
+      toast.error("Could not compress this image, the original will be used");
+    }
   };
 
   const back = () => navigate(LIST_PATH);
@@ -165,7 +181,7 @@ function LiveForm({ live }) {
     e?.preventDefault?.();
     const title = f.title.trim();
     if (!title) return toast.error("Write a title");
-
+    if (cover.busy) return toast("Image is still being prepared, try again in a moment");
     const body = (await editor.current?.save()) || { blocks: [] };
     const hasBody = body.blocks.length > 0;
     const publishing = !editing ? f.mode !== "draft" : ["draft", "scheduled"].includes(status) && f.mode !== "draft";
@@ -243,6 +259,10 @@ function LiveForm({ live }) {
     </div>
   );
 
+  useEffect(() => {
+    const url = cover.preview;
+    return () => { if (url?.startsWith("blob:")) URL.revokeObjectURL(url); };
+  }, [cover.preview]);
   return (
     <div className="mx-auto w-full p-0 sm:p-3 sm:bg-surface rounded-md">
       {/* TOP BAR: title always; buttons only on mobile/tablet (desktop buttons live in the right panel) */}
@@ -269,7 +289,13 @@ function LiveForm({ live }) {
                 {cover.preview
                   ? <img src={cover.preview} alt={f.imageAlt || "Cover"} className="size-full object-cover" />
                   : <span className="flex size-full flex-col items-center justify-center gap-2 text-fg-subtle"><ImagePlus className="size-8" /><span className="text-sm">Click to choose a cover image</span></span>}
+
                 {cover.preview && <span className="absolute inset-0 grid place-items-center bg-ink/0 text-sm font-medium text-paper opacity-0 transition group-hover:bg-ink/40 group-hover:opacity-100">Change image</span>}
+
+                {/* ← add here */}
+                {cover.busy && (
+                  <span className="absolute bottom-2 right-2 rounded-full bg-ink/60 px-2 py-1 text-xs text-paper">Optimizing…</span>
+                )}
               </button>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pickCover} />
               <p className="mt-2 text-xs text-fg-subtle max-sm:hidden">Use a clear 16:9 landscape photo. PNG, JPG or WEBP – it is compressed automatically.</p>
@@ -384,13 +410,7 @@ function LiveForm({ live }) {
               <ChipInput value={f.tags} onChange={(tags) => set({ tags })} max={15} placeholder="Type a tag, press Enter" />
             </Card>
 
-            {!slugLocked && (
-              <Card className="space-y-3">
-                <Field label="Page address" hint={`${siteUrl("/live/")}${f.slug || "…"} · leave empty to create it from the title`}>
-                  <Input value={f.slug} onChange={(e) => set({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} maxLength={120} placeholder="auto" />
-                </Field>
-              </Card>
-            )}
+
 
             <Card padded={false}>
               <button type="button" onClick={() => setSeoOpen((v) => !v)} aria-expanded={seoOpen} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">

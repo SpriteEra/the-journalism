@@ -57,6 +57,7 @@ export const ytNewsSchema = new mongoose.Schema({
         default: false,
         type: Boolean,
     },
+    isPublished: { type: Boolean, default: true },
     update_stack: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'UpdateStack',
@@ -85,6 +86,7 @@ ytNewsSchema.index(
     { 'activity.total_today_count': -1 },
     { partialFilterExpression: { 'activity.total_today_count': { $gt: 0 } } }
 );
+ytNewsSchema.index({ isDeleted: 1, draft: 1, isPublished: 1, publishedAt: -1 });
 ytNewsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
 const YtNews = mongoose.model('YtNews', ytNewsSchema);
 

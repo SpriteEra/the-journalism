@@ -455,31 +455,41 @@ export const getAdminNotifications = async (req, res) => {
             "readBy.userId": { $ne: admin._id }
         };
 
-        // Fetch notifications
-        const [
-            notifications,
-            totalCount,
-            unreadCount
-        ] = await Promise.all([
+        // Only what NotificationCenter / NotificationItem actually render
+        const buildProjection = (userId) => ({
+            title: 1,
+            body: 1,
+            type: 1,
+            category: 1,
+            priority: 1,
+            link: 1,
+            createdAt: 1,
+            additionalData: 1,                      // rendered in NotificationItem
+            "eventData.clickable": 1,               // only the eventData keys the UI reads
+            "eventData.updatedBy": 1,
+            "eventData.deletedBy": 1,
+            "eventData.createdBy": 1,
+            "eventData.restoredBy": 1,
+            "eventData.publishedBy": 1,
+            readBy: { $elemMatch: { userId } }      // only MY read entry, not everyone's
+        });
 
-            AdminNotification.find(query)
+        // Fetch notifications
+        const [notifications, totalCount, unreadCount] = await Promise.all([
+            AdminNotification.find(query, buildProjection(admin._id))
                 .sort({ createdAt: -1, _id: -1 })
                 .skip(skip)
                 .limit(limit)
                 .lean(),
 
             AdminNotification.countDocuments(query),
-
             AdminNotification.countDocuments(unreadQuery)
         ]);
 
-        // Add read status
-        const notificationsWithStatus = notifications.map((notification) => ({
-            ...notification,
-            isRead: notification.readBy?.some(
-                (read) =>
-                    String(read.userId) === String(admin._id)
-            ) || false
+        // Compute isRead on the server and don't send readBy at all
+        const notificationsWithStatus = notifications.map(({ readBy, ...n }) => ({
+            ...n,
+            isRead: Boolean(readBy?.length)
         }));
 
         // Response
@@ -525,14 +535,11 @@ export const markAdminNotificationAsRead = async (req, res) => {
         if (!notificationId || !userId)
             return res.status(400).json({ success: false, message: 'Notification ID and userId are required' });
 
-        const updated = await AdminNotification.findByIdAndUpdate(notificationId, {
-            $addToSet: {
-                readBy: {
-                    userId,
-                    readAt: new Date()
-                }
-            }
-        }, { new: true });
+        const updated = await AdminNotification.findOneAndUpdate(
+            { _id: notificationId, recipients: userId },
+            { $addToSet: { readBy: { userId, readAt: new Date() } } },
+            { new: true, projection: "_id" }
+        );
 
         if (!updated) return res.status(404).json({ success: false, message: 'Notification not found' });
 

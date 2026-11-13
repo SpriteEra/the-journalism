@@ -1,0 +1,1 @@
+import{j as s,a7 as t}from"./index-MeCGxjoa.js";const l=({isOpen:a,onClose:o,btnDanger:e=!1,onConfirm:n=null,description:r="",btnTitle:i="Delete",title:m=""})=>s.jsx(t,{open:a,onClose:o,onConfirm:n||o,title:m,message:r,confirmLabel:i,tone:e?"danger":"primary"});export{l as C};

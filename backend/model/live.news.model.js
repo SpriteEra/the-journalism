@@ -37,6 +37,8 @@ const liveNewsSchema = new Schema({
         total_reads: { type: Number, default: 0 },
         total_today_count: { type: Number, default: 0 },
     },
+    draft: { type: Boolean, default: true },          // status === 'draft'
+    isPublished: { type: Boolean, default: false },   // status is 'live' or 'ended'
     isDeleted: { type: Boolean, default: false },
     update_stack: { type: Schema.Types.ObjectId, ref: 'UpdateStack' },
     requestedStatus: { type: String, enum: ['scheduled', 'live', ''], default: '' },
@@ -47,6 +49,13 @@ const liveNewsSchema = new Schema({
     rejected_by: { type: Schema.Types.ObjectId, ref: 'User' },
     rejected_at: { type: Date },
 }, { timestamps: true });
+liveNewsSchema.pre('save', function () {
+    this.isPublished = this.status === 'live' || this.status === 'ended';
+    this.draft = this.status === 'draft';
+});
+
+liveNewsSchema.index({ isDeleted: 1, draft: 1, isPublished: 1, post_time: -1 });
+
 liveNewsSchema.index(
     { 'activity.total_today_count': -1 },
     { partialFilterExpression: { 'activity.total_today_count': { $gt: 0 } } }

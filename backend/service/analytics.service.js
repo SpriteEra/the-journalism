@@ -28,7 +28,12 @@ export const DEFINITIONS = {
 
 const round = (n, d = 1) => (Number.isFinite(n) ? Math.round(n * 10 ** d) / 10 ** d : 0);
 const pct = (cur, prev) => (prev ? round(((cur - prev) / prev) * 100) : (cur ? 100 : 0));
-const live = (start, end) => ({ isDeleted: false, isPublished: true, draft: false, post_time: { $gte: start, $lte: end } });
+const live = (start, end) => ({
+    isDeleted: false,
+    isPublished: true,
+    draft: false,
+    post_time: { $gte: start, $lte: end }
+});
 const dayKey = (field) => ({ $dateToString: { format: '%Y-%m-%d', date: field, timezone: TZ } });
 
 /** published ShortVideo in a range, split by kind (short | video) and source (youtube | upload) */

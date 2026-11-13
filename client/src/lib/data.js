@@ -168,13 +168,13 @@ export async function getAuthorNews(username, { page = 1, limit = 12 } = {}) {
 
 // ───────────────────────── videos & shorts ─────────────────────────
 export async function getShorts({ page = 1, limit = 12 } = {}) {
-  const r = await safe(apiGet("/short-videos", { params: { kind: "short", page, limit }, revalidate: TTL.list() }), { videos: [], hasMore: false });
+  const r = await safe(apiGet("/shorts", { params: { kind: "short", page, limit }, revalidate: TTL.list() }), { videos: [], hasMore: false });
   return { items: (r.videos || []).map(toShort).filter(Boolean), hasMore: Boolean(r.hasMore) };
 }
 
 /** one short + more shorts + SEO. null when it does not exist */
 export async function getShort(slug) {
-  const r = await apiGetOrNull(`/short-videos/${encodeURIComponent(slug)}`, { revalidate: TTL.list() });
+  const r = await apiGetOrNull(`/shorts/${encodeURIComponent(slug)}`, { revalidate: TTL.list() });
   if (!r?.video) return null;
   return { short: toShort(r.video), more: (r.more || []).map(toShort).filter(Boolean), seo: r.seo || {} };
 }
@@ -182,7 +182,7 @@ export async function getShort(slug) {
 /** shorts to continue with after `slug`: related first, never one of `exclude`. Not cached (depends on what was already shown). */
 export async function getNextShorts(slug, { exclude = [], limit = 5 } = {}) {
   const r = await safe(
-    apiGet(`/short-videos/${encodeURIComponent(slug)}/next`, { params: { exclude: exclude.join(","), limit }, revalidate: 0 }),
+    apiGet(`/shorts/${encodeURIComponent(slug)}/next`, { params: { exclude: exclude.join(","), limit }, revalidate: 0 }),
     { videos: [], hasMore: false },
   );
   return { items: (r.videos || []).map(toShort).filter(Boolean), hasMore: Boolean(r.hasMore) };
@@ -209,6 +209,7 @@ export async function getLiveList({ page = 1, limit = 12, status } = {}) {
 
 export async function getLive(slug) {
   const r = await apiGetOrNull(`/live/${encodeURIComponent(slug)}`, { revalidate: 5 });
+  console.log(r)
   return r?.live ? { live: r.live, seo: r.seo || {}, breadcrumbs: r.breadcrumbs || [] } : null;
 }
 
