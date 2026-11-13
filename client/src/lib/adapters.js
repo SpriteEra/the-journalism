@@ -6,7 +6,7 @@
  */
 const YT_QUALITY = ["maxresdefault", "sddefault", "hqdefault"];
 
-export const ytThumb = (id, quality = "sddefault") =>
+export const ytThumb = (id, quality = "hqdefault") =>
   id ? `https://i.ytimg.com/vi/${id}/${quality}.jpg` : "";
 
 /** use as onError on <img>: steps down to the next quality instead of showing a broken image */
