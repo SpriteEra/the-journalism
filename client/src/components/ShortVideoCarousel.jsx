@@ -16,9 +16,9 @@ const ShortVideoCard = ({ item }) => {
                 src={image || "/banner.png"}
                 alt={title}
                 fill
-                unoptimized={process.env.NODE_ENV === 'development'}
-                sizes="(max-width: 640px) 40vw, (max-width: 1024px) 20vw, 170px"
-                className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                unoptimized
+                sizes="(max-width: 640px) 40vw, (max-width: 1024px) 25vw, 200px"
+                className="object-cover"
             />
 
             {/* play badge */}
