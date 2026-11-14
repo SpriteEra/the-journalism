@@ -147,10 +147,10 @@ function EditorForm({ kind, item, categories, states }) {
                         <Field label="Meta title" hint={cnt(seo.metaTitle, 120, 60)}><Input value={seo.metaTitle} maxLength={120} onChange={(e) => setS({ metaTitle: e.target.value })} /></Field>
                         <Field label="Meta description" hint={cnt(seo.metaDescription, 320, 160)}><Textarea rows={3} value={seo.metaDescription} maxLength={320} onChange={(e) => setS({ metaDescription: e.target.value })} /></Field>
                         <Field label="Meta keywords" hint="Comma separated, at most 20"><Input value={seo.metaKeywords} onChange={(e) => setS({ metaKeywords: e.target.value })} placeholder="politics, election, लोकसभा" /></Field>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Focus keyword"><Input value={seo.focusKeyword} maxLength={80} onChange={(e) => setS({ focusKeyword: e.target.value })} /></Field>
-                            {/* <Field label="Breadcrumb title" hint="Empty = use the name"><Input value={seo.breadcrumbTitle} maxLength={80} onChange={(e) => setS({ breadcrumbTitle: e.target.value })} /></Field> */}
-                        </div>
+                        {/* <div className="grid gap-4 sm:grid-cols-2"> */}
+                        {/* <Field label="Focus keyword"><Input value={seo.focusKeyword} maxLength={80} onChange={(e) => setS({ focusKeyword: e.target.value })} /></Field> */}
+                        {/* <Field label="Breadcrumb title" hint="Empty = use the name"><Input value={seo.breadcrumbTitle} maxLength={80} onChange={(e) => setS({ breadcrumbTitle: e.target.value })} /></Field> */}
+                        {/* </div> */}
                         {/* <Field label="Canonical URL" hint="Only if this page's main version lives elsewhere"><Input type="url" value={seo.canonicalUrl} onChange={(e) => setS({ canonicalUrl: e.target.value })} placeholder="https://" /></Field> */}
                     </Card>
 
