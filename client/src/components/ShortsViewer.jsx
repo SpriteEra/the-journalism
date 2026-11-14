@@ -85,7 +85,7 @@ const ShortsViewer = ({ items: firstItems = [], startId }) => {
     const prev = items[index - 1];
     const next = items[index + 1];
     const ytId = item?.youtubeId || getYouTubeId(item?.videoUrl);
-
+    const ytWatchUrl = ytId ? `https://www.youtube.com/shorts/${ytId}` : null;
     // Seeds the mute state of each new YouTube player; later mute / unmute go through the player API (no reload).
     const mutedRef = useRef(true);
 
@@ -431,6 +431,22 @@ const ShortsViewer = ({ items: firstItems = [], startId }) => {
                                 </div>
 
                                 <div className="pointer-events-auto relative flex shrink-0 flex-col gap-3">
+                                    {ytWatchUrl && (
+                                        <a
+                                            href={ytWatchUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={() => { if (!paused) togglePlay(); }}   // optional: pause here while YouTube opens
+                                            aria-label="YouTube पर देखें"
+                                            title="View on YouTube"
+                                            className="group relative flex size-11 items-center justify-center rounded-full bg-red-600 text-white shadow transition hover:bg-red-700 active:scale-95"
+                                        >
+                                            <YouTubeIcon className="size-5" />
+                                            <span className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded bg-white px-2 py-0.5 text-[11px] font-medium text-black opacity-0 transition group-hover:opacity-100">
+                                                View on YouTube
+                                            </span>
+                                        </a>
+                                    )}
                                     <button type="button" onClick={toggleMute} aria-label={muted ? "आवाज़ चालू करें" : "म्यूट करें"} className={railBtn}>
                                         {muted ? <VolumeX className="size-5" strokeWidth={1.75} /> : <Volume2 className="size-5" strokeWidth={1.75} />}
                                     </button>

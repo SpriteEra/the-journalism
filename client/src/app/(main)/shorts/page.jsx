@@ -32,7 +32,7 @@ export default async function ShortsPage({ searchParams }) {
                                         alt={s.title}
                                         fill
                                         priority={i < 6}
-                                        unoptimized={process.env.NODE_ENV === 'development'}
+                                        unoptimized
                                         sizes="(max-width: 640px) 40vw, (max-width: 1024px) 20vw, 170px"
                                         className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
                                     <span aria-hidden className="absolute left-1/2 top-1/2 flex h-6 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg bg-[#FF3D00] lg:h-7 lg:w-10"><Play className="size-3 fill-white text-white lg:size-4" /></span>
