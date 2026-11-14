@@ -9,19 +9,20 @@ import sanitizeHtml from "sanitize-html";
  */
 
 /* ───────────── sanitising ───────────── */
+const COLOR = [/^#[0-9a-f]{3,8}$/i, /^rgba?\([\d\s.,%]+\)$/i, /^hsla?\([\d\s.,%deg]+\)$/i];
+
 const INLINE = {
   allowedTags: ["b", "strong", "i", "em", "u", "a", "mark", "code", "br", "sub", "sup", "s", "span"],
-  allowedAttributes: { a: ["href", "target", "rel"], mark: ["class"], span: ["class"] },
+  allowedAttributes: { a: ["href", "target", "rel"], mark: ["class", "style"], span: ["class", "style"] },
+  allowedStyles: { "*": { color: COLOR, "background-color": COLOR } },
   allowedSchemes: ["http", "https", "mailto", "tel"],
-  transformTags: {
-    a: (tag, attribs) => ({ tagName: "a", attribs: { href: attribs.href || "#", target: "_blank", rel: "noopener noreferrer" } }),
-  },
+  transformTags: { /* unchanged */ },
 };
 
 /** Hosts allowed for iframes (embed block + raw block) */
 const IFRAME_HOSTS = [
   "www.youtube.com", "www.youtube-nocookie.com", "player.vimeo.com",
-  "www.facebook.com", "platform.twitter.com", "twitframe.com", "www.instagram.com",
+  "www.facebook.com", "platform.twitter.com", "twitframe.com", "www.instagram.com", "codepen.io"
 ];
 
 /** `raw` block: richer HTML (blockquote, img, tables, allowed iframes). Scripts, styles and event handlers are always removed. */
@@ -67,8 +68,7 @@ export const middleBlockIndex = (content) => {
 };
 
 /** only well-known video / social embeds are shown as frames; anything else becomes a plain link */
-const EMBED_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/|www\.facebook\.com\/plugins\/|platform\.twitter\.com\/|twitframe\.com\/|www\.instagram\.com\/)/i;
-
+const EMBED_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/|www\.facebook\.com\/plugins\/|platform\.twitter\.com\/|twitframe\.com\/|www\.instagram\.com\/|codepen\.io\/)/i;
 /* ───────────── Instagram ─────────────
  * Instagram's official embed code is a <blockquote> + <script>. The script can never run here
  * (we strip scripts, and scripts injected via innerHTML don't execute anyway), so instead we pull the
@@ -118,6 +118,22 @@ const Link = ({ href, className = "" }) => (
   <a href={href} target="_blank" rel="noopener noreferrer" className={`break-all text-primary underline ${className}`}>{href}</a>
 );
 
+const ListItems = ({ items = [], style, start }) => {
+  const Tag = style === "ordered" ? "ol" : "ul";
+  const kind = style === "ordered" ? "list-decimal pl-6" : style === "checklist" ? "list-none pl-0" : "list-disc pl-6";
+  return (
+    <Tag start={style === "ordered" ? start : undefined} className={`mt-2 space-y-1.5 ${kind}`}>
+      {items.map((it, k) => (
+        <li key={k}>
+          {style === "checklist" && <span aria-hidden className="mr-2">{it?.meta?.checked ? "☑" : "☐"}</span>}
+          <span dangerouslySetInnerHTML={{ __html: cleanHtml(typeof it === "string" ? it : it?.content) }} />
+          {it?.items?.length ? <div className={style === "checklist" ? "pl-6" : ""}><ListItems items={it.items} style={style} /></div> : null}
+        </li>
+      ))}
+    </Tag>
+  );
+};
+
 export default function EditorContent({ content, afterBlock }) {
   const blocks = blocksOf(content);
 
@@ -140,17 +156,13 @@ export default function EditorContent({ content, afterBlock }) {
             node = plain(d.text).trim() ? <p className={`${P} ${al}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} /> : null;
             break;
 
-          case "list": {
-            const Tag = d.style === "ordered" ? "ol" : "ul";
+          case "list":
             node = (
-              <Tag className={`mt-4 space-y-1.5 pl-6 text-lg lg:text-[22px] lg:leading-[31px] ${d.style === "ordered" ? "list-decimal" : "list-disc"}`}>
-                {(d.items || []).map((it, k) => (
-                  <li key={k} dangerouslySetInnerHTML={{ __html: cleanHtml(typeof it === "string" ? it : it?.content) }} />
-                ))}
-              </Tag>
+              <div className="mt-4 text-lg lg:text-[22px] lg:leading-[31px]">
+                <ListItems items={d.items} style={d.style} start={d.meta?.start} />
+              </div>
             );
             break;
-          }
 
           case "checklist":
             node = (
@@ -176,7 +188,7 @@ export default function EditorContent({ content, afterBlock }) {
                   <path d="M9.6 4C5.4 5.7 3 9 3 13.4V20h7.2v-7.2H6.6c0-2.6 1.2-4.5 3.6-5.6L9.6 4zm10.2 0c-4.2 1.7-6.6 5-6.6 9.4V20h7.2v-7.2h-3.6c0-2.6 1.2-4.5 3.6-5.6L19.8 4z" />
                 </svg>
                 <p
-                  className={`font-medium italic leading-8 text-gray-900 text-[21px] sm:text-2xl lg:text-[28px] lg:leading-[1.45] ${al}`}
+                  className={`font-medium italic leading-8 text-gray-900 text-[21px] sm:text-2xl lg:text-[28px] lg:leading-[1.45] ${al || (d.alignment === "center" ? "text-center" : "")}`}
                   dangerouslySetInnerHTML={{ __html: cleanHtml(text) }}
                 />
                 {plain(d.caption).trim() && (
@@ -195,8 +207,8 @@ export default function EditorContent({ content, afterBlock }) {
             const url = d.file?.url || d.url;
             const cap = plain(d.caption).trim();
             node = url ? (
-              <figure className="my-5">
-                <div className="relative aspect-video w-full overflow-hidden border border-gray-200 bg-gray-200">
+              <figure className={`my-5 ${d.withBackground ? "bg-gray-100 p-3 sm:p-5" : ""}`}>
+                <div className={`relative aspect-video w-full overflow-hidden bg-gray-200 ${d.withBorder ? "border-2 border-gray-400" : "border border-gray-200"}`}>
                   <Image src={url} alt={cap} fill sizes="(max-width: 1024px) 100vw, 760px" className="object-contain" />
                 </div>
                 {cap && <figcaption className="rounded-b-md bg-[#f2f2f2] p-1 text-center text-[15px]">{cap}</figcaption>}
@@ -267,7 +279,7 @@ export default function EditorContent({ content, afterBlock }) {
             const cap = plain(d.caption).trim();
             const src = safeUrl(d.embed);
             const source = safeUrl(d.source);
-
+            const tall = src ? /twitframe|platform\.twitter|codepen/i.test(src) : false;
             // Instagram post/reel (embed or source URL) -> Instagram's iframe version
             const ig = igEmbedUrl(d.embed) || igEmbedUrl(d.source);
             if (ig) {
@@ -277,7 +289,7 @@ export default function EditorContent({ content, afterBlock }) {
 
             node = src && EMBED_HOSTS.test(src) ? (
               <div className="my-6 w-full">
-                <div className="mx-auto aspect-video w-full max-w-3xl overflow-hidden rounded bg-black">
+                <div className={`mx-auto w-full max-w-3xl overflow-hidden rounded ${tall ? "h-[500px] bg-white" : "aspect-video bg-black"}`}>
                   <iframe
                     src={src}
                     title={plain(d.service) || cap || "Embedded media"}

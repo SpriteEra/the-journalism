@@ -5,11 +5,15 @@
 .cdx-notifies { z-index: 100; }
 
 #textEditor h1 { font-size: 30px !important; font-weight: 500; }
-#textEditor h2 { font-size: 25px !important; font-weight: 500; }
-#textEditor h3 { font-size: 20px !important; font-weight: 400; }
-#textEditor h4 { font-size: 18px !important; font-weight: 400; }
-#textEditor h5 { font-size: 15px !important; font-weight: 400; }
-
+#textEditor h2 { font-size: 25px !important; font-weight: 600; }
+#textEditor h3 { font-size: 20px !important; font-weight: 600; }
+#textEditor h4 { font-size: 18px !important; font-weight: 600; }
+#textEditor h5 { font-size: 16px !important; font-weight: 600; }
+.codex-editor h1.ce-header { font-size: 30px !important; font-weight: 500; }
+.codex-editor h2.ce-header { font-size: 25px !important; font-weight: 600; }
+.codex-editor h3.ce-header { font-size: 20px !important; font-weight: 600; }
+.codex-editor h4.ce-header { font-size: 18px !important; font-weight: 600; }
+.codex-editor h5.ce-header { font-size: 16px !important; font-weight: 600; }
 .image-tool__caption {
   display: block !important; visibility: visible !important; position: relative !important;
   min-height: 24px; margin-top: 8px; font-size: 14px; outline: none; cursor: text;

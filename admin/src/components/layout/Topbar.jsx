@@ -49,7 +49,7 @@ export default function Topbar({ onOpenMenu }) {
         <IconButton label={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"} onClick={() => setTheme(resolved === "dark" ? "light" : "dark")} className="hidden sm:inline-flex">
           {resolved === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
         </IconButton>
-        <LanguageSwitch />
+        {/* <LanguageSwitch /> */}
         <NotificationCenter />
         <Menu
           trigger={

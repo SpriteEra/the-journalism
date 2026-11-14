@@ -1,1 +1,0 @@
-import{i as n,u as c,l as i,r as o,j as r,bP as u}from"./index-MeCGxjoa.js";const l=()=>{const{user:s}=n(t=>t.user),{can:a}=c(),e=i();return o.useEffect(()=>{s?e(a("analytics.view")?"/dashboard":"/dashboard/news",{replace:!0}):e("/login",{replace:!0})},[s,e,a]),r.jsx("div",{className:"grid min-h-dvh place-items-center bg-canvas",children:r.jsx(u,{})})};export{l as default};

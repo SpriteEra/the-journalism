@@ -218,14 +218,14 @@ export default function Profile() {
                   ))}
                 </div>
               </div>
-              <div>
+              {/* <div>
                 <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-subtle"><Languages className="size-3.5" />{t("Language")}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {LANGUAGES.map((l) => (
                     <button key={l.code} type="button" aria-pressed={i18n.language === l.code} onClick={() => i18n.changeLanguage(l.code)} className={cn("flex items-center justify-between gap-2 rounded-2xl border px-3 py-3 text-sm font-medium transition-colors sm:px-4", i18n.language === l.code ? "border-fg bg-surface-2 text-fg" : "border-line text-fg-muted hover:bg-surface-2")}><span className="truncate">{l.label}</span>{i18n.language === l.code && <Check className="size-4 shrink-0" />}</button>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
           </Card>
         </div>

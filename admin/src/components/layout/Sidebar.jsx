@@ -126,7 +126,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
             rel="noopener noreferrer"
             className="relative z-10 shrink-0 bg-sidebar px-6 pb-2 pt-2 text-[10px] uppercase tracking-widest text-sidebar-muted/70 shadow-[0_-12px_12px_-8px_var(--sidebar)]"
           >
-            {t("Powered by Spriteera")}
+            Powered by Spriteera
           </a>
         }
         {!isDrawer && (
