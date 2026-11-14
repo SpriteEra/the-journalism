@@ -156,13 +156,13 @@ export async function getStateSections() {
 
 // ───────────────────────── authors ─────────────────────────
 export async function getAuthor(username) {
-  const r = await apiGetOrNull(`/news/authors/${encodeURIComponent(username)}`, { revalidate: 120 });
+  const r = await apiGetOrNull(`/authors/${encodeURIComponent(username)}`, { revalidate: 120 });
   return r?.author ? { author: r.author, seo: r.seo || {} } : null;
 }
 
 /** the stories one author published, newest first: { items:[card], hasMore, page } */
 export async function getAuthorNews(username, { page = 1, limit = 12 } = {}) {
-  const r = await safe(apiGet(`/news/authors/${encodeURIComponent(username)}/news`, { params: { page, limit }, revalidate: 30 }), { news: [], hasMore: false });
+  const r = await safe(apiGet(`/authors/${encodeURIComponent(username)}/news`, { params: { page, limit }, revalidate: 30 }), { news: [], hasMore: false });
   return { items: toCards(r.news), hasMore: Boolean(r.hasMore), page: r.page || page };
 }
 

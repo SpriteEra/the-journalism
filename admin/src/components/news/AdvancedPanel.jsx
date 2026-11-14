@@ -115,13 +115,13 @@ export default function AdvancedPanel({ blog, update, title, description, canFea
         <Field label="SEO description" hint={`${mDesc.length}/320 · leave empty to use the short description`} info="The grey text under the headline in search results. Aim for 120–160 characters.">
           <Textarea rows={3} value={mDesc} maxLength={320} className="hindi-font" placeholder={description || "Short description"} onChange={(e) => setSeo({ metaDescription: e.target.value.replace(/\n/g, " ") })} />
         </Field>
-        <Field
+        {/* <Field
           label="Focus keywords"
           hint="Press Enter or + to add each keyword · the first one is the main keyword"
           info="The phrases people would search to find this story. Add the main one first, and try to use it in the title and the first lines."
         >
           <KeywordInput value={seo.focusKeyword} onChange={(v) => setSeo({ focusKeyword: v })} />
-        </Field>
+        </Field> */}
         <SerpPreview title={mTitle || title} description={mDesc || description} url="thejournalism.news › news › …" />
       </Section>
 

@@ -427,9 +427,9 @@ function LiveForm({ live }) {
                   <Field label="SEO description" hint={`${f.seo.metaDescription.length}/320 · empty = the strap line`}>
                     <Textarea rows={3} value={f.seo.metaDescription} maxLength={320} className="hindi-font" placeholder={f.description || "Short description"} onChange={(e) => setSeo({ metaDescription: e.target.value.replace(/\n/g, " ") })} />
                   </Field>
-                  <Field label="Focus keyword">
+                  {/* <Field label="Focus keyword">
                     <Input value={f.seo.focusKeyword} maxLength={100} className="hindi-font" onChange={(e) => setSeo({ focusKeyword: e.target.value })} />
-                  </Field>
+                  </Field> */}
                 </div>
               )}
             </Card>
