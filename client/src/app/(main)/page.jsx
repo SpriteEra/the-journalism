@@ -13,6 +13,7 @@ import React from 'react'
 import { getFeatured, getHomeSections, getLiveList, getShorts, getVideos } from "@/lib/data";
 import { siteDescription, siteName, abs } from "@/lib/site";
 import JsonLd from '@/components/common/JsonLd';
+import { cn, feature_heading_css } from '@/utils/util';
 
 
 const OG_IMAGE = { url: "/og-default.png", width: 1200, height: 630, alt: siteName() };
@@ -39,7 +40,7 @@ export const metadata = {
 };
 const PATTERN = ['four', 'five', 'four', 'five', 'four', 'five', 'three', 'three', 'four'];
 
-const FIVE_BG = ['bg-[#FF3D000D]', 'bg-[#E56C0F0D]'];   // five-card sections alternate these
+const FIVE_BG = ['bg-[#FF3D000D]', 'bg-[#E56C0F0D]', 'bg-[#1877F20D]'];   // five-card sections alternate these
 
 const SHORTS_AFTER = 2;                                   // shorts carousel goes after this many sections
 const LIMIT = { four: 4, five: 5, three: 3 };
@@ -82,7 +83,7 @@ function HeroStory({ story }) {
             <SectionHeading
                 noLink
                 headingTitle={headingLable}
-                className="text-[15px]!"
+                className="text-[20px]!"
             />
 
             {/* 16:9 media */}
@@ -107,7 +108,7 @@ function HeroStory({ story }) {
                     )}
                 </div>
 
-                <h2 className="mt-3 text-[27px] lg:text-[35px] font-semibold leading-8.75 lg:leading-10 transition-colors group-hover:text-primary font-khand tracking-[0.01em]">
+                <h2 className={cn(feature_heading_css, "mt-3")}>
                     {title}
                 </h2>
             </Link>

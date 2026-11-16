@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import SectionHeading from "./SectionHeading";
 import { UserRound } from "lucide-react";
+import { cn, feature_heading_css } from "@/utils/util";
 
 const StackedFeaturedCard = ({ item, priority = false }) => {
     if (!item) return null;
@@ -23,7 +24,10 @@ const StackedFeaturedCard = ({ item, priority = false }) => {
                     />
                 </div>
 
-                <h2 className="mt-3 line-clamp-3 font-khand text-[27px] font-semibold leading-8.75 lg:leading-10 tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:text-[30px] lg:min-h-30">
+                {/* <h2 className={cn(feature_heading_css, "mt-3 lg:min-h-30")}>
+                    {title}
+                </h2> */}
+                <h2 className="mt-3 line-clamp-3 font-khand text-[25px] font-semibold leading-8 lg:leading-9 tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:text-[28px] lg:min-h-30">
                     {title}
                 </h2>
             </Link>

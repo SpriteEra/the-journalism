@@ -121,7 +121,6 @@ export default function UnderConstruction({
                         <span aria-hidden="true" className="h-[2px] w-10 bg-[#e30000]" />
                         <span
                             className="text-base font-semibold text-[#e30000]"
-                            style={{ fontFamily: "var(--font-mukta), sans-serif" }}
                         >
                             निर्माणाधीन
                         </span>
@@ -131,7 +130,6 @@ export default function UnderConstruction({
                     <h1
                         id="uc-title"
                         className="mt-5 text-4xl font-bold leading-[1.15] sm:text-7xl"
-                        style={{ fontFamily: "var(--font-khand), var(--font-mukta), sans-serif" }}
                     >
                         नई वेबसाइट तैयार हो रही है
                     </h1>
@@ -139,7 +137,6 @@ export default function UnderConstruction({
                     <p
                         id="uc-desc"
                         className="mx-auto mt-5 max-w-lg text-lg leading-relaxed text-[#555]"
-                        style={{ fontFamily: "var(--font-mukta), var(--font-inter), sans-serif" }}
                     >
                         हम आपके लिए नई और तेज़ वेबसाइट बना रहे हैं। कुछ पेज और फ़ीचर अभी अधूरे हो सकते हैं।
                     </p>
@@ -150,7 +147,6 @@ export default function UnderConstruction({
                             type="button"
                             onClick={enter}
                             className="inline-flex items-center gap-3 rounded-md bg-[#e30000] px-6 sm:px-8 py-1.5 sm:py-2 text-lg font-semibold text-white transition-colors hover:bg-[#c40000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e30000]"
-                            style={{ fontFamily: "var(--font-mukta), var(--font-inter), sans-serif" }}
                         >
                             बीटा वर्ज़न देखें
                             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

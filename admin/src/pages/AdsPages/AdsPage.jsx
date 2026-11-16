@@ -9,7 +9,9 @@ import { Button, PageHeader } from "../../components/ui";
 import AdsList from "./AdsList";
 import AdsUploader from "./AdsUploader";
 import { cn } from "../../lib/cn";
+
 const MAX_ADS = 5;
+const BANNER = 1; // addType of the main banner (rectangle) ads
 
 /** Shared page of the three ad placements: header with the create button on top (same structure as News), then the list. */
 export default function AdsPage({ title, description, field, addType }) {
@@ -20,9 +22,15 @@ export default function AdsPage({ title, description, field, addType }) {
   useEffect(() => { if (data?.[field]) setAds(Array.isArray(data[field]) ? data[field] : []); }, [data, field]);
 
   const add = () => (ads.length >= MAX_ADS ? toast.error(`You can keep at most ${MAX_ADS} ads here. Delete one first.`) : setOpen(true));
+
+  // the on/off switch exists only for banner ads
+  const isBanner = addType === BANNER;
+  const liveCount = ads.filter((a) => a.isActive !== false && !a.isExpired).length;
+  const desc = isBanner ? `${description} · ${liveCount} of ${ads.length} live on the website` : description;
+
   return (
     <>
-      <PageHeader title={title} description={description}
+      <PageHeader title={title} description={desc}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => refetch()} disabled={isFetching} aria-label="Reload" title="Reload" className="!px-2.5">

@@ -9,7 +9,7 @@ const ArticleCard = ({ item, divider = true, priority = false, className = "" })
 
     return (
         <article
-            className={`w-full py-2.5 max-lg:pb-2 sm:py-3 first:pt-0 ${divider ? "border-b border-black/10" : ""} ${className}`}
+            className={`w-full py-2.5 max-lg:pb-2 sm:py-3.5 first:pt-0 ${divider ? "border-b border-black/10" : ""} ${className}`}
         >
             <Link href={href} className="group flex items-start gap-2.5 lg:gap-3">
                 <div className="relative aspect-square lg:aspect-video w-[30%] sm:w-[38%] max-w-83 shrink-0 overflow-hidden rounded-sm bg-gray-200 lg:w-[38%]">
@@ -24,18 +24,18 @@ const ArticleCard = ({ item, divider = true, priority = false, className = "" })
                 </div>
 
                 <div className="min-w-0 flex-1">
-                    <h3 className="line-clamp-2 lg:line-clamp-3 font-khand text-xl font-semibold leading-snug text-black transition-colors group-hover:text-primary lg:text-[30px] lg:leading-8.75 tracking-[0.01em] lg:pt-1">
+                    <h3 className="line-clamp-4 lg:line-clamp-3 font-khand text-lg font-semibold leading-tight text-black transition-colors group-hover:text-primary lg:text-[28px] lg:leading-8.75 tracking-[0.01em] lg:pt-1">
                         {title}
                     </h3>
 
                     {description && (
-                        <p className="mt-1 lg:mt-1.5 line-clamp-2 text-[13px] leading-normal text-[#646464] lg:mt-2 lg:text-lg">
+                        <p className="max-lg:hidden mt-1 lg:mt-1.5 line-clamp-2 text-[13px] leading-normal text-[#646464] lg:mt-2 lg:text-lg">
                             {description}
                         </p>
                     )}
 
                     {author && (
-                        <p className="mt-1 lg:mt-2 flex items-center gap-1.5 text-xs font-medium text-primary lg:mt-3 lg:text-lg">
+                        <p className="mt-1 lg:mt-2 flex items-center gap-1.5 text-xs font-medium text-primary lg:mt-3 lg:text-[17px]">
                             <UserRound className="size-3.5 lg:size-5" aria-hidden />
                             <span>{author.fullName}</span>
                         </p>

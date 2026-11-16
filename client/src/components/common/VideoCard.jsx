@@ -111,8 +111,9 @@ const VideoCard = ({
 
     const titleClass = vertical
         ? featured
-            ? "mt-3 line-clamp-2 font-khand text-2xl font-semibold leading-snug tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:text-[36px] lg:leading-normal"
-            : "mt-2 line-clamp-2 font-khand text-lg font-semibold leading-6.25 tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:text-[22px] lg:leading-normal"
+            ? "mt-3 line-clamp-3 lg:line-clamp-2 font-khand text-xl font-semibold leading-snug tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:text-[32px] lg:leading-9.5"
+
+            : "mt-2 line-clamp-3 font-khand tracking-[0.01em] text-black transition-colors group-hover:text-primary text-lg lg:text-xl font-semibold leading-6.25"
         : "line-clamp-2 font-khand text-xl font-semibold leading-snug tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:pt-1 lg:text-[30px] lg:leading-8.75";
 
     const text = (

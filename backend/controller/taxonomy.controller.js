@@ -108,7 +108,13 @@ const readSeo = async (req, existing) => {
 };
 
 /** taxonomy changed -> menu tree, id/slug index, home sections and analytics names are all stale */
-const invalidateTaxonomy = () => { clearCache('tax:'); clearCache('home:'); clearCache('analytics:'); };
+const invalidateTaxonomy = async () => {
+    await Promise.all([
+        clearCache('tax:'),
+        clearCache('home:'),
+        clearCache('analytics:'),
+    ]);
+};
 
 const isId = (v) => mongoose.Types.ObjectId.isValid(v);
 const NEWS_LIST_FIELDS = 'news_id slug primaryRoute.slug title description banner location post_time isVideo tags -_id author';
@@ -180,7 +186,7 @@ export const createCategory = tryCatch(async (req, res) => {
     data.slug = await uniqueSlug(Category, base);
     data.author = req.user._id;
     const category = await Category.create(data);
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(201).json({ success: true, message: 'Category created', category });
 });
 
@@ -192,7 +198,7 @@ export const updateCategory = tryCatch(async (req, res) => {
     Object.assign(category, data);
     await category.save();
     await syncRouteSlug('category', category._id, category.slug);       // story URLs that start with this category follow its new slug
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(200).json({ success: true, message: 'Category updated', category });
 });
 
@@ -208,7 +214,7 @@ export const deleteCategory = tryCatch(async (req, res) => {
     category.isDeleted = true;
     category.isActive = false;
     await category.save();
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(200).json({ success: true, message: 'Category deleted' });
 });
 
@@ -303,7 +309,7 @@ export const createState = tryCatch(async (req, res) => {
     const base = req.body.slug ? await makeSlug(req.body.slug, { from: 'en' }) : await makeSlug(data.state);
     data.slug = await uniqueSlug(State, base);
     const state = await State.create(data);
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(201).json({ success: true, message: 'State created', state });
 });
 
@@ -316,7 +322,7 @@ export const updateState = tryCatch(async (req, res) => {
     Object.assign(state, data);
     await state.save();
     await syncRouteSlug('state', state._id, state.slug);
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(200).json({ success: true, message: 'State updated', state });
 });
 
@@ -326,7 +332,7 @@ export const deleteState = tryCatch(async (req, res) => {
     if (await District.exists({ state: state._id })) throw new ErrorHandler(400, 'Delete its districts first');
     if (await News.exists({ state: state._id, isDeleted: false })) throw new ErrorHandler(400, 'News exist for this state. Mark it inactive instead');
     await state.deleteOne();
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(200).json({ success: true, message: 'State deleted' });
 });
 
@@ -378,7 +384,7 @@ export const createDistrict = tryCatch(async (req, res) => {
     data.slug = await uniqueSlug(District, base);
     const district = await District.create(data);
     await State.updateOne({ _id: state._id }, { $addToSet: { districts: district._id } });
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(201).json({ success: true, message: 'District created', district });
 });
 
@@ -396,7 +402,7 @@ export const updateDistrict = tryCatch(async (req, res) => {
     }
     Object.assign(district, data);
     await district.save();
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(200).json({ success: true, message: 'District updated', district });
 });
 
@@ -406,7 +412,7 @@ export const deleteDistrict = tryCatch(async (req, res) => {
     if (await News.exists({ district: district._id, isDeleted: false })) throw new ErrorHandler(400, 'News exist for this district. Mark it inactive instead');
     await State.updateOne({ _id: district.state }, { $pull: { districts: district._id } });
     await district.deleteOne();
-    invalidateTaxonomy();
+    await invalidateTaxonomy();
     res.status(200).json({ success: true, message: 'District deleted' });
 });
 

@@ -71,9 +71,9 @@ export default async function LiveListPage({ searchParams }) {
                   </div>
                   <h2 className="mt-2 line-clamp-3 font-khand text-lg leading-6.25 font-semibold tracking-[0.01em] transition-colors group-hover:text-primary lg:text-[22px] lg:leading-normal">{it.title}</h2>
                 </Link>
-                <p className="mt-1 text-sm text-black/60">
+                {/* <p className="mt-1 text-sm text-black/60">
                   {it.publishedAt ? `${formatDate(it.publishedAt)}` : ""}
-                </p>
+                </p> */}
               </article>
             ))}
           </div>

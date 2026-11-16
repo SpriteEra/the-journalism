@@ -8,10 +8,13 @@ import { errMsg } from "../../lib/api";
 import { formatDate } from "../../utils/utils";
 import { cn } from "../../lib/cn";
 import AdsUploader from "./AdsUploader";
+import AdLiveToggle from "./AdLiveToggle";
 import Modal from "../../components/ui/Modal";
 import { Badge, Button, Card, EmptyState, useConfirm } from "../../components/ui";
+import usePermission from "../../hooks/usePermission";
 
 const DAY = 86400000;
+const BANNER = 1; // addType of the main banner (rectangle) ads
 
 /** Days left + how much of the ad's lifetime has been used (0–100). */
 function lifetime(ad) {
@@ -37,17 +40,24 @@ function Meta({ icon: Icon, label, children }) {
 }
 
 /** One advertisement: picture, status, dates, who made it, and its actions (Edit · Extend / Renew · Delete). Dragging the handle re-orders. */
-function AdRow({ ad, adType, index, onEdit, onExtend, onRenew, onDelete }) {
+function AdRow({ ad, adType, index, canManage, refetch, onEdit, onExtend, onRenew, onDelete }) {
   const controls = useDragControls();
   const { daysLeft, used } = lifetime(ad);
   const expired = ad.isExpired || daysLeft <= 0;
   const soon = !expired && daysLeft <= 7;
+
+  // on/off switch exists only for banner ads
+  const isBanner = adType === BANNER;
+  const hidden = isBanner && !expired && ad.isActive === false;
 
   const timeLabel = expired
     ? "Expired"
     : daysLeft === 1
       ? "1 day left"
       : `${daysLeft} days left`;
+
+  const badgeTone = expired ? "danger" : hidden ? "neutral" : "success";
+  const badgeText = expired ? "Expired" : hidden ? "Hidden" : isBanner ? "Live" : "Active";
 
   return (
     <Reorder.Item
@@ -83,10 +93,13 @@ function AdRow({ ad, adType, index, onEdit, onExtend, onRenew, onDelete }) {
               <img
                 src={ad.banner?.url}
                 alt="Advertisement"
-                className={cn("pointer-events-none size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]", expired && "opacity-60 grayscale")}
+                className={cn(
+                  "pointer-events-none size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]",
+                  (expired || hidden) && "opacity-60 grayscale"
+                )}
               />
-              <Badge tone={expired ? "danger" : "success"} dot size="sm" className="absolute left-2 top-2 shadow-sm">
-                {expired ? "Expired" : "Active"}
+              <Badge tone={badgeTone} dot size="sm" className="absolute left-2 top-2 shadow-sm">
+                {badgeText}
               </Badge>
               <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur sm:hidden">
                 #{index + 1}
@@ -95,6 +108,23 @@ function AdRow({ ad, adType, index, onEdit, onExtend, onRenew, onDelete }) {
 
             {/* Details */}
             <div className="min-w-0 flex-1 space-y-3">
+              {/* Banner ads only: show / hide on the website */}
+              {isBanner && (
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2 ring-1 ring-line">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-fg">Show on website</p>
+                    <p className="truncate text-xs text-fg-subtle">
+                      {expired
+                        ? "Expired — renew it to show this banner again"
+                        : hidden
+                          ? "Hidden from visitors"
+                          : "Visible to visitors on the home page"}
+                    </p>
+                  </div>
+                  <AdLiveToggle ad={ad} refetch={refetch} canManage={canManage} showBadge={false} />
+                </div>
+              )}
+
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-3">
                 <Meta icon={CalendarPlus} label="Created">{formatDate(ad.createdAt)}</Meta>
                 <Meta icon={CalendarClock} label="Expires">{formatDate(ad.expireDate)}</Meta>
@@ -156,6 +186,7 @@ function AdRow({ ad, adType, index, onEdit, onExtend, onRenew, onDelete }) {
 const AdsList = ({ ads = [], setAds, refetch, adType = 2, onAdd }) => {
   const confirm = useConfirm();
   const qc = useQueryClient();
+  const { can } = usePermission();
   const [ids, setIds] = useState([]);
   const [map, setMap] = useState({});
   const [changed, setChanged] = useState(false);
@@ -188,7 +219,20 @@ const AdsList = ({ ads = [], setAds, refetch, adType = 2, onAdd }) => {
   return (
     <>
       <Reorder.Group axis="y" values={ids} onReorder={(n) => { setIds(n); setAds?.(n.map((id) => map[id])); setChanged(true); }} className="space-y-3">
-        {ids.map((id, i) => map[id] && <AdRow key={id} ad={map[id]} adType={adType} index={i} onEdit={() => setEditing(map[id])} onExtend={() => extend(map[id])} onRenew={() => renew(map[id])} onDelete={() => del(map[id])} />)}
+        {ids.map((id, i) => map[id] && (
+          <AdRow
+            key={id}
+            ad={map[id]}
+            adType={adType}
+            index={i}
+            canManage={can("ads.manage")}
+            refetch={refetch}
+            onEdit={() => setEditing(map[id])}
+            onExtend={() => extend(map[id])}
+            onRenew={() => renew(map[id])}
+            onDelete={() => del(map[id])}
+          />
+        ))}
       </Reorder.Group>
       {changed && (
         <div className="sticky bottom-3 z-10 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3 shadow-pop">

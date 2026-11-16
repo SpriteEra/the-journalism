@@ -57,6 +57,7 @@ export default async function VideosPage({ searchParams }) {
                 {first ? (
                     <>
                         <VideoCard item={first} layout="vertical" featured priority />
+
                         {rest.length > 0 && (
                             <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-2 lg:mt-8 lg:grid-cols-3 lg:gap-x-4 lg:gap-y-8">
                                 {rest.map((item) => <VideoCard key={item.id} item={item} layout="vertical" />)}
@@ -68,7 +69,9 @@ export default async function VideosPage({ searchParams }) {
             </section>
             <aside className="relative min-h-50 space-y-5 pt-5 lg:col-span-2 lg:space-y-3.5 lg:pt-11">
                 <SideAds />
-                <div className="sticky top-35"><LatestNews items={latest.items} /></div>
+                <div className="sticky top-35">
+                    <LatestNews items={latest.items} />
+                </div>
             </aside>
         </div>
     );

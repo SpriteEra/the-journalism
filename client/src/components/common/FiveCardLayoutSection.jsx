@@ -4,6 +4,8 @@ import Image from "next/image";
 import NewsCard from "./NewsCard";
 import SectionHeading from "./SectionHeading";
 import { UserRound } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { cn, feature_heading_css } from "@/utils/util";
 
 
 const FeaturedNewsCard = ({ item, className = "", priority = false }) => {
@@ -33,7 +35,7 @@ const FeaturedNewsCard = ({ item, className = "", priority = false }) => {
                     )}
                 </div>
 
-                <h2 className="mt-3 line-clamp-3 font-khand text-[27px] font-semibold leading-8.75 tracking-[0.01em] text-black transition-colors group-hover:text-primary lg:text-[30px] lg:leading-10">
+                <h2 className={cn(feature_heading_css, 'mt-3')}>
                     {title}
                 </h2>
 
@@ -72,7 +74,7 @@ const FiveCardLayoutSection = ({
     const right = rest.slice(perColumn, perColumn * 2);
 
     return (
-        <section aria-label={title} className={`w-full py-6 lg:py-10 mt-12 lg:mt-20 mb-6 lg:mb-10 ${bgClassName} ${className}`}>
+        <section aria-label={title} className={`w-full py-10 lg:py-10 ${bgClassName} ${className}`}>
             <div className="page-container">
                 {title && <SectionHeading headingRef={titleHref} headingTitle={title} />}
 
@@ -99,6 +101,12 @@ const FiveCardLayoutSection = ({
                             ))}
                         </div>
                     )}
+                </div>
+
+                <div className="mt-2 text-right">
+                    <Link href={titleHref} className="text-sm lg:text-base font-semibold text-primary hover:underline flex items-center justify-end gap-1">
+                        और पढ़ें <ChevronRight className="size-4" />
+                    </Link>
                 </div>
             </div>
         </section>

@@ -4,7 +4,7 @@ import { P } from "../config/permissions.js";
 import { clearFeatured, createNewsByReporter, searchNewsForLinking, deleteNewsAdmin, getFeaturedAdmin, getNewsAuthors, getNewsByReporter, getSingleNewsReporter, updateNewsByReporter } from "../controller/news.controller.js";
 import { approveYtNews, createYtNews, deleteYtNews, getNewsYt, getSingleYtNewsAdmin, updateYtNews } from "../controller/ytnews.controller.js";
 import { Createnews, Deletenews, getBreakingNewsAdmin, Updatenews } from "../controller/breaking.news.controller.js";
-import { createAdvertisement, deleteAdvertisement, extendExpiryMainAdvertisement, getAdminAdvertisement, getAdminSingleAdvertisement, updateAdvertisement, updateAdvertisementOrder, updateMainExpiredAdvertisement } from "../controller/advertisement.controller.js";
+import { createAdvertisement, deleteAdvertisement, extendExpiryMainAdvertisement, getAdminAdvertisement, getAdminSingleAdvertisement, toggleAdvertisementActive, updateAdvertisement, updateAdvertisementOrder, updateMainExpiredAdvertisement } from "../controller/advertisement.controller.js";
 import { archiveAdminNotification, assignRole, blockUnblockUser, Createuser, getUserDetail, setUserPermissions, deleteAdminNotification, Deleteuser, getAdminNotifications, getAdminNotificationStats, GetUser, getUsers, markAdminNotificationAsRead, markAllAdminNotificationsAsRead, resetPassword, sendOtp, updateTrust, updateUser } from "../controller/admin.controller.js";
 import { createScheduleNews, deleteScheduleNews, getScheduleNews, getScheduleNewsByReporters, publishScheduleNews, updateScheduledNews } from "../controller/schedulenews.controller.js";
 import { approveEventNews, createEventNews, deleteEventNews, getEventNewsByReporter, getSingleEventNews, updateEventNews } from "../controller/event.controller.js";
@@ -86,6 +86,7 @@ export async function adminRoutes(app) {
     app.get("/get-advertisement/:id", { onRequest: [auth, need(P.ADS_MANAGE)] }, getAdminSingleAdvertisement);
     app.put("/ads/update/:id", { onRequest: [auth, need(P.ADS_MANAGE)] }, updateAdvertisement);
     app.post("/ads/update-order", { onRequest: [auth, need(P.ADS_MANAGE)] }, updateAdvertisementOrder);
+    app.patch("/toggle/:id", { onRequest: [auth, need(P.ADS_MANAGE)] }, toggleAdvertisementActive);
     app.delete("/delete-ads/:id", { onRequest: [auth, need(P.ADS_MANAGE)] }, deleteAdvertisement);
     app.put("/renew-main-expiry/:id", { onRequest: [auth, need(P.ADS_MANAGE)] }, updateMainExpiredAdvertisement);
     app.put("/extend-main-expiry/:id", { onRequest: [auth, need(P.ADS_MANAGE)] }, extendExpiryMainAdvertisement);

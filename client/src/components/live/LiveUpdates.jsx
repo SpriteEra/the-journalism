@@ -24,7 +24,7 @@ export default function LiveUpdates({ updates = [] }) {
             )}
           </div>
 
-          {u.title && <h2 className="mt-1 font-khand text-2xl leading-snug font-bold lg:text-[30px]">{u.title}</h2>}
+          {u.title && <h2 className="mt-1 text-2xl leading-snug font-bold lg:text-[30px]">{u.title}</h2>}
 
           {u.image ? (
             <figure className="mt-3">

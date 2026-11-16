@@ -1,5 +1,7 @@
+import Link from "next/link";
 import NewsCard from "./NewsCard";
 import SectionHeading from "./SectionHeading";
+import { ChevronRight } from "lucide-react";
 
 /**
  * Four stories in a row.
@@ -23,6 +25,7 @@ const FourCardLayoutSection = ({
                 <SectionHeading
                     headingRef={titleHref}
                     headingTitle={title}
+                    showLink={true}
                 />
             )}
 
@@ -31,13 +34,15 @@ const FourCardLayoutSection = ({
                     <NewsCard item={item} key={i} />
                 ))}
             </div>
+
+
         </>
     );
 
     // no background: unchanged
     if (!bgClassName) {
         return (
-            <section aria-label={title} className={`w-full my-3 lg:my-5 ${className} page-container`}>
+            <section aria-label={title} className={`w-full py-12 lg:py-20 ${className} page-container`}>
                 {content}
             </section>
         );
@@ -45,7 +50,7 @@ const FourCardLayoutSection = ({
 
     // with a background: full-width strip, the content sits inside the page container (like FiveCardLayoutSection)
     return (
-        <section aria-label={title} className={`w-full py-6 lg:py-10 my-3 lg:my-5 ${bgClassName} ${className}`}>
+        <section aria-label={title} className={`w-full py-6 lg:py-20 my-3 lg:my-5 ${bgClassName} ${className}`}>
             <div className="page-container">{content}</div>
         </section>
     );

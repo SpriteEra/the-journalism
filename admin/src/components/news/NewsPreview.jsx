@@ -7,19 +7,6 @@ import { fmtDate } from "../../lib/api";
 import { handleImageError } from "../../utils/imageError";
 import EditorContent from "./EditorContent";
 
-/*
- * Fonts: add this ONCE to your global CSS (index.css), before `@import "tailwindcss"`:
- *
- *   @import url('https://fonts.googleapis.com/css2?family=Khand:wght@300;400;500;600;700&family=Mukta:wght@200;300;400;500;600;700;800&display=swap');
- *   @import "tailwindcss";
- *   @theme {
- *     --font-khand: "Khand", sans-serif;
- *     --font-mukta: "Mukta", sans-serif;
- *   }
- *
- * Then `font-mukta` (default text) and `font-khand` (headings) work as classes below.
- */
-
 // [id, label, icon, frame width]
 const DEVICES = [
   ["mobile", "Mobile", Smartphone, "max-w-[390px]"],
@@ -98,8 +85,7 @@ export default function NewsPreview({ open, onClose, news }) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-2 p-0 sm:p-6">
-        {/* The reader site is always light, so the page itself ignores the admin theme. Mukta is the default font here. */}
-        <div className={cn("mx-auto w-full bg-white font-mukta text-black transition-[max-width] duration-300 sm:rounded-2xl sm:shadow-pop", frame)}>
+        <div className={cn("mx-auto w-full bg-white text-black transition-[max-width] duration-300 sm:rounded-2xl sm:shadow-pop", frame)}>
           <main className={cn("grid grid-cols-1 gap-4 px-4 pb-10 pt-6", lg && "grid-cols-8 pt-10")}>
             <section className={cn(lg && "col-span-6")}>
               {/* breadcrumb */}
@@ -112,8 +98,7 @@ export default function NewsPreview({ open, onClose, news }) {
 
               <div className={cn(lg && "border border-black/5 p-3")}>
                 <article>
-                  {/* heading: Khand */}
-                  <h1 className={cn("font-khand font-bold tracking-[0.01em]", lg ? "text-[45px] leading-12.5" : "text-[32px] leading-[2.625rem]")}>
+                  <h1 className={cn("font-bold tracking-[0.01em]", lg ? "text-[45px] leading-12.5" : "text-[32px] leading-[2.625rem]")}>
                     {news.title || "—"}
                   </h1>
                   {news.description && (
@@ -160,11 +145,10 @@ export default function NewsPreview({ open, onClose, news }) {
                     </figure>
                   )}
 
-                  {/* body: Mukta text, Khand for any headings inside the story, frontend paragraph sizing */}
                   <div className={cn(
                     "mt-4 text-lg leading-7 tracking-[0.02em]",
-                    "[&_p]:mt-4 [&_p]:font-mukta [&_p]:text-lg [&_p]:leading-7 [&_p]:tracking-[0.02em] [&_li]:font-mukta",
-                    "[&_h1]:font-khand [&_h2]:font-khand [&_h3]:font-khand [&_h4]:font-khand",
+                    "[&_p]:mt-4 [&_p]:text-lg [&_p]:leading-7 [&_p]:tracking-[0.02em]",
+                    "",
                     lg && "text-[22px] leading-[31px] [&_p]:text-[22px] [&_p]:leading-[31px]"
                   )}>
                     <EditorContent content={news.content} />

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Play } from "lucide-react";
+import { normal_card_heading_css } from "@/utils/util";
 
 /**
  * Single story card: 16:9 image (optional play button) + headline.
@@ -35,7 +36,7 @@ const NewsCard = ({ item, className = "", priority = false }) => {
                     )}
                 </div>
 
-                <h3 className="mt-2 line-clamp-3 font-khand text-lg lg:text-[22px] font-semibold leading-6.25 text-black transition-colors group-hover:text-primary tracking-[0.01em] lg:leading-normal ">
+                <h3 className={normal_card_heading_css}>
                     {title}
                 </h3>
             </Link>

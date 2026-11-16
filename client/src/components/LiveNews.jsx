@@ -23,20 +23,11 @@ const LiveNews = ({
             </Link>
 
             {/* List */}
-            <ul className="lg:divide-y divide-black/5 max-lg:grid max-lg:grid-cols-2 max-lg:gap-x-2">
+            <ul className="lg:divide-y divide-black/25 max-lg:grid max-lg:grid-cols-2 max-lg:gap-x-2">
                 {items.map((item) => (
-                    <li key={item.id} className="lg:first:pt-0 py-1.5 sm:py-3 lg:first:pb-3 lg:last:pb-2">
-                        <Link href={item.href} className="group flex items-center gap-2 lg:gap-3 max-lg:flex-col">
-                            <div className="relative aspect-video w-full lg:h-15 lg:w-20 shrink-0 overflow-hidden rounded bg-gray-200">
-                                <Image
-                                    src={item.image || "/banner.png"}
-                                    alt={item.title}
-                                    fill
-                                    sizes="72px"
-                                    className="object-cover"
-                                />
-                            </div>
-                            <h3 className="line-clamp-2 font-khand text-lg leading-6 lg:text-xl font-semibold lg:leading-6.5 text-black transition-colors group-hover:text-primary tracking-[0.01em]">
+                    <li key={item.id} className="lg:first:pt-0 py-1.5 sm:py-2 lg:first:pb-2 lg:last:pb-2">
+                        <Link href={item.href} className="group flex items-center gap-2 lg:gap-3 max-lg:flex-col max-lg:border border-gray-200 py-2 px-1 max-lg:rounded">
+                            <h3 className={"line-clamp-3 font-khand text-base leading-5 lg:text-lg font-medium lg:leading-6.5 text-black transition-colors group-hover:text-primary tracking-[0.01em]"}>
                                 {item.title}
                             </h3>
                         </Link>

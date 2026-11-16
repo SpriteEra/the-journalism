@@ -28,9 +28,9 @@ const LatestNews = async ({
             {/* List */}
             <ul className="divide-y divide-black/5">
                 {list.map((item, index) => (
-                    <li key={index} className="first:pt-0 py-2.5 lg:py-3 first:pb-3 last:pb-2">
-                        <Link href={item.href} className="group flex items-center gap-3">
-                            <div className="relative h-[68px] lg:h-[58px] w-22 lg:w-20 shrink-0 overflow-hidden rounded-xs bg-gray-200">
+                    <li key={index} className="first:pt-0 py-2.5 lg:py-2.5 first:pb-3 last:pb-2">
+                        <Link href={item.href} className="group flex items-center gap-2">
+                            <div className="relative h-[68px] lg:h-[58px] w-22 lg:w-19 shrink-0 overflow-hidden rounded-xs bg-gray-200">
                                 <Image
                                     src={item.image || "/banner.png"}
                                     alt={item.title}
@@ -39,7 +39,7 @@ const LatestNews = async ({
                                     className="object-cover"
                                 />
                             </div>
-                            <h3 className="line-clamp-2 font-khand text-lg lg:text-xl font-medium lg:leading-6 text-black transition-colors group-hover:text-primary tracking-[0.01em]">
+                            <h3 className="line-clamp-2 font-khand text-base lg:text-lg font-medium lg:leading-6 text-black transition-colors group-hover:text-primary tracking-[0.01em] pb-px">
                                 {item.title}
                             </h3>
                         </Link>

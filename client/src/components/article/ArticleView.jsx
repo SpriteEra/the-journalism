@@ -75,7 +75,7 @@ export default async function ArticleView({ data }) {
 
         <div className="border-black/5 lg:border lg:p-3">
           <article>
-            <h1 className="font-khand text-[32px] font-bold leading-10.5 tracking-[0.01em] lg:text-[45px] lg:leading-13">{article.title}</h1>
+            <h1 className=" text-[32px] font-bold leading-10.5 tracking-[0.01em] lg:text-[45px] lg:leading-13.75">{article.title}</h1>
 
             {article.description && <p className="mt-3 text-lg leading-relaxed lg:mt-4 lg:text-[22px] lg:leading-7.5">{article.description}</p>}
 

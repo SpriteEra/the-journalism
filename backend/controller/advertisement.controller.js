@@ -10,29 +10,20 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
 const __dirname = path.dirname(__filename);
-export const getAdvertisement = tryCatch(async (req, res, next) => {
-    try {
+export const getAdvertisement = tryCatch(async (req, res) => {
+    const select = 'banner.url link -_id';
 
-        let select = 'banner.url link -_id';
+    // Only banner (rectangle) ads can be switched on/off. Missing isActive counts as on.
+    const liveBanner = { type: 'rectangle', isActive: { $ne: false }, isExpired: { $ne: true } };
 
-        const detailAds = await Advertisement.find({ type: "detail" }).sort({ 'order': 1 }).select(select).exec();
+    const [detailAds, sideAds, bannerAds] = await Promise.all([
+        Advertisement.find({ type: 'detail' }).sort({ order: 1 }).select(select).exec(),
+        Advertisement.find({ type: 'square' }).sort({ order: 1 }).select(select).exec(),
+        Advertisement.find(liveBanner).sort({ order: 1 }).select(select).exec(),
+    ]);
 
-        const sideAds = await Advertisement.find({ type: 'square' }).sort({ 'order': 1 }).select(select).exec();
-        const bannerAds = await Advertisement.find({ type: 'rectangle' }).sort({ 'order': 1 }).select(select).exec();
-        res.status(200).json({
-            success: true,
-            bannerAds,
-            sideAds,
-            detailAds
-        })
-
-
-
-    }
-    catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
-    }
-})
+    res.status(200).json({ success: true, bannerAds, sideAds, detailAds });
+});
 
 export const createAdvertisement = tryCatch(async (req, res, next) => {
     let { link, type, email } = req.body;
@@ -164,35 +155,16 @@ export const extendExpiryMainAdvertisement = tryCatch(async (req, res, next) => 
 //     }
 // })
 export const getAdminAdvertisement = tryCatch(async (req, res, next) => {
-    const { type } = req.query;
+    const base = 'banner link order email createdAt expireDate isExpired';
 
+    const [square, banner, detail] = await Promise.all([
+        Advertisement.find({ type: 'square' }).sort({ order: 1 }).populate('author', 'username').select(base).exec(),
+        Advertisement.find({ type: 'rectangle' }).sort({ order: 1 }).populate('author', 'username').select(`${base} isActive`).exec(),
+        Advertisement.find({ type: 'detail' }).sort({ order: 1 }).populate('author', 'username').select(base).exec(),
+    ]);
 
-    const data2 = await Advertisement.find({ type: 'square' })
-        .sort({ "order": 1 })
-        .populate('author', 'username')
-        .select('banner link order email createdAt expireDate isExpired')
-        .exec();
-
-    const data1 = await Advertisement.find({ type: 'rectangle' })
-        .sort({ "order": 1 })
-        .populate('author', 'username')
-        .select('banner link order email createdAt expireDate isExpired')
-        .exec();
-
-    const data3 = await Advertisement.find({ type: 'detail' })
-        .sort({ "order": 1 })
-        .populate('author', 'username')
-        .select('banner link order email createdAt expireDate isExpired')
-        .exec();
-
-    // const data3 = await Advertisement.find({ type: 'detail' }).sort({ "order": 1 }).select('banner link order').exec();
-
-    res.status(200).json({
-        square: data2,
-        banner: data1,
-        detail: data3,
-    })
-})
+    res.status(200).json({ square, banner, detail });
+});
 export const getAdminSingleAdvertisement = tryCatch(async (req, res, next) => {
     const { id } = req.params;
 
@@ -203,7 +175,33 @@ export const getAdminSingleAdvertisement = tryCatch(async (req, res, next) => {
 
     return res.status(200).json(ads)
 })
+export const toggleAdvertisementActive = tryCatch(async (req, res, next) => {
+    const ad = await Advertisement.findById(req.params.id);
+    if (!ad) return next(new ErrorHandler(404, 'Advertisement not found'));
 
+    if (ad.type !== 'rectangle') {
+        return next(new ErrorHandler(400, 'Only banner ads can be switched on or off'));
+    }
+
+    const turningOn = ad.isActive === false;
+
+    if (turningOn) {
+        // only one banner can be live: switch every other banner off
+        await Advertisement.updateMany(
+            { type: 'rectangle', _id: { $ne: ad._id } },
+            { $set: { isActive: false } }
+        );
+    }
+
+    ad.isActive = turningOn;
+    await ad.save();
+
+    res.status(200).json({
+        success: true,
+        isActive: ad.isActive,
+        message: ad.isActive ? 'Banner is now live on the website' : 'Banner hidden from the website',
+    });
+});
 export const deleteAdvertisement = tryCatch(async (req, res, next) => {
     const { id } = req.params;
     if (!id) {

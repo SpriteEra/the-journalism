@@ -2,10 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Menu, X, Video, ChevronDown } from "lucide-react";
+import { Search, Menu, X, Video, ChevronDown, Home, PlaySquare, Radio, Clapperboard } from "lucide-react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { social } from "@/lib/site";
+import { TvMinimalPlay } from "lucide-react";
+import { House } from "lucide-react";
 
 // loaded only when needed – zero cost on first paint
 const loadSearch = () => import("./SearchModal");
@@ -43,11 +45,30 @@ const formatIST = (d) => {
 /* Height of the top bar (date + socials). Must match `h-8` below (32px). */
 const TOP_BAR_H = 32;
 
+const TABS = [
+    { label: "होम", href: "/", icon: House },
+    { label: "वीडियो", href: "/videos", icon: TvMinimalPlay },
+    { label: "लाइव न्यूज़", href: "/live", icon: Radio },
+    { label: "Shorts", href: "/shorts", icon: Clapperboard },
+];
+
+/* Dropdown parents with no page of their own (e.g. "अन्य") only open their menu, never navigate */
+const isMenuOnly = (item) => {
+    const label = String(item.label).replace(/\s+/g, "");
+    return (
+        !!item.children?.length &&
+        (!item.href ||
+            item.href === "#" ||
+            label.includes("अन्य") ||
+            /\/(other|others|anya)(\/|$)/i.test(item.href))
+    );
+};
+
 const Navbar = ({ items = [], topics = [] }) => {
     const STATE_LINK = { label: "राज्य", href: "/state" };
     let statePlaced = false;
     const menuItems = items.map((it) => {
-        if (!statePlaced && String(it.label).replace(/\s+/g, "") === "देश-विदेश") {
+        if (!statePlaced && String(it.label).replace(/\s+/g, "") === "देश") {
             statePlaced = true;
             return { ...it, children: [...(it.children || []), STATE_LINK] };
         }
@@ -107,12 +128,11 @@ const Navbar = ({ items = [], topics = [] }) => {
         };
     }, []);
 
-    const isActive = (item) =>
-        item.href === "/"
-            ? pathname === "/"
-            : pathname === item.href ||
-            pathname.startsWith(item.href + "/") ||
-            !!item.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"));
+    const isActive = (item) => {
+        const match = (href) => !!href && (pathname === href || pathname.startsWith(href + "/"));
+        if (item.href === "/") return pathname === "/";
+        return match(item.href) || !!item.children?.some((c) => match(c.href));
+    };
 
     const hoverOpen = (label) => {
         clearTimeout(closeTimer.current);
@@ -159,7 +179,7 @@ const Navbar = ({ items = [], topics = [] }) => {
             </div>
 
             {/* ---------- Row 2: logo + search ---------- */}
-            <div className="sm:border-b border-gray-200 pb-3.5 sm:pb-8 pt-3 max-sm:shadow-[0px_1px_4px_0px_#0000001A]">
+            <div className="sm:border-b border-gray-200 py-3.5 max-sm:shadow-[0px_1px_4px_0px_#0000001A]">
                 <div className="page-container flex items-center justify-between">
                     <button
                         type="button"
@@ -212,31 +232,44 @@ const Navbar = ({ items = [], topics = [] }) => {
                         <nav aria-label="Main" ref={menuRef} className="min-w-0">
                             {/* overflow-x-auto on small screens (scrollable row),
                   overflow-visible on lg+ so dropdowns aren't clipped */}
-                            <ul className="no-scrollbar flex h-full items-stretch gap-7 overflow-x-auto whitespace-nowrap lg:gap-14 lg:overflow-visible">
+                            <ul className="no-scrollbar flex h-full items-stretch gap-7 overflow-x-auto whitespace-nowrap lg:gap-10 lg:overflow-visible">
                                 {navItems.map((item) => {
-                                    const hasDrop = !!item.children;
+                                    const hasDrop = !!item.children?.length;
+                                    const menuOnly = isMenuOnly(item);
                                     const active = isActive(item);
                                     const open = openMenu === item.label;
 
+                                    const labelClass = `relative flex items-center px-1 text-[15px] font-medium transition-colors hover:text-primary lg:text-[20px] ${active || open ? "text-primary" : "text-black"
+                                        }`;
+                                    const underline = active && (
+                                        <span className="absolute inset-x-0 bottom-0 h-[5px] rounded-t-full bg-primary" />
+                                    );
+
                                     return (
                                         <li
-                                            key={item.href}
+                                            key={item.label}
                                             className="relative flex"
                                             onMouseEnter={() => (hasDrop ? hoverOpen(item.label) : setOpenMenu(null))}
                                             onMouseLeave={() => hasDrop && hoverClose()}
                                         >
                                             <div className="flex items-stretch">
-                                                <Link
-                                                    href={item.href}
-                                                    aria-current={active ? "page" : undefined}
-                                                    className={`relative flex items-center px-1 text-[15px] font-semibold transition-colors hover:text-primary lg:text-[22px] ${active || open ? "font-medium text-primary" : "text-black"
-                                                        }`}
-                                                >
-                                                    {item.label}
-                                                    {active && (
-                                                        <span className="absolute inset-x-0 bottom-0 h-[5px] rounded-t-full bg-primary" />
-                                                    )}
-                                                </Link>
+                                                {menuOnly ? (
+                                                    <button
+                                                        type="button"
+                                                        aria-haspopup="true"
+                                                        aria-expanded={open}
+                                                        onClick={() => hoverOpen(item.label)}
+                                                        className={`${labelClass} cursor-pointer`}
+                                                    >
+                                                        {item.label}
+                                                        {underline}
+                                                    </button>
+                                                ) : (
+                                                    <Link href={item.href} aria-current={active ? "page" : undefined} className={labelClass}>
+                                                        {item.label}
+                                                        {underline}
+                                                    </Link>
+                                                )}
 
                                                 {/* chevron toggle – desktop only (mobile uses the drawer) */}
                                                 {hasDrop && (
@@ -244,7 +277,7 @@ const Navbar = ({ items = [], topics = [] }) => {
                                                         type="button"
                                                         aria-label={`Toggle ${item.label} menu`}
                                                         aria-expanded={open}
-                                                        onClick={() => setOpenMenu(open ? null : item.label)}
+                                                        onClick={() => (menuOnly ? hoverOpen(item.label) : setOpenMenu(open ? null : item.label))}
                                                         className={`hidden items-center pl-0.5 hover:text-primary lg:flex ${active || open ? "text-primary" : ""
                                                             }`}
                                                     >
@@ -259,20 +292,17 @@ const Navbar = ({ items = [], topics = [] }) => {
                                             {/* Dropdown card (desktop) */}
                                             {hasDrop && open && (
                                                 <ul className="absolute left-0 top-full z-50 hidden w-52 rounded-b-md border border-gray-200 bg-white py-1.5 shadow-[0_8px_20px_rgba(15,23,42,0.12)] lg:block">
-                                                    {item.children.map((child) => {
-                                                        const childActive = pathname === child.href;
-                                                        return (
-                                                            <li key={child.href}>
-                                                                <Link
-                                                                    href={child.href}
-                                                                    className={`block px-4 py-2 text-[14px] lg:text-lg font-medium transition-colors hover:bg-[#fdecec] hover:text-primary ${childActive ? "text-primary font-semibold" : ""
-                                                                        }`}
-                                                                >
-                                                                    {child.label}
-                                                                </Link>
-                                                            </li>
-                                                        );
-                                                    })}
+                                                    {item.children.map((child) => (
+                                                        <li key={child.href}>
+                                                            <Link
+                                                                href={child.href}
+                                                                className={`block px-4 py-2 text-[14px] font-medium transition-colors hover:bg-[#fdecec] hover:text-primary lg:text-lg ${pathname === child.href ? "font-semibold text-primary" : ""
+                                                                    }`}
+                                                            >
+                                                                {child.label}
+                                                            </Link>
+                                                        </li>
+                                                    ))}
                                                 </ul>
                                             )}
                                         </li>
@@ -289,12 +319,12 @@ const Navbar = ({ items = [], topics = [] }) => {
                             aria-label="Videos"
                             className="flex items-center justify-center bg-primary px-3 text-white"
                         >
-                            <Video className="size-5.5" />
+                            <Video className="size-5" />
                         </Link>
                         <Link
                             href="/live"
                             aria-label="लाइव न्यूज़"
-                            className="group flex items-center gap-2.5 bg-[#FFECE6] px-4 text-[14px] font-medium transition-colors hover:bg-[#fddcd3] lg:px-5 lg:text-[22px]"
+                            className="group flex items-center gap-2.5 bg-[#FFECE6] px-4 text-[14px] font-medium transition-colors hover:bg-[#fddcd3] lg:px-4 lg:text-[20px]"
                         >
                             {/* live indicator: ring + pulsing dot */}
                             <span className="relative flex size-4 items-center justify-center rounded-full border border-primary">
@@ -322,30 +352,45 @@ const Navbar = ({ items = [], topics = [] }) => {
 
                         <ul className="flex-1 overflow-y-auto px-4 py-2">
                             {navItems.map((item) => {
-                                const hasDrop = !!item.children;
+                                const hasDrop = !!item.children?.length;
+                                const menuOnly = isMenuOnly(item);
                                 const expanded = mobileSub === item.label;
+                                const labelClass = `flex-1 py-2.5 text-left text-lg font-medium lg:py-3 lg:text-xl ${isActive(item) ? "text-primary" : "text-gray-900"
+                                    }`;
+                                const chevron = (
+                                    <ChevronDown className={`size-4 transition-transform lg:size-4.5 ${expanded ? "rotate-180" : ""}`} />
+                                );
+
                                 return (
-                                    <li key={item.href} className="border-b border-gray-100 last:border-0">
+                                    <li key={item.label} className="border-b border-gray-100 last:border-0">
                                         <div className="flex items-center justify-between">
-                                            <Link
-                                                href={item.href}
-                                                className={`flex-1 py-2.5 lg:py-3 text-lg lg:text-xl font-medium ${isActive(item) ? "text-primary" : "text-gray-900"
-                                                    }`}
-                                            >
-                                                {item.label}
-                                            </Link>
-                                            {hasDrop && (
+                                            {menuOnly ? (
                                                 <button
                                                     type="button"
-                                                    aria-label={`Toggle ${item.label}`}
                                                     aria-expanded={expanded}
                                                     onClick={() => setMobileSub(expanded ? null : item.label)}
-                                                    className="p-3"
+                                                    className={`${labelClass} flex items-center justify-between pr-3`}
                                                 >
-                                                    <ChevronDown
-                                                        className={`size-4 lg:size-4.5 transition-transform ${expanded ? "rotate-180" : ""}`}
-                                                    />
+                                                    {item.label}
+                                                    {chevron}
                                                 </button>
+                                            ) : (
+                                                <>
+                                                    <Link href={item.href} className={labelClass}>
+                                                        {item.label}
+                                                    </Link>
+                                                    {hasDrop && (
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Toggle ${item.label}`}
+                                                            aria-expanded={expanded}
+                                                            onClick={() => setMobileSub(expanded ? null : item.label)}
+                                                            className="p-3"
+                                                        >
+                                                            {chevron}
+                                                        </button>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
 
@@ -355,7 +400,7 @@ const Navbar = ({ items = [], topics = [] }) => {
                                                     <li key={child.href}>
                                                         <Link
                                                             href={child.href}
-                                                            className={`block py-2 lg:py-2.5 text-[15px] lg:text-base font-medium ${pathname === child.href ? "text-primary" : ""
+                                                            className={`block py-2 text-[15px] font-medium lg:py-2.5 lg:text-base ${pathname === child.href ? "text-primary" : ""
                                                                 }`}
                                                         >
                                                             {child.label}
@@ -379,6 +424,45 @@ const Navbar = ({ items = [], topics = [] }) => {
                     </aside>
                 </div>
             )}
+            {/* ---------- Bottom tab bar (mobile only) ---------- */}
+            <nav
+                aria-label="Bottom navigation"
+                className="fixed inset-x-0 bottom-0 z-[70] border-t border-gray-200 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.08)] sm:hidden"
+                style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            >
+                <ul className="flex h-16 items-stretch justify-around">
+                    {TABS.map(({ label, href, icon: Icon }) => {
+                        const active = href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+                        return (
+                            <li key={href} className="flex-1">
+                                <Link
+                                    href={href}
+                                    aria-current={active ? "page" : undefined}
+                                    className={`flex h-full flex-col items-center justify-center gap-1 text-[13px] font-medium ${active ? "text-primary" : "text-black"
+                                        }`}
+                                >
+                                    <Icon className="size-5" strokeWidth={1.6} />
+                                    {label}
+                                </Link>
+                            </li>
+                        );
+                    })}
+
+                    <li className="flex-1">
+                        <button
+                            type="button"
+                            aria-label="Open menu"
+                            aria-expanded={drawerOpen}
+                            onClick={() => setDrawerOpen(true)}
+                            className="flex h-full w-full flex-col items-center justify-center gap-1 text-[13px] font-medium text-black"
+                        >
+                            <Menu className="size-6" strokeWidth={1.6} />
+                            मेनू
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+
             {searchOpen && <SearchModal topics={topics} onClose={() => setSearchOpen(false)} />}
         </header>
     );

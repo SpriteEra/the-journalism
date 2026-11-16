@@ -12,7 +12,7 @@ const VideoSection = ({
     return (
         <section
             aria-label={title}
-            className={`w-full lg:max-w-75 rounded-sm lg:border border-gray-100 bg-white lg:p-2 max-lg:mt-7 shadow-[0_0px_4px_rgba(0,0,0,0.01)] ${className}`}
+            className={`w-full lg:max-w-75 rounded-sm lg:border border-gray-100 bg-white lg:p-2 max-lg:mt-10 shadow-[0_0px_4px_rgba(0,0,0,0.01)] max-lg:pb-5 ${className}`}
         >
             {/* Header */}
             <Link
@@ -43,13 +43,19 @@ const VideoSection = ({
                                 </span>
                             </div>
 
-                            <h3 className="mt-2 line-clamp-3 font-khand text-lg lg:text-xl font-semibold text-black transition-colors group-hover:text-primary tracking-[0.01em] leading-[25px]">
+                            <h3 className="mt-2 line-clamp-3 font-khand text-lg lg:text-xl font-semibold text-black transition-colors group-hover:text-primary tracking-[0.01em] leading-tight lg:leading-[25px]">
                                 {item.title}
                             </h3>
                         </Link>
                     </li>
                 ))}
             </ul>
+
+            <div className="lg:mt-2 text-right">
+                <Link href={'/videos'} className="text-sm lg:text-[15px] font-semibold text-primary hover:underline flex items-center justify-end gap-1">
+                    और पढ़ें <ChevronRight className="size-4" />
+                </Link>
+            </div>
         </section>
     );
 };

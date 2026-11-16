@@ -28,6 +28,10 @@ const advertisementSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    isActive: {
+        type: Boolean,
+        default: true
+    },
     expireDate: {
         type: Date,
     },
@@ -42,7 +46,6 @@ const advertisementSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
-
 
 const Advertisement = mongoose.model('advertisement', advertisementSchema);
 

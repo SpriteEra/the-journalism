@@ -4,6 +4,7 @@
   --background: #ffffff;
   --foreground: #000000;
   --primary: #ee0101;
+  --secondary: #011445;
 }
 
 @theme inline {
@@ -11,12 +12,15 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
-
+  --color-secondary: var(--secondary);
   /* Fonts */
-  --font-sans: var(--font-mukta);
+  /* --font-sans: var(--font-mukta);
   --font-mukta: var(--font-mukta);
-  --font-khand: var(--font-khand);
-  --font-inter: var(--font-inter);
+  --font-inter: var(--font-inter); */
+
+  --font-khand: var(--font-noto-sans);
+  --font-sans: var(--font-noto-sans);
+  --font-noto-sans: var(--font-noto-sans);
 
   /* Container */
   --container-main: 1310px;
@@ -25,7 +29,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-mukta), sans-serif;
+  font-family: var(--font-noto-sans), sans-serif;
 }
 
 /* Centered page container */
@@ -52,5 +56,11 @@ body {
 
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  body {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }
 }

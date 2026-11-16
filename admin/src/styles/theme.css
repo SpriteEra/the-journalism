@@ -231,8 +231,9 @@
 
   --font-sans: "Inter", "Anek Devanagari", ui-sans-serif, system-ui, sans-serif;
   --font-hindi: "Anek Devanagari", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-khand: "Khand", sans-serif;
-  --font-mukta: "Mukta", sans-serif;
+  --font-khand: "Noto Sans", sans-serif;
+  --font-mukta: "Noto Sans", sans-serif;
+
 
   --breakpoint-xs: 30rem;
 }
