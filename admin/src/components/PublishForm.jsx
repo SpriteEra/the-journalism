@@ -197,9 +197,9 @@ const PublishForm = () => {
     if (primary && (blog.primaryRoute?.id !== primary.id || blog.primaryRoute?.kind !== primary.kind)) setBlog((p) => ({ ...p, primaryRoute: { kind: primary.kind, id: primary.id } }));
   }, [primary?.id, primary?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const kindLabel = { category: "category", subCategory: "sub-category", state: "state" };
+  // users only know "category": sub-categories are labelled the same
+  const kindLabel = { category: "category", subCategory: "category", state: "state" };
   const origin = (import.meta.env.VITE_CLIENT_URL || "yoursite.com").replace(/^https?:\/\//, "");
-
 
   const saveDraft = async () => {
     if (!title?.trim()) return toast.error("Add a title first");
@@ -219,7 +219,6 @@ const PublishForm = () => {
   const isDraftStory = blog.draft === true || type === "draft";
   const isNewStory = mode !== "edit";
 
-  // const canDraft = mode !== "edit" || blog.draft === true;
   // Draft + Publish while the story is new or still a draft; only Update once it is live
   const canDraft = isNewStory || isDraftStory;
   const canPublish = can("news.publish");
@@ -241,7 +240,6 @@ const PublishForm = () => {
     ));
   };
 
-  // const verb = mode !== "edit" || type === "guest-news" || type === "review" ? "Publish" : "Update";
   const post = async (replaceFeatured) => {
     const endpoint = mode === "edit" && type === "guest-news" ? "/publish-guest-news" : mode === "edit" ? "/update-news" : "/create-news";
     return httpClient.post(endpoint, buildForm(blog, { newsId: news_id, replaceFeatured }), { headers: { "Content-Type": "multipart/form-data" } });
@@ -301,9 +299,7 @@ const PublishForm = () => {
       navigate("/dashboard/schedule-news");
     } catch (e) { toast.error(errMsg(e, "Failed to schedule"), { id }); }
   };
-  // const showSchedule =
-  //   (mode !== "edit" && type !== "guest-news") ||
-  //   (mode === "edit" && type === "schedule_news");
+
   return (
     <div className="mx-auto w-full max-w-7xl pb-20  lg:pb-8">
       <div className="sticky top-15 z-20 -mx-1 mb-3 sm:mb-5 flex flex-wrap items-center gap-2 sm:gap-3 bg-surface/90 backdrop-blur-xs px-2 py-2 sm:px-3 shadow-sm lg:flex-nowrap">
@@ -341,7 +337,6 @@ const PublishForm = () => {
             <CardHeader icon={Info} title="Summary" description="What readers see in lists and on social cards" info="The short text under the headline in lists, on the home page and when the story is shared." />
             <div className="space-y-4 p-2.5 sm:p-5">
               <Field label="Short description" required
-                // hint={`${(description || "").length}/${CHAR_LIMIT}`}
                 info="Two or three lines that sum the story up. Shown under the headline and used as the search description when you leave the SEO description empty."
               >
                 <Textarea
@@ -354,9 +349,6 @@ const PublishForm = () => {
                   })}
                 />
               </Field>
-              {/* <Field label={t("Reporter credit")} hint="Optional" info="The reporter / agency name printed as the byline, for example “Ravi Kumar” or “PTI”. Leave empty to show the author's own name.">
-                <Input value={ref_reporter || ""} onChange={(e) => update({ ref_reporter: e.target.value })} placeholder="Name shown as the byline" className="hindi-font" />
-              </Field> */}
             </div>
           </Card>
 
@@ -380,14 +372,19 @@ const PublishForm = () => {
           <Card padded={false}>
             <CardHeader icon={MapPin} title="Category, place & URL" description="Where the story appears and how its link looks" info="Choose where the story belongs. The link of the story starts with ONE of these (the primary section), for example yoursite.com/politics/news/story-name." />
             <div className="space-y-5 p-2.5 sm:p-5">
-              <TaxonomyFields value={{ category, subCategory, state, district }} onChange={(x) => update(x)} categoryRequired={false} />
+              <TaxonomyFields
+                value={{ category, subCategory, state, district }}
+                onChange={(x) => update(x)}
+                categoryRequired={false}
+                mergeCategories
+              />
 
               <div className="rounded-lg sm:rounded-2xl border border-line bg-surface-2/50 p-2 sm:p-4">
                 <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-fg"><Link2 className="size-4 text-fg-subtle" />Story link
-                  <InfoTip>The first part of the link is the primary section. It is required: pick a category, sub-category or state above. If you choose several, mark the one the link should use. Readers and Google will see this link.</InfoTip>
+                  <InfoTip>The first part of the link is the primary section. It is required: pick a category or state above. If you choose several, mark the one the link should use. Readers and Google will see this link.</InfoTip>
                 </p>
                 {!linkBase ? (
-                  <p className="rounded-xl bg-warning-soft p-3 text-sm text-fg-muted">Choose a category, sub-category or state - the story link needs one of them.</p>
+                  <p className="rounded-xl bg-warning-soft p-3 text-sm text-fg-muted">Choose a category or state - the story link needs one of them.</p>
                 ) : (
                   <>
                     {routeOptions.length > 1 && (
@@ -410,12 +407,6 @@ const PublishForm = () => {
                   </>
                 )}
               </div>
-
-              {/* <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface-2/50 p-3">
-                <Switch checked={Boolean(is_literature)} onChange={(v) => update({ is_literature: v })} />
-                <span className="text-sm"><b className="text-fg">Literature</b><span className="block text-fg-subtle">Shown in the literature section instead of the news feed.</span></span>
-              </label> */}
-              {/* {!is_literature && <Field label="Location" hint="Village / town as written on the story" info="The exact place the news happened, for example “chandauli”. Used for local search and the place line of the story."><Input value={location || ""} onChange={(e) => update({ location: e.target.value })} placeholder="e.g. chandauli" /></Field>} */}
             </div>
           </Card>
 

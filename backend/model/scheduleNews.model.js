@@ -4,6 +4,7 @@ export const newsSchema = new mongoose.Schema({
     news_id: { type: String, required: true, unique: true },
     title: { type: String, required: true },
     banner: { type: String },
+    bannerMedia: { type: Schema.Types.ObjectId, ref: 'Media' },     // media-library image behind `banner` (see utils/mediaRef.js)
     description: { type: String },
     content: { type: [] },
 
@@ -50,6 +51,7 @@ export const newsSchema = new mongoose.Schema({
 
 newsSchema.index({ author: 1, createdAt: -1 });
 
+newsSchema.index({ bannerMedia: 1 }, { sparse: true });
 const ScheduleNews = mongoose.model('scheduleNews', newsSchema);
 
 export default ScheduleNews;

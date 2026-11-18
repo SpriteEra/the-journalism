@@ -2,7 +2,7 @@ import { isAuthenticated, requireAnyPermission, requirePermission } from "../mid
 import { P } from "../config/permissions.js";
 
 import { clearFeatured, createNewsByReporter, searchNewsForLinking, deleteNewsAdmin, getFeaturedAdmin, getNewsAuthors, getNewsByReporter, getSingleNewsReporter, updateNewsByReporter } from "../controller/news.controller.js";
-import { approveYtNews, createYtNews, deleteYtNews, getNewsYt, getSingleYtNewsAdmin, updateYtNews } from "../controller/ytnews.controller.js";
+import { approveYtNews, createYtNews, deleteYtNews, getNewsYt, getSingleYtNewsAdmin, pinYtNews, updateYtNews } from "../controller/ytnews.controller.js";
 import { Createnews, Deletenews, getBreakingNewsAdmin, Updatenews } from "../controller/breaking.news.controller.js";
 import { createAdvertisement, deleteAdvertisement, extendExpiryMainAdvertisement, getAdminAdvertisement, getAdminSingleAdvertisement, toggleAdvertisementActive, updateAdvertisement, updateAdvertisementOrder, updateMainExpiredAdvertisement } from "../controller/advertisement.controller.js";
 import { archiveAdminNotification, assignRole, blockUnblockUser, Createuser, getUserDetail, setUserPermissions, deleteAdminNotification, Deleteuser, getAdminNotifications, getAdminNotificationStats, GetUser, getUsers, markAdminNotificationAsRead, markAllAdminNotificationsAsRead, resetPassword, sendOtp, updateTrust, updateUser } from "../controller/admin.controller.js";
@@ -61,6 +61,7 @@ export async function adminRoutes(app) {
     app.get('/yt-news', { onRequest: [auth, anyOf(P.YT_CREATE, P.YT_MANAGE_OWN, P.YT_MANAGE_ANY, P.YT_APPROVE)] }, getNewsYt);
     app.post('/create-yt-news', { onRequest: [auth, need(P.YT_CREATE)] }, createYtNews);
     app.patch('/yt-news/:id/approve', { onRequest: [auth, need(P.YT_APPROVE)] }, approveYtNews);
+    app.patch('/yt-news/:id/pin', { onRequest: [auth, need(P.YT_CREATE)] }, pinYtNews);
     app.delete('/delete-yt-news/:id', { onRequest: [auth, anyOf(P.YT_MANAGE_OWN, P.YT_MANAGE_ANY)] }, deleteYtNews);   // ownership is checked inside (assertCanManage)
     app.put('/update-yt-news/:id', { onRequest: [auth, anyOf(P.YT_MANAGE_OWN, P.YT_MANAGE_ANY)] }, updateYtNews);
     app.get('/yt-news/:video_id', { onRequest: [auth, anyOf(P.YT_MANAGE_OWN, P.YT_MANAGE_ANY)] }, getSingleYtNewsAdmin);

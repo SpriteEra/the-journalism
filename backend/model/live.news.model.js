@@ -5,6 +5,7 @@ import { seoSchema } from './seo.schema.js';
 const liveUpdateSchema = new Schema({
     title: { type: String, default: '' },
     image: { type: String, default: '' },
+    imageMedia: { type: Schema.Types.ObjectId, ref: 'Media' },   // media-library image behind `image`
     caption: { type: String, default: '' },
     content: { type: [], default: [] },              // same editor-block format as News.content
     time: { type: Date, default: Date.now },         // time shown on the timeline
@@ -16,7 +17,8 @@ const liveUpdateSchema = new Schema({
 const liveNewsSchema = new Schema({
     title: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true },
-    image: { type: String, default: '' },            // cover / banner
+    image: { type: String, default: '' },            // cover / banner (copy of the library image's url)
+    imageMedia: { type: Schema.Types.ObjectId, ref: 'Media' },   // the media-library image behind `image` (see utils/mediaRef.js)
     imageAlt: { type: String, default: '' },
     description: { type: String, default: '' },          // photo caption + short strap line
     content: { type: [], default: [] },              // intro / main body (same format as News.content)
@@ -64,4 +66,5 @@ liveNewsSchema.index({ isDeleted: 1, status: 1, startTime: -1 });
 liveNewsSchema.index({ isDeleted: 1, status: 1, post_time: -1 });
 liveNewsSchema.index({ author: 1, createdAt: -1 });
 liveNewsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
+liveNewsSchema.index({ imageMedia: 1 }, { sparse: true });
 export default mongoose.model('LiveNews', liveNewsSchema);

@@ -1,17 +1,19 @@
 import { Link } from "react-router-dom";
-import { Clock, Eye, Languages, MapPin, MoreVertical, Pencil, ScanEye, Share2, Trash2, History, Link2, MessageCircle } from "lucide-react";
+import { Clock, Eye, MoreVertical, Pencil, ScanEye, Share2, Trash2, History, Link2, MessageCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { cn } from "../../lib/cn";
 import { fmtDate } from "../../lib/api";
 import { handleImageError } from "../../utils/imageError";
 import { Avatar, Badge, Button, IconButton, Menu, MenuItem, MenuSeparator } from "../ui";
+import { siteUrl } from "../../lib/share";
+
 
 export const statusOf = (n, draft) => (n.rejected_at && !n.need_approval ? { tone: "danger", label: "Rejected" } : draft ? { tone: "neutral", label: "Draft" } : n.need_approval ? { tone: "warning", label: "Needs approval" } : n.isPublished === false ? { tone: "neutral", label: "Unpublished" } : { tone: "success", label: "Published" });
-
+export const newsSitePath = (n) =>
+  n?.slug && n?.primaryRoute?.slug ? `/${n.primaryRoute.slug}/news/${n.slug}` : `/news/${n?.news_id ?? ""}`;
 function ShareMenu({ item }) {
   const { t } = useTranslation();
-  const url = `${import.meta.env.VITE_CLIENT_URL || ""}/news/${item.news_id}`;
+  const url = siteUrl(newsSitePath(item));
   const kw = [...(item.keywords?.en || []), ...(item.keywords?.hi || [])].slice(0, 3).map((k) => `#${k.replace(/\s+/g, "")}`).join(" ");
   return (
     <Menu trigger={<IconButton label={t("Share")} size="icon-sm"><Share2 className="size-4" /></IconButton>} width="w-48">

@@ -2,6 +2,7 @@ import LiveNews from '../model/live.news.model.js';
 import UpdateStack from '../model/updatedstack.model.js';
 import tryCatch from '../utils/asyncFunction.js';
 import ErrorHandler from '../utils/errorHandler.js';
+import { readMediaInput } from '../utils/mediaRef.js';
 import { makeSlug, uniqueSlug, parseJSON, toBool } from '../utils/slug.js';
 import { sanitizeSeo, resolveSeo, assembleJsonLd, liveBlogLd } from '../utils/seo.js';
 import { uploadImage, deleteImage } from '../utils/uploadImage.js';
@@ -58,18 +59,21 @@ export const createLiveNews = tryCatch(async (req, res) => {
     const wanted = ['draft', 'scheduled', 'live'].includes(b.status) ? b.status : 'draft';
     const startTime = dateOrUndef(b.startTime);
     if (wanted === 'scheduled' && (!startTime || startTime <= new Date())) throw new ErrorHandler(400, 'Scheduled live news needs a future startTime');
-    if (wanted !== 'draft' && !req.files?.image && !b.image) throw new ErrorHandler(400, 'Cover image is required');
+    const imageIn = await readMediaInput(b, 'imageMedia', 'image');          // media-library image chosen by reference
+    if (wanted !== 'draft' && !req.files?.image && !b.image && !imageIn?.media) throw new ErrorHandler(400, 'Cover image is required');
     const needApproval = wanted !== 'draft' && !canPublish(req.user, req);
     const status = needApproval ? 'draft' : wanted;
 
     const base = b.slug ? await makeSlug(b.slug, { from: 'en' }) : await makeSlug(b.title);
     const slug = await uniqueSlug(LiveNews, base);
 
-    let image = b.image || '';
+    let image = b.image || ''; let imageMedia;
     if (req.files?.image) image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
+    else if (imageIn?.media) { image = imageIn.media.url; imageMedia = imageIn.media._id; }
+    else if (imageIn?.clear) image = '';
 
     const live = new LiveNews({
-        title: b.title.trim(), slug, image, imageAlt: b.imageAlt || '', description: b.description || '',
+        title: b.title.trim(), slug, image, ...(imageMedia ? { imageMedia } : {}), imageAlt: b.imageAlt || '', description: b.description || '',
         content: parseJSON(b.content, []),
         tags: cleanTags(b.tags), startTime, author: req.user._id,
         seo: sanitizeSeo(b.seo) || {},
@@ -101,11 +105,16 @@ export const updateLiveNews = tryCatch(async (req, res) => {
     if (b.endTime !== undefined) { live.endTime = dateOrUndef(b.endTime); changes.push('endTime'); }
     const seo = sanitizeSeo(b.seo);
     if (seo) { live.seo = seo; changes.push('seo'); }
+    const imageIn = await readMediaInput(b, 'imageMedia', 'image', { keep: live.imageMedia });
     if (req.files?.image) {
-        if (live.image) await deleteImage(live.image);
-        live.image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
+        if (live.image && !live.imageMedia) await deleteImage(live.image);      // a library image's file is shared: never deleted from here
+        live.image = await uploadImage(req.files.image.data, req.files.image.name, 'live'); live.imageMedia = undefined;
         changes.push('image');
-    } else if (b.image !== undefined && b.image !== live.image) { live.image = b.image; changes.push('image'); }
+    } else if (imageIn?.media) {
+        if (live.image !== imageIn.media.url || String(live.imageMedia || '') !== String(imageIn.media._id)) { live.image = imageIn.media.url; live.imageMedia = imageIn.media._id; changes.push('image'); }
+    } else if (imageIn?.clear) {
+        if (live.image || live.imageMedia) { live.image = ''; live.imageMedia = undefined; changes.push('image'); }
+    } else if (b.image !== undefined && b.image !== live.image) { live.image = b.image; live.imageMedia = undefined; changes.push('image'); }
 
     if (b.slug && b.slug !== live.slug) { // only allowed while unpublished, so public URLs never break
         if (live.post_time) throw new ErrorHandler(400, 'Slug cannot change after the live news has been published');
@@ -213,13 +222,15 @@ export const addLiveUpdate = tryCatch(async (req, res) => {
     if (live.status === 'ended') throw new ErrorHandler(400, 'This live coverage has ended. Re-open it first');
     const b = req.body;
     const content = parseJSON(b.content, []);
-    if (!b.title?.trim() && !b.description?.trim() && !content.length && !req.files?.image) throw new ErrorHandler(400, 'Add a title, description, content or image');
+    const imageIn = await readMediaInput(b, 'imageMedia', 'image');
+    if (!b.title?.trim() && !b.description?.trim() && !content.length && !req.files?.image && !imageIn?.media) throw new ErrorHandler(400, 'Add a title, description, content or image');
 
-    let image = b.image || '';
+    let image = b.image || ''; let imageMedia;
     if (req.files?.image) image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
+    else if (imageIn?.media) { image = imageIn.media.url; imageMedia = imageIn.media._id; }
 
     live.updates.push({
-        title: b.title?.trim() || '', image, description: b.description || '', content,
+        title: b.title?.trim() || '', image, ...(imageMedia ? { imageMedia } : {}), description: b.description || '', content,
         time: dateOrUndef(b.time) || new Date(), pinned: toBool(b.pinned), author: req.user._id,
     });
     live.contentUpdatedAt = new Date();
@@ -240,10 +251,13 @@ export const editLiveUpdate = tryCatch(async (req, res) => {
     if (b.content !== undefined) entry.content = parseJSON(b.content, entry.content);
     if (b.time !== undefined) entry.time = dateOrUndef(b.time) || entry.time;
     if (b.pinned !== undefined) entry.pinned = toBool(b.pinned);
+    const imageIn = await readMediaInput(b, 'imageMedia', 'image', { keep: entry.imageMedia });
     if (req.files?.image) {
-        if (entry.image) await deleteImage(entry.image);
-        entry.image = await uploadImage(req.files.image.data, req.files.image.name, 'live');
-    } else if (b.image !== undefined) entry.image = b.image;
+        if (entry.image && !entry.imageMedia) await deleteImage(entry.image);
+        entry.image = await uploadImage(req.files.image.data, req.files.image.name, 'live'); entry.imageMedia = undefined;
+    } else if (imageIn?.media) { entry.image = imageIn.media.url; entry.imageMedia = imageIn.media._id; }
+    else if (imageIn?.clear) { entry.image = ''; entry.imageMedia = undefined; }
+    else if (b.image !== undefined) { if (b.image !== entry.image) entry.imageMedia = undefined; entry.image = b.image; }
     live.contentUpdatedAt = new Date();
     await live.save();
     res.status(200).json({ success: true, message: 'Update edited', update: entry });

@@ -97,7 +97,7 @@ const VideoFilter = ({
               ))}
             </div>
           </div> */}
-          <div className="mb-4">
+          {/* <div className="mb-4">
             <h2 className="font-semibold dark:font-medium text-lg text-primary">News State</h2>
             <hr className="text-fg-subtle w-full mt-1" />
             <div className="flex flex-wrap mt-2">
@@ -125,8 +125,8 @@ const VideoFilter = ({
                 <span>Remove</span>
               </label>
             </div>
-          </div>
-          <div className="mb-4">
+          </div> */}
+          {/* <div className="mb-4">
             <h2 className="font-semibold dark:font-medium text-lg text-primary">News District</h2>
             <hr className="text-fg-subtle w-full mt-1" />
             <div className="flex flex-wrap mt-2">
@@ -156,9 +156,9 @@ const VideoFilter = ({
                 <span>Remove</span>
               </label>
             </div>
-          </div>
+          </div> */}
 
-          <div className="mb-4">
+          {/* <div className="mb-4">
             <h2 className="font-semibold dark:font-medium text-lg text-primary">Location</h2>
             <hr className="text-fg-subtle w-full mt-1" />
 
@@ -176,7 +176,7 @@ const VideoFilter = ({
                 }
               />
             </div>
-          </div>
+          </div> */}
           <div className="mt-2">
             <h2 className="font-semibold dark:font-medium text-lg text-primary">Post Date</h2>
 
@@ -199,7 +199,7 @@ const VideoFilter = ({
         </div>
         <div className="shadow-card p-2 flex justify-between">
           <div className="btn-outline bg-transparent">
-              Cancel
+            Cancel
           </div>
           <button
             className="btn-blue"

@@ -52,6 +52,13 @@ export const PERMISSIONS = {
     YT_PUBLISH: 'yt.publish',
     YT_APPROVE: 'yt.approve',
 
+    // ── media library (shared images for Live + News) ───────────────────────
+    MEDIA_VIEW: 'media.view',             // open the library / pick an image in the Live and News forms
+    MEDIA_UPLOAD: 'media.upload',
+    MEDIA_MANAGE_OWN: 'media.manage.own', // edit / replace / delete images I uploaded
+    MEDIA_MANAGE_ANY: 'media.manage.any', // ... anybody's images
+    MEDIA_DEFAULT: 'media.default',       // choose / remove the default image (admin by default)
+
     // ── gallery (disabled for now) ──────────────────────────────────────────
     // GALLERY_CREATE: 'gallery.create',
     // GALLERY_MANAGE_OWN: 'gallery.manage.own',
@@ -171,6 +178,16 @@ export const PERMISSION_CATALOG = [
             [P.YT_MANAGE_OWN, 'Edit and manage own YouTube news'],
             [P.YT_MANAGE_ANY, 'Edit and manage anybody\'s YouTube news'],
             [P.YT_PUBLISH, 'Publish YouTube news directly, without approval'],
+        ]
+    },
+    {
+        group: 'Media library',
+        items: [
+            [P.MEDIA_VIEW, 'View the media library and pick images'],
+            [P.MEDIA_UPLOAD, 'Upload images'],
+            [P.MEDIA_MANAGE_OWN, 'Edit, replace and delete own images'],
+            [P.MEDIA_MANAGE_ANY, 'Edit, replace and delete anybody\'s images'],
+            [P.MEDIA_DEFAULT, 'Choose the default image used by News and Live'],
         ]
     },
     // {
@@ -298,6 +315,7 @@ export const SYSTEM_ROLES = Object.freeze({
             // P.GALLERY_CREATE, P.GALLERY_MANAGE_OWN, P.EVENT_CREATE, P.EVENT_MANAGE_OWN,
             P.TOOLS_AI, P.TRASH_VIEW_OWN, P.REPORTER_PERFORMANCE_OWN,
             P.YT_CREATE, P.YT_MANAGE_OWN,
+            P.MEDIA_VIEW, P.MEDIA_UPLOAD, P.MEDIA_MANAGE_OWN,
 
         ],
     },
@@ -308,8 +326,9 @@ export const SYSTEM_ROLES = Object.freeze({
  * `defaultsVersion` get the NEW default keys added (nothing is ever removed, admin edits are kept).
  */
 
-export const SYSTEM_ROLE_VERSION = 3;
+export const SYSTEM_ROLE_VERSION = 4;
 export const SYSTEM_ROLE_ADDED_IN_V3 = Object.freeze({ reporter: [P.YT_CREATE, P.YT_MANAGE_OWN] });
+export const SYSTEM_ROLE_ADDED_IN_V4 = Object.freeze({ reporter: [P.MEDIA_VIEW, P.MEDIA_UPLOAD, P.MEDIA_MANAGE_OWN] });
 
 export const SYSTEM_ROLE_NAMES = Object.freeze(Object.keys(SYSTEM_ROLES));
 export const DEFAULT_ROLE = 'reporter';

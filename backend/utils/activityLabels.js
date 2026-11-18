@@ -7,7 +7,7 @@ const RULES = [
     [/gallery|photo/, 'Photo gallery'], [/event/, 'Event news'], [/live/, 'Live news'], [/ads|advertisement/, 'Advertisement'],
     [/add-reporter|create-user/, 'Created user'], [/update-reporter/, 'Updated user'], [/block-unblock/, 'Blocked / unblocked user'],
     [/reset-password|send-otp/, 'Password reset'], [/role/, 'Role / permissions'], [/tags?(\/|$)/, 'Tag'],
-    [/categor|state|district|taxonomy/, 'Category / location'], [/trash/, 'Trash'], [/panchang/, 'Panchang'],
+    [/categor|state|district|taxonomy/, 'Category / location'], [/\/media(\/|$)/, 'Media library'], [/trash/, 'Trash'], [/panchang/, 'Panchang'],
     [/notification/, 'Notification'], [/analytics\/refresh/, 'Refreshed analytics'], [/spriteera-service/, 'OraAI tool'],
 ];
 const VERB = { POST: 'Added', PUT: 'Updated', PATCH: 'Updated', DELETE: 'Deleted' };

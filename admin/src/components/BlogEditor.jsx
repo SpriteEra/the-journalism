@@ -2,7 +2,6 @@ import { normalizeBlog } from "./taxonomy/TaxonomyFields.jsx";
 import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import EditorJS from "@editorjs/editorjs";
-import imageCompression from "browser-image-compression";
 // @ts-ignore
 import Undo from "editorjs-undo";
 import {
@@ -19,20 +18,12 @@ import { EditorContext } from "../pages/news/CreateNews.jsx";
 import { truncate } from "../utils/utils.js";
 import toast from "react-hot-toast";
 import InputFields from "../utils/InputFields.jsx";
+import MediaImageField from "./media/MediaImageField.jsx";
 import { useQueryClient } from "@tanstack/react-query";
 import httpClient from "../api/httpClient.js";
 import { useSelector } from "react-redux";
 import { handleImageError } from "../utils/imageError.js";
 const Todaydate = new Date().toISOString().split("T")[0];
-
-const fileToBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result); // this is the base64 string
-    reader.onerror = (error) => reject(error);
-  });
-};
 
 function base64ToFile(base64String, fileName) {
   const arr = base64String.split(",");
@@ -151,6 +142,7 @@ const BlogEditor = () => {
     blog,
     blog: {
       banner,
+      bannerMedia,
       title,
       tags,
       ref_reporter,
@@ -338,29 +330,13 @@ const BlogEditor = () => {
     return () => holder.removeEventListener("keydown", onKeyDown, true);
   }, []);
 
-  const handleChangeBanner = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 800,
-        useWebWorker: true,
-      };
-
-      try {
-        const compressedFile = await imageCompression(file, options);
-
-        // Convert to base64
-        const base64String = await fileToBase64(compressedFile);
-
-        const updatedBlog = { ...blog, banner: base64String };
-        setBlog(updatedBlog);
-        localStorage.setItem("blog", JSON.stringify(updatedBlog));
-        setHasChanges(true);
-      } catch (error) {
-        console.error("Image compression or conversion failed:", error);
-      }
-    }
+  // banner chosen from the media library / uploaded there / default image (null = removed). The caption comes along and stays editable below.
+  const handleBannerPick = (pick) => {
+    // the story keeps a REFERENCE to the library image (bannerMedia = its id); `banner` is only the url copy for previews
+    const updatedBlog = { ...blog, banner: pick?.url || "", bannerMedia: pick?._id || "", imageRef: pick ? pick.caption || "" : "" };
+    setBlog(updatedBlog);
+    localStorage.setItem("blog", JSON.stringify(updatedBlog));
+    setHasChanges(true);
   };
 
   const handleTitleKeyDown = (e) => {
@@ -435,6 +411,8 @@ const BlogEditor = () => {
         } else {
           formData.append("banner", banner); // Image file
         }
+        // image by reference: the library image's id. "null" = the image was removed. (A plain `banner` url is still accepted by the server.)
+        formData.append("bannerMedia", bannerMedia || (banner ? "" : "null"));
         formData.append("ref_reporter", ref_reporter);
         formData.append("is_literature", is_literature);
 
@@ -584,52 +562,12 @@ const BlogEditor = () => {
           {/* ---------- LEFT: banner ---------- */}
           <div className="lg:col-start-1 lg:row-start-1">
             <div className="bg-surface rounded-lg sm:rounded-2xl shadow-card border border-line/50 p-1 sm:p-3 mb-3 sm:mb-8 backdrop-blur-sm">
-              <div className="relative group">
-                <div className="aspect-video bg-gradient-to-br from-surface-2 to-surface-2 rounded-lg sm:rounded-xl overflow-hidden border-2 border-dashed border-line-strong hover:border-primary transition-all duration-300">
-                  <label
-                    htmlFor="uploadBanner"
-                    className="cursor-pointer block h-full"
-                  >
-                    <img
-                      src={banner || "/news-banner.png"}
-                      alt="Article Banner"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={handleImageError}
-                    />
-                    <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/10 transition-colors duration-300 flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-surface/90 backdrop-blur-sm rounded-xl p-2 sm:px-4 sm:py-2">
-                        <span className="text-sm font-medium text-fg-muted flex items-center space-x-2">
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                          <span>Change Image</span>
-                        </span>
-                      </div>
-                    </div>
-                  </label>
-                  <input
-                    type="file"
-                    id="uploadBanner"
-                    accept=".png, .jpg, .jpeg, .webp"
-                    hidden
-                    onChange={handleChangeBanner}
-                  />
-                </div>
-              </div>
-              <p className="mt-2 text-xs text-fg-subtle max-sm:hidden">
-                Use a clear 16:9 landscape photo. PNG, JPG or WEBP – it is
-                compressed automatically.
-              </p>
+              <MediaImageField
+                value={banner}
+                onChange={handleBannerPick}
+                pickerTitle="Select news banner"
+                hint="Pick from the media library or upload a 16:9 image (1280 × 720 looks best). “Use default image” fills in the default chosen in the media library."
+              />
               <div className="mt-2 sm:mt-4">
                 <InputFields
                   LabelTitle={"Image Caption"}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BadgeCheck, ExternalLink, Eye, Pencil, Plus, Radio, RefreshCw, Trash2, Zap } from "lucide-react";
 import { cn } from "../../lib/cn";
 import httpClient from "../../api/httpClient";
@@ -66,7 +66,8 @@ export default function LiveNews() {
       key: "title", header: "Live news", primary: true, cell: (l) => (
         <div className="flex min-w-0 items-center gap-3">
           <Cover src={l.image} alt={l.title} />
-          <p className="line-clamp-2 max-w-sm font-medium text-fg lg:text-base">{l.title}</p>
+          {/* <p className="line-clamp-2 max-w-sm font-medium text-fg lg:text-base">{l.title}</p> */}
+          <Link to={`/dashboard/live/${l.slug}/edit`} className="line-clamp-2 max-w-sm font-medium text-fg lg:text-base">{l.title}</Link>
         </div>
       ),
     },

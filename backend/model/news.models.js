@@ -17,6 +17,8 @@ export const newsSchema = new mongoose.Schema({
     banner: {
         type: String,
     },
+    // the media-library image behind `banner` (reference). `banner` is a copy of its url, kept in sync by utils/mediaRef.js
+    bannerMedia: { type: Schema.Types.ObjectId, ref: 'Media' },
     description: {
         type: String,
     },
@@ -197,6 +199,7 @@ newsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 });
 //   (b) drop this index if you're keeping regex search (regex without a
 //       leading ^ anchor can't use any index anyway, so it's dead weight).
 // (tags are references now, so they are not part of the text index; tag names are matched through the Tag collection)
+newsSchema.index({ bannerMedia: 1 }, { sparse: true });     // "which stories use this image?"
 newsSchema.index({ 'featured.isFeatured': 1, 'featured.until': 1 });
 newsSchema.index({ title: "text", description: "text", 'keywords.hi': "text", 'keywords.en': "text" });
 newsSchema.index(

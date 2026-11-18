@@ -1,47 +1,320 @@
-import { editorBlocks, sanitizeInline } from "../../lib/sanitizeHtml";
+import sanitizeHtml from "sanitize-html";
 
-const Html = ({ html, className, as: Tag = "p" }) => <Tag className={className} dangerouslySetInnerHTML={{ __html: sanitizeInline(html) }} />;
+/**
+ * Admin preview: renders EditorJS blocks the way readers see them on the website.
+ * Same sanitising and styling as the public site's story renderer.
+ * `afterBlock` = { index, node } or an array of them: something placed after that block.
+ */
 
-const HEADER = { 1: "text-3xl", 2: "text-2xl", 3: "text-xl", 4: "text-lg", 5: "text-base", 6: "text-base" };
+/* ───────────── sanitising ───────────── */
+const COLOR = [
+  /^#[0-9a-f]{3,8}$/i,
+  /^rgba?\([\d\s.,%]+\)$/i,
+  /^hsla?\([\d\s.,%deg]+\)$/i,
+  /^inherit$/i,
+];
 
-/** Renders EditorJS blocks the way readers see them (sanitised, no editor code). */
-export default function EditorContent({ content, className = "" }) {
-  const blocks = editorBlocks(content);
-  if (!blocks.length) return null;
+// highlights from the editor's background-color tool: rounded, small side padding, text keeps its color
+const MARK = "[&_mark]:rounded-sm [&_mark]:px-1 [&_mark]:[box-decoration-break:clone]";
+
+const INLINE = {
+  allowedTags: ["b", "strong", "i", "em", "u", "a", "mark", "code", "br", "sub", "sup", "s", "span"],
+  allowedAttributes: { a: ["href", "target", "rel"], mark: ["class", "style"], span: ["class", "style"] },
+  allowedStyles: { "*": { color: COLOR, "background-color": COLOR } },
+  allowedSchemes: ["http", "https", "mailto", "tel"],
+};
+
+/** Hosts allowed for iframes (raw block) */
+const IFRAME_HOSTS = [
+  "www.youtube.com", "www.youtube-nocookie.com", "player.vimeo.com",
+  "www.facebook.com", "platform.twitter.com", "twitframe.com", "www.instagram.com", "codepen.io",
+];
+
+/** `raw` block: richer HTML (blockquote, img, tables, allowed iframes). Scripts, styles and event handlers are always removed. */
+const RAW = {
+  allowedTags: [
+    ...sanitizeHtml.defaults.allowedTags,
+    "img", "iframe", "figure", "figcaption", "span", "mark", "u", "s", "sub", "sup", "h1", "h2",
+  ],
+  allowedAttributes: {
+    a: ["href", "target", "rel"],
+    img: ["src", "alt", "width", "height"],
+    iframe: ["src", "width", "height", "title", "allowfullscreen", "loading"],
+    div: ["class"], span: ["class"], blockquote: ["class"], p: ["class"],
+  },
+  allowedSchemes: ["http", "https", "mailto", "tel"],
+  allowedIframeHostnames: IFRAME_HOSTS,
+  transformTags: {
+    a: (tag, attribs) => ({ tagName: "a", attribs: { href: attribs.href || "#", target: "_blank", rel: "noopener noreferrer" } }),
+  },
+};
+
+export const cleanHtml = (html = "") => sanitizeHtml(String(html), INLINE);
+const cleanRaw = (html = "") => sanitizeHtml(String(html), RAW);
+const plain = (html = "") => sanitizeHtml(String(html), { allowedTags: [], allowedAttributes: {} });
+const safeUrl = (u = "") => (/^https?:\/\//i.test(String(u).trim()) ? String(u).trim() : null);
+
+export const blocksOf = (content) => (Array.isArray(content) ? content[0]?.blocks : content?.blocks) || [];
+
+/** only well-known video / social embeds are shown as frames; anything else becomes a plain link */
+const EMBED_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/|www\.facebook\.com\/plugins\/|platform\.twitter\.com\/|twitframe\.com\/|www\.instagram\.com\/|codepen\.io\/)/i;
+
+/* ───────────── Instagram ───────────── */
+const IG_POST = /instagram\.com\/(p|reels?|tv)\/([A-Za-z0-9_-]+)/i;
+
+const igEmbedUrl = (text = "") => {
+  const m = String(text).match(IG_POST);
+  if (!m) return null;
+  const type = m[1].toLowerCase() === "reels" ? "reel" : m[1].toLowerCase();
+  return `https://www.instagram.com/${type}/${m[2]}/embed`;
+};
+
+const igFromRaw = (html = "") => {
+  const s = String(html);
+  const looksLikeIg = /instagram-media|data-instgrm/i.test(s) || /^\s*https?:\/\/(www\.)?instagram\.com\/\S+\s*$/i.test(s);
+  if (!looksLikeIg) return null;
+  const permalink = s.match(/data-instgrm-permalink=["']([^"']+)["']/i)?.[1];
+  return igEmbedUrl(permalink) || igEmbedUrl(s);
+};
+
+const InstagramFrame = ({ src, caption }) => (
+  <div className="my-6 flex w-full flex-col items-center">
+    <iframe
+      src={src}
+      title={caption || "Instagram post"}
+      loading="lazy"
+      scrolling="no"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+      className="h-[700px] w-full max-w-[540px] rounded border border-gray-200 bg-white"
+    />
+    {caption && <p className="mt-2 text-center text-sm text-black/60">{caption}</p>}
+  </div>
+);
+
+/* ───────────── styles (static class names so Tailwind keeps them) ───────────── */
+const P = "text-lg lg:text-[22px] leading-7 lg:leading-[31px] mt-4 tracking-[0.02em]";
+const H = { 2: "text-[26px] lg:text-[32px]", 3: "text-[22px] lg:text-[27px]", 4: "text-xl lg:text-[23px]", 5: "text-lg lg:text-xl", 6: "text-lg" };
+const FIRST_ROW_IS_HEADER = true;
+const ALIGN = { left: "text-left", center: "text-center", right: "text-right", justify: "text-justify" };
+
+const Link = ({ href, className = "" }) => (
+  <a href={href} target="_blank" rel="noopener noreferrer" className={`break-all text-primary underline ${className}`}>{href}</a>
+);
+
+const ListItems = ({ items = [], style, start }) => {
+  const Tag = style === "ordered" ? "ol" : "ul";
+  const kind = style === "ordered" ? "list-decimal pl-6" : style === "checklist" ? "list-none pl-0" : "list-disc pl-6";
   return (
-    <div className={`hindi-font space-y-4 text-[1.0625rem] leading-8 text-fg ${className}`}>
+    <Tag start={style === "ordered" ? start : undefined} className={`mt-2 space-y-1.5 ${kind}`}>
+      {items.map((it, k) => (
+        <li key={k}>
+          {style === "checklist" && <span aria-hidden className="mr-2">{it?.meta?.checked ? "☑" : "☐"}</span>}
+          <span dangerouslySetInnerHTML={{ __html: cleanHtml(typeof it === "string" ? it : it?.content) }} />
+          {it?.items?.length ? <div className={style === "checklist" ? "pl-6" : ""}><ListItems items={it.items} style={style} /></div> : null}
+        </li>
+      ))}
+    </Tag>
+  );
+};
+
+export default function EditorContent({ content, afterBlock, className = "" }) {
+  const blocks = blocksOf(content);
+  if (!blocks.length) return null;
+
+  return (
+    <div className={`font-khand ${className}`}>
       {blocks.map((b, i) => {
         const d = b.data || {};
+        const al = ALIGN[b.tunes?.alignmentTune?.alignment] || "";
+        let node = null;
+
         switch (b.type) {
-          case "header": return <Html key={i} as={`h${Math.min(Math.max(d.level || 2, 2), 6)}`} html={d.text} className={`mt-6 font-bold leading-snug ${HEADER[d.level] || "text-2xl"}`} />;
-          case "paragraph": return d.text ? <Html key={i} html={d.text} className="[&_a]:text-primary [&_a]:underline [&_mark]:rounded [&_mark]:bg-warning-soft [&_mark]:px-0.5" /> : null;
-          case "list": return (
-            <ul key={i} className={`space-y-1 pl-6 ${d.style === "ordered" ? "list-decimal" : "list-disc"}`}>
-              {(d.items || []).map((it, k) => <li key={k} dangerouslySetInnerHTML={{ __html: sanitizeInline(typeof it === "string" ? it : it?.content || "") }} />)}
-            </ul>
-          );
-          case "checklist": return <ul key={i} className="space-y-1">{(d.items || []).map((it, k) => <li key={k} className="flex gap-2"><input type="checkbox" checked={Boolean(it.checked)} readOnly className="mt-2 size-4 accent-primary" /><span dangerouslySetInnerHTML={{ __html: sanitizeInline(it.text || "") }} /></li>)}</ul>;
-          case "quote": return (
-            <blockquote key={i} className="rounded-r-xl border-l-4 border-accent bg-accent-soft/50 py-3 pl-5 pr-4">
-              <Html html={d.text} className="text-xl font-medium leading-9" />
-              {d.caption && <Html as="cite" html={d.caption} className="mt-1 block text-sm not-italic text-fg-subtle" />}
-            </blockquote>
-          );
-          case "image": case "simpleImage": {
-            const url = d.file?.url || d.url;
-            return url ? <figure key={i}><img src={url} alt={d.caption || ""} loading="lazy" className="w-full rounded-xl object-contain" />{d.caption && <figcaption className="mt-1.5 text-center text-sm italic text-fg-subtle">{d.caption}</figcaption>}</figure> : null;
+          case "header": {
+            const level = Math.min(Math.max(Number(d.level) || 2, 2), 6);
+            const Tag = `h${level}`;
+            node = <Tag className={`mt-6 font-bold leading-snug ${H[level]} ${al} ${MARK}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} />;
+            break;
           }
-          case "delimiter": return <p key={i} className="py-2 text-center text-2xl tracking-[0.6em] text-fg-faint" aria-hidden>***</p>;
-          case "warning": return <div key={i} className="rounded-xl border border-warning/40 bg-warning-soft p-4"><b>{d.title}</b><p className="text-fg-muted">{d.message}</p></div>;
-          case "table": return (
-            <div key={i} className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full text-sm"><tbody>{(d.content || []).map((row, r) => <tr key={r} className="border-b border-line last:border-0">{row.map((cell, c) => (r === 0 && d.withHeadings ? <th key={c} className="bg-surface-2 px-3 py-2 text-left font-semibold" dangerouslySetInnerHTML={{ __html: sanitizeInline(cell) }} /> : <td key={c} className="px-3 py-2" dangerouslySetInnerHTML={{ __html: sanitizeInline(cell) }} />))}</tr>)}</tbody></table>
-            </div>
-          );
-          case "embed": return d.embed ? <div key={i} className="aspect-video overflow-hidden rounded-xl bg-surface-3"><iframe src={d.embed} title={d.caption || "Embedded media"} className="size-full" allowFullScreen loading="lazy" /></div> : null;
-          case "linkTool": return d.link ? <a key={i} href={d.link} target="_blank" rel="noopener noreferrer" className="block break-all font-medium text-primary underline">{d.link}</a> : null;
-          default: return d.text ? <Html key={i} html={d.text} /> : null;
+
+          case "paragraph":
+            node = plain(d.text).trim() ? <p className={`${P} ${al} ${MARK}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} /> : null;
+            break;
+
+          case "list":
+            node = (
+              <div className="mt-4 text-lg lg:text-[22px] lg:leading-[31px]">
+                <ListItems items={d.items} style={d.style} start={d.meta?.start} />
+              </div>
+            );
+            break;
+
+          case "checklist":
+            node = (
+              <ul className="mt-4 space-y-1.5 text-lg lg:text-[22px]">
+                {(d.items || []).map((it, k) => (
+                  <li key={k} className="flex gap-2">
+                    <span aria-hidden>{it.checked ? "☑" : "☐"}</span>
+                    <span dangerouslySetInnerHTML={{ __html: cleanHtml(it.text) }} />
+                  </li>
+                ))}
+              </ul>
+            );
+            break;
+
+          case "quote": {
+            const text = d.text ?? d.quote;
+            node = plain(text).trim() ? (
+              <blockquote className="relative my-8 overflow-hidden rounded-xl border border-black/5 bg-gradient-to-br from-gray-50 to-white px-5 pb-5 pt-12 shadow-sm sm:px-8 sm:pb-6 sm:pt-14">
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1.5 bg-primary" />
+                <svg aria-hidden viewBox="0 0 24 24" className="absolute left-5 top-4 size-9 fill-primary sm:left-8 sm:size-11">
+                  <path d="M9.6 4C5.4 5.7 3 9 3 13.4V20h7.2v-7.2H6.6c0-2.6 1.2-4.5 3.6-5.6L9.6 4zm10.2 0c-4.2 1.7-6.6 5-6.6 9.4V20h7.2v-7.2h-3.6c0-2.6 1.2-4.5 3.6-5.6L19.8 4z" />
+                </svg>
+                <p
+                  className={`font-medium italic leading-8 text-gray-900 text-[21px] sm:text-2xl lg:text-[28px] lg:leading-[1.45] ${al || (d.alignment === "center" ? "text-center" : "")}`}
+                  dangerouslySetInnerHTML={{ __html: cleanHtml(text) }}
+                />
+                {plain(d.caption).trim() && (
+                  <footer className="mt-4 flex items-center gap-3">
+                    <span aria-hidden className="h-0.5 w-8 shrink-0 bg-primary" />
+                    <cite className="text-sm font-semibold not-italic tracking-wide text-black/65 sm:text-base" dangerouslySetInnerHTML={{ __html: cleanHtml(d.caption) }} />
+                  </footer>
+                )}
+              </blockquote>
+            ) : null;
+            break;
+          }
+
+          case "image":
+          case "simpleImage": {
+            const url = d.file?.url || d.url;
+            const cap = plain(d.caption).trim();
+            node = url ? (
+              <figure className={`my-5 ${d.withBackground ? "bg-gray-100 p-3 sm:p-5" : ""}`}>
+                <div className={`relative aspect-video w-full overflow-hidden bg-gray-200 ${d.withBorder ? "border-2 border-gray-400" : "border border-gray-200"}`}>
+                  <img src={url} alt={cap} loading="lazy" className="absolute inset-0 size-full object-contain" />
+                </div>
+                {cap && <figcaption className="rounded-b-md bg-[#f2f2f2] p-1 text-center text-[15px]">{cap}</figcaption>}
+              </figure>
+            ) : null;
+            break;
+          }
+
+          case "delimiter":
+            node = <p aria-hidden className="py-3 text-center text-3xl tracking-[0.6em] text-black/30">*****</p>;
+            break;
+
+          case "warning":
+            node = (plain(d.title).trim() || plain(d.message).trim()) ? (
+              <aside role="note" className="my-6 flex gap-3 overflow-hidden rounded-xl border border-amber-300/70 bg-gradient-to-r from-amber-50 via-amber-50 to-orange-50 p-4 shadow-sm sm:gap-4 sm:p-5">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white shadow sm:size-12">
+                  <svg aria-hidden viewBox="0 0 24 24" className="size-6 fill-none stroke-current sm:size-7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                    <path d="M12 9v4M12 17h.01" />
+                  </svg>
+                </span>
+                <div className="min-w-0">
+                  {plain(d.title).trim() && <p className="text-lg font-bold leading-snug text-amber-900 sm:text-xl">{plain(d.title)}</p>}
+                  {plain(d.message).trim() && <p className="mt-1 text-base leading-relaxed text-amber-900/80 sm:text-lg">{plain(d.message)}</p>}
+                </div>
+              </aside>
+            ) : null;
+            break;
+
+          case "table": {
+            const rows = (d.content || []).filter((r) => Array.isArray(r) && r.length);
+            if (!rows.length) { node = null; break; }
+            const cols = Math.max(...rows.map((r) => r.length));
+            const hasHead = FIRST_ROW_IS_HEADER ? rows.length > 1 : !!d.withHeadings;
+            const [head, body] = hasHead ? [rows[0], rows.slice(1)] : [null, rows];
+            node = (
+              <div className="my-6 overflow-hidden rounded-xl border border-black/10 shadow-sm">
+                <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                  <table className="w-full border-collapse text-[15px] sm:text-base lg:text-lg" style={{ minWidth: `${Math.min(cols * 130, 720)}px` }}>
+                    {head && (
+                      <thead>
+                        <tr className="bg-primary text-white">
+                          {head.map((cell, c) => (
+                            <th key={c} scope="col" className="whitespace-nowrap px-3 py-3 text-left text-sm font-bold uppercase tracking-wide sm:px-4 sm:text-[15px]" dangerouslySetInnerHTML={{ __html: cleanHtml(cell) }} />
+                          ))}
+                        </tr>
+                      </thead>
+                    )}
+                    <tbody>
+                      {body.map((row, r) => (
+                        <tr key={r} className="border-t border-black/10 odd:bg-white even:bg-gray-50 hover:bg-amber-50/60">
+                          {Array.from({ length: cols }, (_, c) => (
+                            <td key={c} className="px-3 py-2.5 align-top sm:px-4 sm:py-3" dangerouslySetInnerHTML={{ __html: cleanHtml(row[c] ?? "") }} />
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+            break;
+          }
+
+          case "embed": {
+            const cap = plain(d.caption).trim();
+            const src = safeUrl(d.embed);
+            const source = safeUrl(d.source);
+            const tall = src ? /twitframe|platform\.twitter|codepen/i.test(src) : false;
+            const ig = igEmbedUrl(d.embed) || igEmbedUrl(d.source);
+            if (ig) {
+              node = <InstagramFrame src={ig} caption={cap} />;
+              break;
+            }
+
+            node = src && EMBED_HOSTS.test(src) ? (
+              <div className="my-6 w-full">
+                <div className={`mx-auto w-full max-w-3xl overflow-hidden rounded ${tall ? "h-[500px] bg-white" : "aspect-video bg-black"}`}>
+                  <iframe
+                    src={src}
+                    title={plain(d.service) || cap || "Embedded media"}
+                    loading="lazy"
+                    allowFullScreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    className="size-full"
+                  />
+                </div>
+                {cap && <p className="mt-2 text-center text-sm text-black/60">{cap}</p>}
+              </div>
+            ) : source ? <p className={P}><Link href={source} /></p> : null;
+            break;
+          }
+
+          case "linkTool": {
+            const href = safeUrl(d.link);
+            const ig = igEmbedUrl(href);
+            node = ig ? <InstagramFrame src={ig} /> : href ? <p className={P}><Link href={href} /></p> : null;
+            break;
+          }
+
+          case "raw": {
+            const ig = igFromRaw(d.html);
+            if (ig) {
+              node = <InstagramFrame src={ig} />;
+              break;
+            }
+
+            const html = cleanRaw(d.html).trim();
+            node = html ? <div className="my-6 flex w-full justify-center [&_iframe]:max-w-full [&_img]:h-auto [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: html }} /> : null;
+            break;
+          }
+
+          default:
+            node = plain(d.text).trim() ? <p className={`${P} ${al}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} /> : null;
         }
+
+        return (
+          <div key={b.id ?? i}>
+            {node}
+            {[].concat(afterBlock || []).filter((a) => a && a.index === i).map((a, k) => <div key={k}>{a.node}</div>)}
+          </div>
+        );
       })}
     </div>
   );

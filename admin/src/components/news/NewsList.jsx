@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { FilterX, LayoutGrid, Newspaper, Plus, RefreshCw, Rows3, SlidersHorizontal, UserRound } from "lucide-react";
+import { BadgeCheck, ExternalLink, Eye, FilterX, History, LayoutGrid, Link2, MessageCircle, MoreVertical, Newspaper, Pencil, Plus, RefreshCw, Rows3, ScanEye, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient";
@@ -8,20 +8,30 @@ import { fetchSingleNews, useFetchNews, useNewsAuthors } from "../../hooks/news"
 import usePermission from "../../hooks/usePermission";
 import { useApiMutation, useCategories, useDistricts, useStates } from "../../hooks/admin";
 import { cn } from "../../lib/cn";
-import { errMsg } from "../../lib/api";
+import { errMsg, fmtDate } from "../../lib/api";
+import { siteUrl } from "../../lib/share";
+import { handleImageError } from "../../utils/imageError";
 import NewsFilter from "../NewsFilter";
 import UpdateStackPanel from "../UpdateStack";
-import NewsCard from "./NewsCard";
+import NewsCard, { newsSitePath, statusOf } from "./NewsCard";
 import NewsPreview from "./NewsPreview";
 import { buttonStyles } from "../ui/Button";
-import { Badge, Button, Card, DateRangeFilter, EmptyState, ErrorState, Field, PageHeader, Pagination, SearchInput, Select, Skeleton, useConfirm } from "../ui";
+import { Badge, Button, Card, DataTable, DateRangeFilter, EmptyState, ErrorState, Field, IconButton, Menu, MenuItem, MenuSeparator, PageHeader, Pagination, SearchInput, Select, Skeleton, useConfirm } from "../ui";
 
 const EMPTY = { category: [], subCategory: [], district: "", state: "", location: "", createdAt: "", search: "", from: "", to: "", author: "" };
 const countActive = (f) => ["category", "subCategory"].reduce((n, k) => n + (f[k]?.length ? 1 : 0), 0) + ["district", "state", "location", "createdAt", "from", "author"].filter((k) => f[k]).length;
 const VIEW_KEY = "newsListLayout";
 
+function Cover({ src, alt }) {
+  return src
+    ? <img src={src} alt={alt || ""} loading="lazy" onError={handleImageError} className="h-12 w-20 shrink-0 rounded-md bg-surface-3 object-cover" />
+    : <span className="grid h-12 w-20 shrink-0 place-items-center rounded-md bg-surface-3 text-fg-faint"><Newspaper className="size-5" /></span>;
+}
+
 /**
  * One list for published news, drafts and the review queue.
+ *  - Grid layout: NewsCard banner cards.
+ *  - List layout: the same table as the Live news page (cover + title, status, by, time, views, actions).
  * Filters: search (title / place / category / topic / Hindi + English keywords), created by, date range, category, place.
  * Permissions: "Created by" needs news.view.all, edit = news.update.own / news.update.any, delete = news.delete.own / news.delete.any.
  */
@@ -63,6 +73,9 @@ export default function NewsList({ title, description, draft = false, needApprov
 
   const canDelete = (n) => can("news.delete.any") || (can("news.delete.own") && String(n.author?._id) === String(user?.id || user?._id) && (draft || can("news.publish")));
   const canEdit = can("news.update.any") || can("news.update.own");
+  const isRejected = (n) => Boolean(n.rejected_at) && !n.need_approval;
+  const editLabel = (n) => (needApproval ? t("Review") : isRejected(n) ? t("Fix & resubmit") : t("Edit"));
+  const goEdit = (n) => navigate(`${editBase}/${n.news_id}${editQuery}`);
 
   // preview of a story from the list: the list has no body, so it is fetched on demand
   const openPreview = async (n) => {
@@ -94,7 +107,7 @@ export default function NewsList({ title, description, draft = false, needApprov
     const out = [];
     if (applied.author) out.push(["author", `${t("Created by")}: ${(authors.data || []).find((a) => a._id === applied.author)?.username || "…"}`, { author: "" }]);
     if (applied.from || applied.to) out.push(["range", `${applied.from || "…"} → ${applied.to || "…"}`, { from: "", to: "" }]);
-    (applied.category || []).forEach((id) => out.push([`c${id}`, name(cats.data, id, (c) => c.name) || "…", { category: applied.category.filter((x) => x !== id), subCategory: [] }]));
+    (applied.category || []).forEach((id) => out.push([`c${id}`, name(cats.data, id, (c) => c.name) || "…", { category: applied.category.filter((x) => x !== id) }]));
     (applied.subCategory || []).forEach((id) => out.push([`s${id}`, name(cats.data, id, (c) => c.name) || "…", { subCategory: applied.subCategory.filter((x) => x !== id) }]));
     if (applied.state) out.push(["state", name(states.data, applied.state, (s) => s.displayName || s.state) || "…", { state: "", district: "" }]);
     if (applied.district) out.push(["district", name(districts.data, applied.district, (d) => d.displayName || d.district) || "…", { district: "" }]);
@@ -103,8 +116,137 @@ export default function NewsList({ title, description, draft = false, needApprov
     return out;
   }, [applied, authors.data, cats.data, states.data, districts.data, t]);
 
-  const noun = draft ? "drafts" : "stories";
   const writeBtn = showCreate && can("news.create") && <Link to="/dashboard/news/create" className={buttonStyles({})}><Plus className="size-4" />{t("Write news")}</Link>;
+  const clearAll = () => { setSearch(""); apply(EMPTY); };
+
+  const emptyState = (
+    <EmptyState
+      icon={Newspaper}
+      title={draft && rejectedOnly ? t("No rejected stories") : t(emptyText)}
+      description={active ? t("Try clearing the filters.") : undefined}
+      action={!active ? writeBtn || null : <Button variant="outline" onClick={clearAll}>{t("Clear all")}</Button>}
+    />
+  );
+
+  // ───────────── list layout: same table as Live news ─────────────
+  // every row action lives in one three-dot menu
+  const rowActions = (n) => {
+    const url = siteUrl(newsSitePath(n));
+    const onSite = !draft && !n.need_approval && n.isPublished !== false;
+    return (
+      <div className="flex justify-end">
+        <Menu trigger={<IconButton label={t("More")} size="icon-sm"><MoreVertical className="size-4" /></IconButton>} width="w-52">
+          {canEdit && <MenuItem icon={Pencil} onClick={() => goEdit(n)}>{editLabel(n)}</MenuItem>}
+          <MenuItem icon={ScanEye} onClick={() => openPreview(n)}>{t("Preview")}</MenuItem>
+          {n.update_stack && <MenuItem icon={History} onClick={() => setStack(n.update_stack)}>{t("History")}</MenuItem>}
+          {isRejected(n) && <MenuItem icon={BadgeCheck} onClick={() => navigate(`/dashboard/review/news/${n.news_id}`)}>{t("View details & apply again")}</MenuItem>}
+          {onSite && <MenuItem icon={ExternalLink} onClick={() => window.open(url, "_blank", "noopener")}>{t("View on website")}</MenuItem>}
+          {!draft && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon={MessageCircle} as="a" href={`https://wa.me/?text=${encodeURIComponent(`*${n.title}*\n${url}`)}`} target="_blank" rel="noreferrer">WhatsApp</MenuItem>
+              <MenuItem icon={Link2} onClick={() => navigator.clipboard?.writeText(url).then(() => toast.success("Link copied"))}>{t("Copy link")}</MenuItem>
+            </>
+          )}
+          {canDelete(n) && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon={Trash2} tone="danger" onClick={() => askDelete(n)}>{t("Delete")}</MenuItem>
+            </>
+          )}
+        </Menu>
+      </div>
+    );
+  };
+
+  const columns = [
+    {
+      key: "title", header: t("News"), primary: true, cell: (n) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <Cover src={n.banner ? `${n.banner}?q=75&w=240` : ""} alt={n.title} />
+          <Link to={`/dashboard/news/${n.news_id}`} className="hindi-font line-clamp-2 max-w-sm font-medium text-fg hover:text-primary lg:text-base">{n.title}</Link>
+        </div>
+      ),
+    },
+    {
+      key: "status", header: t("Status"), cell: (n) => {
+        const st = statusOf(n, draft);
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <Badge tone={st.tone} dot size="sm">{t(st.label)}</Badge>
+            {isRejected(n) && n.rejected_by?.username && <span className="text-xs text-fg-subtle">{t("by")} {n.rejected_by.username}</span>}
+          </div>
+        );
+      },
+    },
+    { key: "by", header: t("By"), cell: (n) => n.author?.fullName || n.author?.username || "—" },
+    { key: "when", header: t("Time"), cell: (n) => <span className="text-xs"><span className="text-fg-subtle">{t("Created")}</span><br />{fmtDate(n.createdAt, true)}</span> },
+    ...(!draft ? [{ key: "views", header: t("Views"), align: "right", cell: (n) => <span className="inline-flex items-center gap-1 text-fg-muted"><Eye className="size-3.5" />{(n.activity?.total_reads || 0).toLocaleString("en-IN")}</span> }] : []),
+    { key: "actions", header: t("Actions"), align: "right", cell: rowActions },
+  ];
+
+  // phones keep the compact NewsCard row (the layout switch is hidden below sm)
+  const mobileCard = (n) => (
+    <NewsCard
+      item={n}
+      layout="list"
+      draft={draft}
+      needApproval={needApproval}
+      canEdit={canEdit}
+      canDelete={canDelete(n)}
+      onEdit={() => goEdit(n)}
+      onPreview={() => openPreview(n)}
+      onHistory={() => setStack(n.update_stack)}
+      onDelete={() => askDelete(n)}
+    />
+  );
+
+  let body;
+  if (isError) {
+    body = <Card><ErrorState error={error} onRetry={refetch} /></Card>;
+  } else if (layout === "list") {
+    body = (
+      <Card padded={false} className={cn("overflow-hidden transition-opacity", isFetching && !isPending && "opacity-70")}>
+        <DataTable
+          contained
+          breakpoint="sm"
+          columns={columns}
+          rows={data?.news}
+          loading={isPending}
+          mobileCard={mobileCard}
+          empty={emptyState}
+        />
+      </Card>
+    );
+  } else if (isPending) {
+    body = (
+      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="surface-card space-y-3 p-4"><Skeleton className="aspect-video w-full" /><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-1/2" /></div>)}
+      </div>
+    );
+  } else if (!data?.news?.length) {
+    body = <Card className="flex min-h-[max(20rem,calc(100dvh-26rem))] items-center">{emptyState}</Card>;
+  } else {
+    body = (
+      <div className={cn("grid h-full flex-1 gap-4 transition-opacity sm:grid-cols-2 2xl:grid-cols-3", isFetching && "opacity-70")}>
+        {data.news.map((n) => (
+          <NewsCard
+            key={n.news_id}
+            item={n}
+            layout="grid"
+            draft={draft}
+            needApproval={needApproval}
+            canEdit={canEdit}
+            canDelete={canDelete(n)}
+            onEdit={() => goEdit(n)}
+            onPreview={() => openPreview(n)}
+            onHistory={() => setStack(n.update_stack)}
+            onDelete={() => askDelete(n)}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -122,7 +264,7 @@ export default function NewsList({ title, description, draft = false, needApprov
       />
 
       <Card padded={false} className="mb-2 overflow-visible rounded-lg">
-        <div className="flex gap-1.5 p-1 items-center sm:p-2.5">
+        <div className="flex items-center gap-1.5 p-1 sm:p-2.5">
           <form
             className="min-w-0 flex-1"
             onSubmit={(e) => {
@@ -133,8 +275,7 @@ export default function NewsList({ title, description, draft = false, needApprov
               value={search}
               onChange={(v) => {
                 setSearch(v);
-                if (!v && applied.search)
-                  apply({ ...applied, search: "" });
+                if (!v && applied.search) apply({ ...applied, search: "" });
               }}
               placeholder={t("Search title, place, category or keyword (Enter)")}
             />
@@ -148,33 +289,22 @@ export default function NewsList({ title, description, draft = false, needApprov
             <Button
               variant="outline"
               leftIcon={SlidersHorizontal}
-              onClick={() => { setSelected(applied); setFilterOpen(true); }} className="px-2 flex-1 sm:flex-none"
+              onClick={() => { setSelected(applied); setFilterOpen(true); }} className="flex-1 px-2 sm:flex-none"
             >
-              {t("Filters")}{active - (applied.search ? 1 : 0) > 0 && <span className="ml-1 grid size-4 sm:size-5 place-items-center rounded-full bg-fg text-[11px] font-semibold text-canvas">{active - (applied.search ? 1 : 0)}</span>}
+              {t("Filters")}{active - (applied.search ? 1 : 0) > 0 && <span className="ml-1 grid size-4 place-items-center rounded-full bg-fg text-[11px] font-semibold text-canvas sm:size-5">{active - (applied.search ? 1 : 0)}</span>}
             </Button>
 
-            <div className="hidden sm:flex items-center rounded-control border border-line-strong p-0.5" role="group" aria-label="Layout">
+            <div className="hidden items-center rounded-control border border-line-strong p-0.5 sm:flex" role="group" aria-label="Layout">
               {[["grid", LayoutGrid, t("Grid")], ["list", Rows3, t("List")]].map(([id, Icon, label]) => (
                 <button key={id} type="button" aria-pressed={layout === id} aria-label={label} title={label} onClick={() => setLayout(id)}
-                  className={cn("grid size-7 sm:size-9 place-items-center rounded-md sm:rounded-lg transition-colors", layout === id ? "bg-primary text-primary-fg" : "text-fg-subtle hover:bg-surface-2")}><Icon className="size-3.5 sm:size-4" /></button>
+                  className={cn("grid size-7 place-items-center rounded-md transition-colors sm:size-9 sm:rounded-lg", layout === id ? "bg-primary text-primary-fg" : "text-fg-subtle hover:bg-surface-2")}><Icon className="size-3.5 sm:size-4" /></button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2.5 sm:px-4">
-          <Badge tone="primary">{(data?.total ?? 0).toLocaleString("en-IN")} {t(noun)}</Badge>
-          {chips.length && chips.map(([key, text, patch]) => (
-            <button key={key} type="button" onClick={() => apply({ ...applied, ...patch })} className="group inline-flex max-w-full items-center gap-1 rounded-full bg-surface-3 px-2.5 py-1 text-xs font-medium text-fg-muted hover:bg-danger-soft hover:text-danger">
-              <span className="truncate">{text}</span><span aria-hidden className="text-fg-faint group-hover:text-danger">×</span>
-            </button>
-          ))}
-          {applied.search && <button type="button" onClick={() => { setSearch(""); apply({ ...applied, search: "" }); }} className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-2.5 py-1 text-xs font-medium text-fg-muted hover:bg-danger-soft hover:text-danger">“{applied.search}” ×</button>}
-          {active > 0 && <Button variant="ghost" size="xs" leftIcon={FilterX} className="ml-auto" onClick={() => { setSearch(""); apply(EMPTY); }}>{t("Clear all")}</Button>}
-        </div> */}
-
         {active > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2 sm:px-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2">
             {chips.map(([key, text, patch]) => (
               <button
                 key={key}
@@ -195,56 +325,14 @@ export default function NewsList({ title, description, draft = false, needApprov
                 “{applied.search}” ×
               </button>
             )}
-            <Button
-              variant="ghost"
-              size="xs"
-              leftIcon={FilterX}
-              className="ml-auto"
-              onClick={() => { setSearch(""); apply(EMPTY); }}
-            >
+            <Button variant="ghost" size="xs" leftIcon={FilterX} className="ml-auto" onClick={clearAll}>
               {t("Clear all")}
             </Button>
           </div>
         )}
       </Card>
 
-      {isError
-        ?
-        <Card>
-          <ErrorState error={error} onRetry={refetch} />
-        </Card> :
-        isPending ? (
-          <div className={cn("grid gap-4", layout === "grid" ? "sm:grid-cols-2 2xl:grid-cols-3" : "")}>
-            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="surface-card space-y-3 p-4"><Skeleton className="aspect-video w-full" /><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-1/2" /></div>)}
-          </div>
-        ) : !data?.news?.length ? (
-          <Card className="flex min-h-[max(20rem,calc(100dvh-26rem))] items-center">
-            <EmptyState
-              icon={Newspaper}
-              title={draft && rejectedOnly ? t("No rejected stories") : t(emptyText)}
-              description={active ? t("Try clearing the filters.") : undefined} action={!active ? writeBtn || null : <Button variant="outline" onClick={() => { setSearch(""); apply(EMPTY); }}>{t("Clear all")}</Button>}
-            />
-          </Card>
-        ) : (
-          <div className={cn("grid gap-4 transition-opacity h-full flex-1", layout === "grid" ? "sm:grid-cols-2 2xl:grid-cols-3" : "grid-cols-1", isFetching && "opacity-70")}>
-            {data.news.map((n) => (
-              <NewsCard
-                key={n.news_id}
-                item={n}
-                layout={layout}
-                draft={draft}
-                needApproval={needApproval}
-                canEdit={canEdit}
-                canDelete={canDelete(n)}
-                onEdit={() =>
-                  navigate(`${editBase}/${n.news_id}${editQuery}`)}
-                onPreview={() => openPreview(n)}
-                onHistory={() => setStack(n.update_stack)}
-                onDelete={() => askDelete(n)}
-              />
-            ))}
-          </div>
-        )}
+      {body}
 
       {Boolean(data?.total) && <Card padded={false} className="mt-4"><Pagination page={page} total={data.total} limit={limit} onPage={go} onLimit={(l) => { setLimit(l); go(1); }} limits={[12, 24, 48]} /></Card>}
 

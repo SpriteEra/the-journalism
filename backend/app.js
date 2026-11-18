@@ -30,6 +30,7 @@ import { tagPublicRouter, tagAdminRouter } from './router/tag.routes.js';
 import { liveAdminRouter } from './router/live.news.routes.js';
 import reporterPerformanceRouter from './router/reporter.performance.routes.js';
 import roleRouter from './router/role.routes.js';
+import { mediaAdminRouter } from './router/media.routes.js';
 import { shortVideoAdminRouter, shortVideoUploadRouter } from './router/short-video.routes.js';
 import { seoRootRouter, seoApiRouter } from './router/seo.routes.js';
 import activityLog from './plugins/activityLog.js';
@@ -126,7 +127,7 @@ export async function buildApp({ logger, sockets = true } = {}) {
 
     for (const plugin of [
         adminRoutes, userRoute, scheduleNewsRouter, analyticsRouter, TitleAdvertisementRoutes, eventNewsRouter,
-        taxonomyAdminRouter, tagAdminRouter, liveAdminRouter, reporterPerformanceRouter, roleRouter, activityLogRouter, shortVideoAdminRouter, shortVideoUploadRouter,
+        taxonomyAdminRouter, tagAdminRouter, liveAdminRouter, reporterPerformanceRouter, roleRouter, activityLogRouter, shortVideoAdminRouter, shortVideoUploadRouter, mediaAdminRouter,
     ]) app.register(plugin, { prefix: '/api/v1/admin' });
     app.register(SpriteEraServiceRouter, { prefix: '/api/v1/admin/spriteera-service' });
 

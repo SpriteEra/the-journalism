@@ -30,7 +30,7 @@ export const newsPath = (n) => {
 };
 
 export const categoryPath = (slug) => `/${slug}`;
-export const subCategoryPath = (parentSlug, slug) => `/${parentSlug}/${slug}`;
+export const subCategoryPath = (parentSlug, slug) => `/${slug}`;
 export const topicPath = (slug) => `/topic/${slug}`;
 export const authorPath = (username) => `/author/${username}`;
 export const statePath = (slug) => `/state/${slug}`;

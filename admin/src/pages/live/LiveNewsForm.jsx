@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, ImagePlus, Radio, Search, Send, ChevronDown, RotateCcw, CheckCircle2, Circle, Lightbulb } from "lucide-react";
-import imageCompression from "browser-image-compression";
+import { ArrowLeft, ExternalLink, Radio, Search, Send, ChevronDown, RotateCcw, CheckCircle2, Circle, Lightbulb } from "lucide-react";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient";
 import usePermission from "../../hooks/usePermission";
@@ -9,30 +8,13 @@ import { useApiMutation } from "../../hooks/admin";
 import { useLiveNewsItem } from "../../hooks/live";
 import { Alert, Badge, Button, Card, ChipInput, ErrorState, Field, Input, PageLoader, StatusBadge, Tabs, Textarea, useConfirm } from "../../components/ui";
 import LiveEditor from "../../components/live/LiveEditor";
+import MediaImageField from "../../components/media/MediaImageField";
 import { cn } from "../../lib/cn";
 import { fromIstInput, fmtISTDateTime, toIstInput } from "../../lib/time";
 import { siteUrl } from "../../lib/share";
 import { truncate } from "../../utils/utils.js";
 
 const LIST_PATH = "/dashboard/live";
-
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-  });
-
-function base64ToFile(base64String, fileName) {
-  const arr = base64String.split(",");
-  const mime = arr[0].match(/:(.*?);/)[1];
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) u8arr[n] = bstr.charCodeAt(n);
-  return new File([u8arr], fileName, { type: mime });
-}
 
 /** Loads the live news (edit) and mounts the form once the data is there, so the editor starts with the right content. */
 export default function LiveNewsFormPage() {
@@ -72,7 +54,6 @@ function LiveForm({ live }) {
   });
 
   const editor = useRef(null);
-  const fileRef = useRef(null);
   const latest = useRef({});
   const [dirty, setDirty] = useState(false);
   const [needsSave, setNeedsSave] = useState(false);
@@ -92,11 +73,10 @@ function LiveForm({ live }) {
     const merged = { ...base, ...(draft?.f || {}), seo: { ...base.seo, ...(draft?.f?.seo || {}) } };
     return merged;
   });
+  // the cover is a REFERENCE to a media-library image: id = what is saved, url = only for the preview
   const [cover, setCover] = useState(() => {
-    if (draft?.cover) {
-      try { return { file: base64ToFile(draft.cover, "cover.jpg"), preview: draft.cover, base64: draft.cover }; } catch { /* broken copy */ }
-    }
-    return { file: null, preview: live?.image || "", base64: "" };
+    if (draft?.cover && typeof draft.cover === "object") return { id: draft.cover.id || "", url: draft.cover.url || "" };   // (older drafts stored a base64 string: ignored)
+    return { id: live?.imageMedia || "", url: live?.image || "" };
   });
 
   const set = (p) => { setF((s) => ({ ...s, ...p })); setDirty(true); setNeedsSave(true); };
@@ -113,7 +93,7 @@ function LiveForm({ live }) {
       try {
         const content = (await editor.current?.save()) || null;
         const { f: ff, cover: cc } = latest.current;
-        localStorage.setItem(draftKey, JSON.stringify({ f: ff, content, cover: cc.base64 || "", savedAt: Date.now() }));
+        localStorage.setItem(draftKey, JSON.stringify({ f: ff, content, cover: cc, savedAt: Date.now() }));
         setNeedsSave(false);
       } catch { /* storage full */ }
     }, 5000);
@@ -127,36 +107,11 @@ function LiveForm({ live }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-  useEffect(() => () => { if (cover.file && cover.preview.startsWith("blob:")) URL.revokeObjectURL(cover.preview); }, [cover]);
-
-  const pickCover = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return toast.error("Choose an image file");
-
-    // 1. show the picked image immediately (blob URL, no waiting)
-    const quick = URL.createObjectURL(file);
-    setCover({ file, preview: quick, base64: "", busy: true });
-    setDirty(true);
-
-    try {
-      // 2. compress in the background
-      const small = await imageCompression(file, {
-        maxSizeMB: 0.8,
-        maxWidthOrHeight: 1600,
-        initialQuality: 0.8,
-        useWebWorker: true,
-      });
-      // 3. base64 is only needed for the local draft copy
-      const base64 = await fileToBase64(small);
-      // ignore the result if the user picked another image meanwhile
-      setCover((c) => (c.preview === quick ? { file: small, preview: quick, base64, busy: false } : c));
-      setNeedsSave(true);
-    } catch {
-      setCover((c) => (c.preview === quick ? { ...c, busy: false } : c)); // keep the original file
-      toast.error("Could not compress this image, the original will be used");
-    }
+  // cover chosen in the media picker (null = removed). Its alt text fills the alt field; you can still edit it below.
+  const pickCover = (pick) => {
+    setCover(pick ? { id: pick._id, url: pick.url } : { id: "", url: "" });
+    if (pick?.altText) setF((s) => ({ ...s, imageAlt: pick.altText }));
+    setDirty(true); setNeedsSave(true);
   };
 
   const back = () => navigate(LIST_PATH);
@@ -164,7 +119,6 @@ function LiveForm({ live }) {
   const save = useApiMutation(async (body) => {
     const fd = new FormData();
     Object.entries(body).forEach(([k, v]) => { if (v !== undefined) fd.append(k, typeof v === "string" ? v : JSON.stringify(v)); });
-    if (cover.file) fd.append("image", cover.file, cover.file.name || "cover.jpg");
     const { data } = editing ? await httpClient.put(`/live/${live.slug}`, fd) : await httpClient.post("/live", fd);
     return data;
   }, {
@@ -181,13 +135,12 @@ function LiveForm({ live }) {
     e?.preventDefault?.();
     const title = f.title.trim();
     if (!title) return toast.error("Write a title");
-    if (cover.busy) return toast("Image is still being prepared, try again in a moment");
     const body = (await editor.current?.save()) || { blocks: [] };
     const hasBody = body.blocks.length > 0;
     const publishing = !editing ? f.mode !== "draft" : ["draft", "scheduled"].includes(status) && f.mode !== "draft";
 
     if (publishing) {
-      if (!cover.preview) return toast.error("Add a cover image before publishing");
+      if (!cover.url) return toast.error("Add a cover image before publishing");
       if (!hasBody && !f.description.trim()) return toast.error("Add a short strap line or some story text before publishing");
     }
     if (f.mode === "scheduled" && ["draft", "scheduled"].includes(status)) {
@@ -215,6 +168,9 @@ function LiveForm({ live }) {
       tags: f.tags.map((t) => t.title),
       seo,
     };
+    // image by reference: the library image id. "null" = removed. (An old cover that is not in the library is left as it is.)
+    if (cover.id) payload.imageMedia = cover.id;
+    else if (!cover.url) payload.imageMedia = "null";
     if (!slugLocked && f.slug.trim() && f.slug.trim() !== live?.slug) payload.slug = f.slug.trim();
 
     if (!waiting && ["draft", "scheduled"].includes(status)) {
@@ -241,7 +197,7 @@ function LiveForm({ live }) {
   // ── "ready" checklist (display only, the real checks stay in submit) ──
   const checklist = [
     { label: "Title", done: Boolean(f.title.trim()) },
-    { label: "Cover image", done: Boolean(cover.preview) },
+    { label: "Cover image", done: Boolean(cover.url) },
     { label: "Strap line or story text", done: Boolean(f.description.trim()) || Boolean(draft?.content?.blocks?.length) || Boolean(live?.content?.blocks?.length) || dirty },
     ...(f.mode === "scheduled" && showModes ? [{ label: "Publish time", done: Boolean(f.startTime) }] : []),
   ];
@@ -259,10 +215,6 @@ function LiveForm({ live }) {
     </div>
   );
 
-  useEffect(() => {
-    const url = cover.preview;
-    return () => { if (url?.startsWith("blob:")) URL.revokeObjectURL(url); };
-  }, [cover.preview]);
   return (
     <div className="mx-auto w-full p-0 sm:p-3 sm:bg-surface rounded-md">
       {/* TOP BAR: title always; buttons only on mobile/tablet (desktop buttons live in the right panel) */}
@@ -285,20 +237,13 @@ function LiveForm({ live }) {
           {/* ---------- LEFT: cover image ---------- */}
           <div className="lg:col-start-1 lg:row-start-1">
             <div className="mb-3 sm:mb-8 rounded-lg sm:rounded-2xl border border-line/50 bg-surface p-1 sm:p-3 shadow-card">
-              <button type="button" onClick={() => fileRef.current?.click()} className="group relative block aspect-video w-full overflow-hidden rounded-lg sm:rounded-xl border-2 border-dashed border-line-strong bg-surface-2/50 transition-colors hover:border-primary focus-ring">
-                {cover.preview
-                  ? <img src={cover.preview} alt={f.imageAlt || "Cover"} className="size-full object-cover" />
-                  : <span className="flex size-full flex-col items-center justify-center gap-2 text-fg-subtle"><ImagePlus className="size-8" /><span className="text-sm">Click to choose a cover image</span></span>}
-
-                {cover.preview && <span className="absolute inset-0 grid place-items-center bg-ink/0 text-sm font-medium text-paper opacity-0 transition group-hover:bg-ink/40 group-hover:opacity-100">Change image</span>}
-
-                {/* ← add here */}
-                {cover.busy && (
-                  <span className="absolute bottom-2 right-2 rounded-full bg-ink/60 px-2 py-1 text-xs text-paper">Optimizing…</span>
-                )}
-              </button>
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={pickCover} />
-              <p className="mt-2 text-xs text-fg-subtle max-sm:hidden">Use a clear 16:9 landscape photo. PNG, JPG or WEBP – it is compressed automatically.</p>
+              <MediaImageField
+                value={cover.url}
+                onChange={pickCover}
+                pickerTitle="Select live cover image"
+                placeholder="/news-banner.png"
+                hint="Pick from the media library or upload a 16:9 image (1280 × 720 looks best). “Use default image” fills in the default chosen in the media library."
+              />
               <div className="mt-2 sm:mt-4">
                 <Input value={f.imageAlt} onChange={(e) => set({ imageAlt: e.target.value })} maxLength={200} placeholder="Image description (alt text, helps search & accessibility)" className="hindi-font" />
               </div>

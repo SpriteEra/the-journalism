@@ -1,18 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import { seoSchema } from './seo.schema.js';
 
-/**
- * ShortVideo – ONE schema for every short / video that is not a legacy YtNews item.
- * It replaces the old YtShort and CustomVideo models (collection: shortvideos).
- *
- *   sourceType = 'youtube_auto'    pulled from a YouTube channel by the cron / "sync now"
- *                'youtube_manual'  an admin / reporter pasted a YouTube link
- *                'upload'          our own file, stored on Cloudflare (through the media server)
- *   kind       = 'short' | 'video' vertical short-form vs normal video (any source)
- *
- * Taxonomy is the same as News: category / subCategory / state / district are arrays of ids,
- * tags are references to the Tag collection (`keywords` keeps the raw YouTube keywords, never turned into tags automatically).
- */
 const maxLen = (max) => (arr) => !Array.isArray(arr) || arr.length <= max;
 const ref = (model, max, label) => ({ type: [{ type: Schema.Types.ObjectId, ref: model }], default: [], validate: [maxLen(max), `A video can have at most ${max} ${label}`] });
 
@@ -61,6 +49,10 @@ const shortVideoSchema = new Schema({
     },
     seo: { type: seoSchema, default: () => ({}) },
     author: { type: Schema.Types.ObjectId, ref: 'User' },         // empty for auto-imported items
+    isPinned: { type: Boolean, default: false },
+    pinnedAt: { type: Date },
+    pinnedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+
     need_approval: { type: Boolean, default: false },
     approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
     approved_at: { type: Date },
@@ -105,4 +97,5 @@ shortVideoSchema.index(
     { 'activity.total_today_count': -1 },
     { partialFilterExpression: { 'activity.total_today_count': { $gt: 0 } } }
 );
+shortVideoSchema.index({ isDeleted: 1, draft: 1, isPublished: 1, isPinned: -1, pinnedAt: -1, publishedAt: -1, _id: -1 }, live);
 export default mongoose.model('ShortVideo', shortVideoSchema);

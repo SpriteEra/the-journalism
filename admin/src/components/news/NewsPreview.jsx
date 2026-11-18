@@ -67,7 +67,7 @@ export default function NewsPreview({ open, onClose, news }) {
   const publishedAt = news.createdAt || new Date();
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex flex-col bg-canvas animate-fade-in" role="dialog" aria-modal="true" aria-label={t("Full preview")}>
+    <div className="fixed inset-0 z-[70] flex flex-col bg-canvas animate-fade-in font-khand" role="dialog" aria-modal="true" aria-label={t("Full preview")}>
       <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2.5 sm:px-5">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-fg">{t("Full preview")}</p>
@@ -102,7 +102,7 @@ export default function NewsPreview({ open, onClose, news }) {
                     {news.title || "—"}
                   </h1>
                   {news.description && (
-                    <p className={cn("mt-3 leading-relaxed", lg ? "mt-4 text-lg leading-7.5" : "text-lg")}>{news.description}</p>
+                    <p className={cn("mt-3 leading-relaxed", lg ? "mt-4 text-xl leading-7.5" : "text-lg")}>{news.description}</p>
                   )}
 
                   {/* author + date + actions */}
@@ -158,15 +158,15 @@ export default function NewsPreview({ open, onClose, news }) {
                 {(topics.length > 0 || kw.length > 0) && (
                   <div className={cn("mt-2.5 border-t border-gray-200 pt-2.5", lg && "mt-4 pt-4")}>
                     {topics.length > 0 && (
-                      <div className={cn("flex flex-wrap items-baseline gap-x-2 text-base font-medium leading-[31px] tracking-[0.02em]", lg && "gap-y-1 text-lg")}>
+                      <div className={cn("flex flex-col gap-2 items-baseline gap-x-2 text-base font-medium leading-[31px] tracking-[0.02em]", lg && "gap-y-1 text-lg")}>
                         <span className="text-black">{t("Topics")}:</span>
                         <ul className="flex flex-wrap items-baseline gap-x-1">
                           {topics.map((topic, i) => (
                             <li key={topic}>
-                              <span className="cursor-pointer text-red-500 underline decoration-red-500/40 underline-offset-4 transition-colors hover:decoration-red-500">
+                              <span className="block rounded-full border px-3 py-1 text-xs leading-normal transition-colors lg:px-4 lg:py-1.5 lg:text-base border-black/15 text-black/60 hover:border-primary hover:text-primary">
                                 {topic}
                               </span>
-                              {i < topics.length - 1 && <span className="text-red-500">,</span>}
+
                             </li>
                           ))}
                         </ul>

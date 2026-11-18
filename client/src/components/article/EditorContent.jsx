@@ -9,8 +9,14 @@ import sanitizeHtml from "sanitize-html";
  */
 
 /* ───────────── sanitising ───────────── */
-const COLOR = [/^#[0-9a-f]{3,8}$/i, /^rgba?\([\d\s.,%]+\)$/i, /^hsla?\([\d\s.,%deg]+\)$/i];
-
+const COLOR = [
+  /^#[0-9a-f]{3,8}$/i,
+  /^rgba?\([\d\s.,%]+\)$/i,
+  /^hsla?\([\d\s.,%deg]+\)$/i,
+  /^inherit$/i,
+];
+// highlights from the editor's background-color tool: rounded, small side padding, text keeps its color
+const MARK = "[&_mark]:rounded-sm [&_mark]:px-1 [&_mark]:[box-decoration-break:clone]";
 const INLINE = {
   allowedTags: ["b", "strong", "i", "em", "u", "a", "mark", "code", "br", "sub", "sup", "s", "span"],
   allowedAttributes: { a: ["href", "target", "rel"], mark: ["class", "style"], span: ["class", "style"] },
@@ -148,12 +154,12 @@ export default function EditorContent({ content, afterBlock }) {
           case "header": {
             const level = Math.min(Math.max(Number(d.level) || 2, 2), 6); // h1 is reserved for the story title
             const Tag = `h${level}`;
-            node = <Tag className={`mt-6 font-khand font-bold leading-snug ${H[level]} ${al}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} />;
+            node = <Tag className={`mt-6 font-khand font-bold leading-snug ${H[level]} ${al} ${MARK}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} />;
             break;
           }
 
           case "paragraph":
-            node = plain(d.text).trim() ? <p className={`${P} ${al}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} /> : null;
+            node = plain(d.text).trim() ? <p className={`${P} ${al} ${MARK}`} dangerouslySetInnerHTML={{ __html: cleanHtml(d.text) }} /> : null;
             break;
 
           case "list":

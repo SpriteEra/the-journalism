@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BadgeCheck, History, Pencil, Plus, RefreshCw, RotateCcw, TextSearch, Trash2, Youtube } from "lucide-react";
+import { BadgeCheck, History, Pencil, Pin, PinOff, Plus, RefreshCw, RotateCcw, TextSearch, Trash2, Youtube } from "lucide-react";
 import { cn } from "../lib/cn";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import httpClient from "../api/httpClient";
+import { errMsg } from "../lib/api";
 import { useFetchVideos } from "../hooks/ytnews";
 import { fmtISTDateTime } from "../lib/time";
 import VideoFilter from "../components/VideoFilter";
@@ -17,10 +18,19 @@ import usePermission from "../hooks/usePermission";
 import ApprovalInfoModal, { ApprovalBadge, approvalState, hasApprovalInfo } from "../components/common/ApprovalInfoModal";
 
 const EMPTY_FILTERS = { district: [], state: [], location: "", createdAt: "", search: "" };
+const MAX_PINNED = 2; // keep in sync with MAX_PINNED on the server
 
 const thumbOf = (item) => `https://img.youtube.com/vi/${item.videoLinkId}/mqdefault.jpg`;
 const dateOf = (item) => fmtISTDateTime(item.publishedAt || item.createdAt);
 const videoStatus = (item) => (item.draft ? "draft" : item.isPublished === false ? "pending" : "published");
+// only a published item (not draft, not waiting for approval) can be pinned
+const isPinnable = (item) => !item.draft && item.isPublished !== false && !item.need_approval;
+
+const pinnedBadge = () => (
+  <Badge tone="info" size="sm">
+    <Pin className="mr-1 size-3" />Pinned
+  </Badge>
+);
 
 const Videos = () => {
   const navigate = useNavigate();
@@ -30,6 +40,8 @@ const Videos = () => {
 
   // only people who can approve may open the approval popup
   const canReview = can("yt.approve");
+  // pinning needs the publish permission (same as the server); change to your pin permission if you add one
+  const canPin = can("yt.publish");
   const [approval, setApproval] = useState(null);
   // hide the plain status badge while the item is waiting for approval
   const showStatus = (item) => approvalState(item) !== "pending";
@@ -45,6 +57,10 @@ const Videos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isShowUpdatedStack, setIsShowUpdatedStack] = useState(false);
+
+  // pin: { item, willRemove: [{ news_id, title }] } while the "replace the oldest pin?" dialog is open
+  const [pinTarget, setPinTarget] = useState(null);
+  const [pinning, setPinning] = useState(false);
 
   const { data, isPending, isFetching, isError, error, refetch } = useFetchVideos({
     page,
@@ -99,6 +115,31 @@ const Videos = () => {
     }
   };
 
+  // Pin / unpin one item. The confirmation opens ONLY when pinning hits the limit (server answers 409 PIN_LIMIT).
+  // replace = true -> the server unpins the oldest pinned video(s) to make room.
+  const sendPin = async (item, pin, replace = false) => {
+    if (pinning) return;
+    setPinning(true);
+    const tid = toast.loading(pin ? "Pinning…" : "Unpinning…");
+    try {
+      await httpClient.patch(`/yt-news/${item.news_id}/pin`, { pin, replace });
+      toast.success(pin ? (replace ? "Pinned. The oldest pin was removed" : "Pinned to top") : "Unpinned", { id: tid });
+      setPinTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["yt-news"] });
+    } catch (err) {
+      const body = err?.response?.data;
+      if (pin && !replace && err?.response?.status === 409 && body?.code === "PIN_LIMIT") {
+        toast.dismiss(tid);
+        setPinTarget({ item, willRemove: body.willRemove || [] });
+      } else {
+        toast.error(errMsg(err, pin ? "Could not pin the video" : "Could not unpin the video"), { id: tid });
+        setPinTarget(null);
+      }
+    } finally {
+      setPinning(false);
+    }
+  };
+
   // one definition, used by the table row AND the collapsible card
   const rowActions = (item) => (
     <RowActions
@@ -108,6 +149,18 @@ const Videos = () => {
         title: (r) => r.title,
       }}
       actions={[
+        {
+          label: "Pin to top",
+          icon: Pin,
+          hidden: (r) => !canPin || r.isPinned || !isPinnable(r),
+          onClick: (r) => sendPin(r, true),
+        },
+        {
+          label: "Unpin",
+          icon: PinOff,
+          hidden: (r) => !canPin || !r.isPinned,
+          onClick: (r) => sendPin(r, false),
+        },
         {
           label: "Approval details",
           icon: BadgeCheck,
@@ -140,6 +193,27 @@ const Videos = () => {
     />
   );
 
+  // a visible pin toggle in the row (the menu keeps the same actions). Shown only for published videos.
+  const pinButton = (item) => {
+    if (!canPin || !isPinnable(item)) return null;
+    const on = !!item.isPinned;
+    return (
+      <button
+        type="button"
+        disabled={pinning}
+        onClick={() => sendPin(item, !on)}
+        title={on ? "Unpin" : "Pin to top"}
+        aria-label={on ? "Unpin" : "Pin to top"}
+        className={cn(
+          "grid size-8 place-items-center rounded-lg transition-colors disabled:opacity-50",
+          on ? "bg-info-soft text-info" : "text-fg-muted hover:bg-surface-2"
+        )}
+      >
+        <Pin className={cn("size-4", on && "fill-current")} />
+      </button>
+    );
+  };
+
   const sourceBadge = () => <Badge tone="info" size="sm">YouTube · link</Badge>;
 
   // sm and up: the table
@@ -150,8 +224,16 @@ const Videos = () => {
       primary: true,
       cell: (item) => (
         <div className="flex min-w-0 items-center gap-3">
-          <VideoThumb src={thumbOf(item)} />
+          <div className="relative shrink-0">
+            <VideoThumb src={thumbOf(item)} />
+            {item.isPinned && (
+              <span className="absolute -left-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-info text-white shadow" title="Pinned">
+                <Pin className="size-3.5" />
+              </span>
+            )}
+          </div>
           <div className="min-w-0">
+            {item.isPinned && <div className="mb-1">{pinnedBadge()}</div>}
             <p className="hindi-font line-clamp-2 max-w-xs font-medium text-fg lg:text-base">{item.title}</p>
             <span className="text-xs">{dateOf(item)}</span>
           </div>
@@ -171,7 +253,17 @@ const Videos = () => {
     },
     { key: "by", header: "By", cell: (item) => item.author?.username || <span className="text-fg-faint">auto</span> },
     { key: "reads", header: "Reads", cell: (item) => <span className="tabular-nums">{item.activity?.total_reads ?? 0}</span> },
-    { key: "actions", header: "Actions", align: "right", cell: rowActions },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (item) => (
+        <div className="flex items-center justify-end gap-1">
+          {pinButton(item)}
+          {rowActions(item)}
+        </div>
+      ),
+    },
   ];
 
   // below sm: collapsible card
@@ -184,12 +276,16 @@ const Videos = () => {
       views={item.activity?.total_reads ?? 0}
     >
       <div className="flex flex-wrap items-center gap-2">
+        {item.isPinned && pinnedBadge()}
         {sourceBadge()}
         {showStatus(item) && <StatusBadge status={videoStatus(item)} />}
         <ApprovalBadge item={item} onClick={canReview ? setApproval : undefined} />
       </div>
       <p className="text-sm text-fg-muted">By {item.author?.username || "auto"}</p>
-      {rowActions(item)}
+      <div className="flex items-center gap-2">
+        {pinButton(item)}
+        {rowActions(item)}
+      </div>
     </VideoCard>
   );
 
@@ -304,6 +400,20 @@ const Videos = () => {
           confirmLabel="Delete"
           title="Delete this video?"
           message="This action cannot be undone."
+        />
+      )}
+
+      {/* opened only when a pin request hits the limit; plain pin / unpin never asks */}
+      {pinTarget && (
+        <ConfirmDialog
+          open
+          onClose={() => setPinTarget(null)}
+          loading={pinning}
+          onConfirm={() => sendPin(pinTarget.item, true, true)}
+          confirmLabel="Replace and pin"
+          title="Replace pinned video?"
+          message={`${MAX_PINNED} videos are already pinned. Pinning "${pinTarget.item.title}" will unpin the oldest: ${pinTarget.willRemove.map((v) => v.title).join(", ") || "the oldest pinned video"
+            }.`}
         />
       )}
 

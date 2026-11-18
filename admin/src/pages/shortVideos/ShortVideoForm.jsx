@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Link2, Upload, Youtube } from "lucide-react";
 import toast from "react-hot-toast";
 import httpClient from "../../api/httpClient";
@@ -9,11 +9,12 @@ import { useApiMutation } from "../../hooks/admin";
 import { fmtBytes } from "../../lib/api";
 import { MAX_MB, readVideoMeta, youtubeId } from "../../lib/videoMeta";
 import { appendTaxonomy, emptyTaxonomy, taxonomyFrom, tagsFrom } from "../../components/taxonomy/TaxonomyFields";
-import { Badge, Button, Card, ErrorState, Field, Input, PageHeader, Switch, Tabs, Textarea } from "../../components/ui";
+import { Badge, Button, Card, ConfirmDialog, ErrorState, Field, Input, PageHeader, Switch, Tabs, Textarea } from "../../components/ui";
 import VideoPreview from "../../components/shorts/VideoPreview";
 
 const LIST_PATH = "/dashboard/short-videos";
 const SOURCE = { youtube_auto: "YouTube · auto", youtube_manual: "YouTube · link", upload: "Uploaded" };
+const MAX_PINNED = 10; // keep in sync with MAX_PINNED on the server
 
 export default function ShortVideoFormPage() {
     const { slug } = useParams();
@@ -34,6 +35,7 @@ export default function ShortVideoFormPage() {
 function VideoFormBody({ video }) {
     const { can } = usePermission();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [params, setParams] = useSearchParams();
     const editing = !!video;
     const savedYt = editing && video.sourceType !== "upload"
@@ -54,22 +56,87 @@ function VideoFormBody({ video }) {
     const [progress, setProgress] = useState(0);
     const set = (p) => setF((s) => ({ ...s, ...p }));
 
+    // ── pin ──
+    const canPublish = can("video.publish");              // only people who can publish can pin (same rule as the server)
+    const initialPin = !!video?.isPinned;
+    const [pin, setPin] = useState(initialPin);
+    const [replaceOpen, setReplaceOpen] = useState(false); // "10 already pinned, replace the oldest?" dialog
+    const [willRemove, setWillRemove] = useState([]);
+    const replaceRef = useRef(false);                      // true after the user confirms the replacement
+    const savedRef = useRef(false);                        // edit: the fields are already saved, only the pin call is left
+
+    // an existing video can be pinned only when it is published (a draft is fine: saving it as published makes it so)
+    const statusOk = !editing || video.draft || (video.isPublished !== false && !video.need_approval);
+    const pinnable = canPublish && !f.draft && statusOk;
+    const effectivePin = pinnable && pin;                  // what will really be sent
+    const needsPinCall = editing && !f.draft && effectivePin !== initialPin; // edit: pin / unpin after the PUT
+
     const back = () => navigate(LIST_PATH);
 
     const save = useApiMutation(async () => {
+        const replace = replaceRef.current;
+        // create: the server answers 409 + code PIN_LIMIT before anything is saved or uploaded
+        const limitHit = (err) => {
+            const body = err?.response?.data;
+            if (effectivePin && !replace && err?.response?.status === 409 && body?.code === "PIN_LIMIT") {
+                return { __pinLimit: true, willRemove: body.willRemove || [] };
+            }
+            throw err;
+        };
+
         if (mode === "youtube") {
-            const { data } = await httpClient.post("/short-videos/youtube", { url: f.url, title: f.title || undefined, kind: f.kind || undefined, draft: f.draft, category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district, tags: tags.map((t) => t.id || t.title) });
+            try {
+                const { data } = await httpClient.post("/short-videos/youtube", { url: f.url, title: f.title || undefined, kind: f.kind || undefined, draft: f.draft, category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district, tags: tags.map((t) => t.id || t.title), pin: effectivePin, replace });
+                return data;
+            } catch (err) { return limitHit(err); }
+        }
+
+        if (editing) {
+            // 1) save the fields (once)  2) pin / unpin when the switch changed
+            let data;
+            if (!savedRef.current) {
+                const fd = new FormData();
+                fd.append("title", f.title); fd.append("description", f.description); if (f.kind) fd.append("kind", f.kind); fd.append("draft", String(f.draft));
+                appendTaxonomy(fd, tax, tags);
+                if (thumb) fd.append("thumbnail", thumb);
+                ({ data } = await httpClient.put(`/short-videos/${video.slug}`, fd));
+                savedRef.current = true;
+            }
+            if (needsPinCall) {
+                try {
+                    await httpClient.patch(`/short-videos/${video.slug}/pin`, { pin: effectivePin, replace });
+                } catch (err) {
+                    // the pin endpoint answers 409 only when the limit is reached
+                    if (effectivePin && !replace && err?.response?.status === 409) return { __pinLimit: true, willRemove: err.response.data?.willRemove || [] };
+                    throw err;
+                }
+            }
             return data;
         }
-        const fd = new FormData();
-        fd.append("title", f.title); fd.append("description", f.description); if (f.kind) fd.append("kind", f.kind); fd.append("draft", String(f.draft));
-        appendTaxonomy(fd, tax, tags);
-        if (thumb) fd.append("thumbnail", thumb);
-        if (editing) { const { data } = await httpClient.put(`/short-videos/${video.slug}`, fd); return data; }
-        fd.append("video", file);
-        const { data } = await httpClient.post("/short-videos/upload", fd, { timeout: 0, onUploadProgress: (e) => e.total && setProgress(Math.round((e.loaded / e.total) * 100)) });
-        return data;
-    }, { invalidate: ["short-videos"], onSuccess: back });
+
+        try {
+            const fd = new FormData();
+            fd.append("title", f.title); fd.append("description", f.description); if (f.kind) fd.append("kind", f.kind); fd.append("draft", String(f.draft));
+            fd.append("pin", String(effectivePin)); fd.append("replace", String(replace));
+            appendTaxonomy(fd, tax, tags);
+            if (thumb) fd.append("thumbnail", thumb);
+            fd.append("video", file);
+            const { data } = await httpClient.post("/short-videos/upload", fd, { timeout: 0, onUploadProgress: (e) => e.total && setProgress(Math.round((e.loaded / e.total) * 100)) });
+            return data;
+        } catch (err) { return limitHit(err); }
+    }, {
+        invalidate: ["short-videos"],
+        onSuccess: (res) => {
+            // the pin limit was hit: ask before replacing the oldest pin (the confirmation never opens for a normal save)
+            if (res?.__pinLimit) {
+                setProgress(0);
+                setWillRemove(res.willRemove);
+                setReplaceOpen(true);
+                return;
+            }
+            back();
+        },
+    });
 
     const submit = async (e) => {
         e.preventDefault();
@@ -81,11 +148,40 @@ function VideoFormBody({ video }) {
             if (probe && probe.width >= probe.height) return toast.error("Only portrait (vertical) videos can be uploaded here.");
             if (probe && probe.duration > 180) return toast.error("Shorts can be at most 3 minutes long.");
         }
+        replaceRef.current = false;
         save.mutate();
     };
 
+    const confirmReplace = () => {
+        setReplaceOpen(false);
+        replaceRef.current = true;
+        save.mutate();
+    };
+
+    // edit: closing the dialog keeps the saved changes and leaves the video unpinned; create: nothing was saved yet, stay on the form
+    const cancelReplace = () => {
+        setReplaceOpen(false);
+        if (editing) {
+            toast.success("Changes saved. The video was not pinned");
+            queryClient.invalidateQueries({ queryKey: ["short-videos"] });
+            back();
+        }
+    };
+
     const title = editing ? "Edit video" : mode === "youtube" ? "Add YouTube short" : "Upload short";
-    const submitLabel = editing ? "Save changes" : f.draft ? "Save draft" : can("video.publish") ? "Publish" : "Submit for approval";
+    const submitLabel = editing
+        ? (needsPinCall ? (effectivePin ? "Save and pin" : "Save and unpin") : "Save changes")
+        : f.draft ? "Save draft"
+            : canPublish ? (effectivePin ? "Publish and pin" : "Publish")
+                : "Submit for approval";
+
+    const pinHint = f.draft
+        ? "Drafts can't be pinned"
+        : !statusOk
+            ? "Only published videos can be pinned"
+            : effectivePin
+                ? `Shown first in the list. Only ${MAX_PINNED} videos can be pinned; you'll be asked before the oldest one is replaced.`
+                : "Show this video first in the list";
 
     return (
         <>
@@ -139,6 +235,11 @@ function VideoFormBody({ video }) {
 
                     <Switch checked={f.draft} onChange={(v) => set({ draft: v })} label="Save as draft" description={can("video.publish") ? "Drafts are not shown on the website" : "Without “draft” it goes to the review queue"} />
 
+                    {/* pin: only for people who can publish. The "replace the oldest pin?" dialog opens only when the limit is reached. */}
+                    {canPublish && (
+                        <Switch checked={effectivePin} onChange={setPin} disabled={!pinnable} label="Pin to top" description={pinHint} />
+                    )}
+
                     {save.isPending && mode === "upload" && !editing && (
                         <div>
                             <div className="h-2 overflow-hidden rounded-full bg-surface-3"><div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} /></div>
@@ -163,6 +264,19 @@ function VideoFormBody({ video }) {
                     />
                 </Card>
             </form>
+
+            {replaceOpen && (
+                <ConfirmDialog
+                    open
+                    onClose={cancelReplace}
+                    loading={save.isPending}
+                    onConfirm={confirmReplace}
+                    confirmLabel="Replace and pin"
+                    title="Replace pinned video?"
+                    message={`${MAX_PINNED} videos are already pinned. If you pin this one, the oldest pinned video (${willRemove.map((v) => v.title).join(", ") || "the first one you pinned"
+                        }) will be unpinned automatically.`}
+                />
+            )}
         </>
     );
 }

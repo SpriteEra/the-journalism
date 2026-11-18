@@ -13,6 +13,8 @@ import Delimiter from "@editorjs/delimiter";
 import ColorPicker from "editorjs-color-picker";
 import RawPreview from "./RawPreview";
 import CustomHyperlink from "./CustomHyperlink";
+import TextBgColor from "./TextBgColor";
+import TextColor from "./TextColor";
 
 const uploadImageByURL = (url) => {
   return Promise.resolve({
@@ -49,17 +51,14 @@ export const tools = {
   paragraph: {
     class: Paragraph,
     tunes: ["alignmentTune"],
-    inlineToolbar: ["customHyperlink", "bold", "italic", "ColorPicker"],
+    inlineToolbar: ["customHyperlink", "bold", "italic", "textColor", "textBgColor"],
     config: {
       preserveBlank: true,
     },
     sanitizer: {
-      a: {
-        href: true,
-        target: true,
-        rel: true,
-        class: true,
-      },
+      a: { href: true, target: true, rel: true, class: true },
+      mark: { class: true, style: true },
+      span: { class: true, style: true },
     },
   },
 
@@ -125,5 +124,7 @@ export const tools = {
   alignmentTune: { class: AlignmentTune },
   delimiter: Delimiter,
   ColorPicker: { class: ColorPicker },
+  textColor: { class: TextColor },
+  textBgColor: { class: TextBgColor },
   quote: Quote,
 };

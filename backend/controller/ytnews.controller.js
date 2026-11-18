@@ -12,7 +12,7 @@ import { toBool } from "../utils/slug.js";
 import { escapeRegex } from "../utils/newsTaxonomy.js";
 import { onNewsChanged } from "../utils/newsCache.js";
 import { clampInt } from "../utils/common.js";
-
+export const MAX_PINNED = 2;
 const assertCanManage = (req, item) => {
     if (req.can(P.YT_MANAGE_ANY)) return;
     if (req.can(P.YT_MANAGE_OWN) && String(item.author) === String(req.user._id)) return;
@@ -62,7 +62,7 @@ export const createYtNews = tryCatch(async (req, res, next) => {
 
     videoLinkId = id || '';
     title = String(title || meta?.title || '').trim();
-    description = description ?? meta?.description ?? '';
+    description = String(description || '').trim() || meta?.description || '';
     tags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map((t) => t.trim()).filter(Boolean) : []);
 
     if (!title) return next(new ErrorHandler(400, `You must provide a title to ${isDraft ? 'save' : 'publish'} a news`));
@@ -104,6 +104,67 @@ export const createYtNews = tryCatch(async (req, res, next) => {
     if (needApproval) notifyApprovers(req, { perms: [P.YT_APPROVE], label: 'YouTube news', title: news.title, link: '/dashboard/videos' });
     else if (!isDraft) NotificationService.sendToAdmins('Youtube News Added', `News ${news.title} has been added`, { excludeIds: [req.user._id], createdBy: req.user.username });
 });
+const trimPins = async () => {
+    const pinned = await YtNews.find({ isDeleted: false, isPinned: true })
+        .sort({ pinnedAt: 1 }).select('_id title update_stack');
+    const remove = pinned.slice(0, Math.max(0, pinned.length - MAX_PINNED));
+    if (!remove.length) return [];
+    await YtNews.updateMany(
+        { _id: { $in: remove.map((x) => x._id) } },
+        { $set: { isPinned: false }, $unset: { pinnedAt: '', pinnedBy: '' } }
+    );
+    return remove;
+};
+
+export const pinYtNews = tryCatch(async (req, res, next) => {
+    if (!req.can(P.YT_PUBLISH)) return next(new ErrorHandler(403, `Missing permission: ${P.YT_PUBLISH}`));
+
+    const { id } = req.params;
+    const item = await YtNews.findOne({ news_id: id, isDeleted: false });
+    if (!item) return next(new ErrorHandler(404, 'News not found'));
+
+    const pin = req.body.pin === undefined ? !item.isPinned : toBool(req.body.pin);
+    const replace = toBool(req.body.replace);
+    if (pin === item.isPinned) return res.status(200).json({ message: pin ? 'Already pinned' : 'Already unpinned', isPinned: pin });
+
+    if (pin) {
+        if (item.draft || !item.isPublished || item.need_approval) {
+            return next(new ErrorHandler(400, 'Only published news can be pinned'));
+        }
+        if (!replace) {
+            const current = await YtNews.find({ isDeleted: false, isPinned: true })
+                .sort({ pinnedAt: 1 }).select('news_id title -_id').lean();
+            if (current.length >= MAX_PINNED) {
+                return res.status(409).json({
+                    code: 'PIN_LIMIT',
+                    message: `${MAX_PINNED} videos are already pinned.`,
+                    willRemove: current.slice(0, current.length - MAX_PINNED + 1),
+                });
+            }
+        }
+    }
+
+    await YtNews.updateOne(
+        { _id: item._id },
+        pin
+            ? { $set: { isPinned: true, pinnedAt: new Date(), pinnedBy: req.user._id } }
+            : { $set: { isPinned: false }, $unset: { pinnedAt: '', pinnedBy: '' } }
+    );
+
+    // after pinning, keep only the newest MAX_PINNED (this is what removes the oldest)
+    const replaced = pin ? await trimPins() : [];
+    for (const r of replaced) {
+        await UpdateStack.findByIdAndUpdate(r.update_stack, {
+            $push: { updates: { updatedBy: req.user._id, updatedByModel: 'User', updatedAt: new Date(), description: 'Unpinned (replaced by a newer pin)' } },
+        });
+    }
+    await UpdateStack.findByIdAndUpdate(item.update_stack, {
+        $push: { updates: { updatedBy: req.user._id, updatedByModel: 'User', updatedAt: new Date(), description: pin ? 'Pinned' : 'Unpinned' } },
+    });
+
+    res.status(200).json({ message: pin ? 'Pinned' : 'Unpinned', isPinned: pin, replaced: replaced.map((x) => x.title) });
+    onNewsChanged();
+});
 
 export const getNewsYt = tryCatch(async (req, res) => {
     const { state, district, location, search } = req.query;
@@ -130,13 +191,13 @@ export const getNewsYt = tryCatch(async (req, res) => {
 
     const [ytnews, total] = await Promise.all([
         YtNews.find(query)
-            .sort({ createdAt: -1 })
+            .sort({ isPinned: -1, pinnedAt: -1, createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit)
             .populate('author', 'username fullName profile')
             .populate('approved_by', 'username fullName profile')
             .populate('rejected_by', 'username fullName profile')
-            .select('news_id title location activity update_stack videoLinkId createdAt draft isPublished need_approval approved_by approved_at rejected_by rejected_at rejected_reason _id'),
+            .select('news_id title location state district thumbnail duration activity update_stack videoLinkId createdAt draft isPublished need_approval isPinned pinnedAt approved_by approved_at rejected_by rejected_at rejected_reason _id'),
         YtNews.countDocuments(query),
     ]);
 
@@ -145,13 +206,17 @@ export const getNewsYt = tryCatch(async (req, res) => {
 
 export const deleteYtNews = tryCatch(async (req, res, next) => {
     const { id } = req.params;
-    const userId = req.user?._id || 'unknown';
+    const userId = req.user._id;
 
     const item = await YtNews.findOne({ news_id: id, isDeleted: false });
     if (!item) return next(new ErrorHandler(404, 'News Not Found or Already Deleted'));
     assertCanManage(req, item);
 
-    const updated = await YtNews.findOneAndUpdate({ news_id: id }, { $set: { isDeleted: true } }, { new: true });
+    const updated = await YtNews.findOneAndUpdate(
+        { news_id: id },
+        { $set: { isDeleted: true, isPinned: false }, $unset: { pinnedAt: '', pinnedBy: '' } },
+        { new: true }
+    );
     if (!updated) return next(new ErrorHandler(404, 'News Not Found or Already Deleted'));
 
     await Trash.create({
@@ -192,19 +257,22 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
     assertCanManage(req, ytnews);
 
     const updateData = {};
+    const unsetData = {};
     const changes = [];
+    const cleanTitle = title === undefined ? undefined : String(title).trim();
+    if (cleanTitle !== undefined && !cleanTitle) return next(new ErrorHandler(400, 'Title cannot be empty'));
 
-    if (title !== undefined && title !== ytnews.title) {
-        updateData.title = title;
-        changes.push(`Title changed from "${ytnews.title}" to "${title}"`);
+    if (cleanTitle !== undefined && cleanTitle !== ytnews.title) {
+        updateData.title = cleanTitle;
+        changes.push(`Title changed from "${ytnews.title}" to "${cleanTitle}"`);
     }
     if (description !== undefined && description !== ytnews.description) {
         updateData.description = description;
         changes.push('Description updated');
     }
-    if (tags !== undefined && JSON.stringify(tags) !== JSON.stringify(ytnews.tags)) {
-        updateData.tags = tags;
-        changes.push('Tags updated');
+    if (tags !== undefined) {
+        const t = Array.isArray(tags) ? tags : String(tags).split(',').map((x) => x.trim()).filter(Boolean);
+        if (JSON.stringify(t) !== JSON.stringify(ytnews.tags)) { updateData.tags = t; changes.push('Tags updated'); }
     }
     if (location !== undefined && location !== ytnews.location) {
         updateData.location = location;
@@ -218,23 +286,53 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
         updateData.district = district;
         changes.push(`District changed from "${ytnews.district}" to "${district}"`);
     }
-    if (videoLinkId !== undefined && videoLinkId !== ytnews.videoLinkId) {
-        updateData.videoLinkId = videoLinkId;
-        changes.push('Video link updated');
+    if (videoLinkId !== undefined) {
+        const raw = String(videoLinkId || '').trim();
+        if (!raw) {
+            if (!(draft ?? ytnews.draft)) return next(new ErrorHandler(400, 'You must provide a valid YouTube link for the video'));
+            if (ytnews.videoLinkId) { updateData.videoLinkId = ''; changes.push('Video link removed'); }
+        } else {
+            const newId = parseYoutubeId(raw);
+            if (!newId) return next(new ErrorHandler(400, 'Invalid YouTube link'));
+            if (newId !== ytnews.videoLinkId) {
+                if (await YtNews.exists({ videoLinkId: newId, isDeleted: false, _id: { $ne: ytnews._id } })) {
+                    return next(new ErrorHandler(409, 'This YouTube video is already added'));
+                }
+                const meta = await fetchYoutubeMeta(newId).catch(() => null);
+                if (meta && await isShort({ id: newId, duration: meta.duration }).catch(() => false)) {
+                    return next(new ErrorHandler(400, 'This is a Short (portrait video). YouTube news is for long landscape videos.'));
+                }
+                Object.assign(updateData, {
+                    videoLinkId: newId,
+                    ...(meta ? { thumbnail: meta.thumbnail || '', duration: meta.duration || 0, channelId: meta.channelId || '', channelTitle: meta.channelTitle || '' } : {}),
+                });
+                changes.push('Video link updated');
+            }
+        }
     }
 
-    // draft / publish / approval switch
+
     if (draft !== undefined && draft !== ytnews.draft) {
         updateData.draft = draft;
         if (draft) {
-            Object.assign(updateData, { isPublished: false, need_approval: false }, approvalCleared);
+            Object.assign(updateData, { isPublished: false, need_approval: false, isPinned: false }, approvalCleared);
+            Object.assign(unsetData, { pinnedAt: '', pinnedBy: '' });
             changes.push('Moved to draft');
-        } else if (req.can(P.YT_PUBLISH)) {
-            Object.assign(updateData, { isPublished: true, need_approval: false, publishedAt: ytnews.publishedAt || new Date() }, approvalCleared);
-            changes.push('Published');
         } else {
-            Object.assign(updateData, { isPublished: false, need_approval: true }, approvalCleared);
-            changes.push('Submitted for approval');
+            const finalDesc = updateData.description ?? ytnews.description;
+            const finalTags = updateData.tags ?? ytnews.tags;
+            const finalVideo = updateData.videoLinkId ?? ytnews.videoLinkId;
+            if (!finalVideo) return next(new ErrorHandler(400, 'You must provide a valid YouTube link for the video'));
+            if (!String(finalDesc).trim()) return next(new ErrorHandler(400, 'You must provide some description for the news'));
+            if (!finalTags.length) return next(new ErrorHandler(400, 'You must provide a tags for the news'));
+
+            if (req.can(P.YT_PUBLISH)) {
+                Object.assign(updateData, { isPublished: true, need_approval: false, publishedAt: ytnews.publishedAt || new Date() }, approvalCleared);
+                changes.push('Published');
+            } else {
+                Object.assign(updateData, { isPublished: false, need_approval: true }, approvalCleared);
+                changes.push('Submitted for approval');
+            }
         }
     }
 
@@ -244,7 +342,7 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
 
     const updatedYtNews = await YtNews.findOneAndUpdate(
         { news_id: id },
-        updateData,
+        Object.keys(unsetData).length ? { $set: updateData, $unset: unsetData } : { $set: updateData },
         { new: true, runValidators: true }
     );
 
@@ -269,7 +367,7 @@ export const updateYtNews = tryCatch(async (req, res, next) => {
         // submitted for approval: tell everyone who can approve
         notifyApprovers(req, { perms: [P.YT_APPROVE], label: 'YouTube news', title: updatedYtNews.title, link: '/dashboard/videos' });
     } else {
-        NotificationService.sendToAdmins('Youtube News Updated', `News ${ytnews.title} has been updated`, { excludeIds: [req.user._id], updatedBy: req.user.username });
+        NotificationService.sendToAdmins('Youtube News Updated', `News ${updatedYtNews.title} has been updated`, { excludeIds: [req.user._id], updatedBy: req.user.username });
     }
 });
 
@@ -277,7 +375,7 @@ export const getSingleYtNewsAdmin = tryCatch(async (req, res, next) => {
     const { video_id } = req.params;
 
     const ytNews = await YtNews.findOne({ news_id: video_id, isDeleted: false })
-        .select('news_id title description tags location state district videoLinkId author createdAt updatedAt -_id');
+        .select('news_id title description tags location state district videoLinkId isPinned author createdAt updatedAt -_id');
     if (!ytNews) return next(new ErrorHandler(404, 'News not found'));
 
     // managers and approvers may open it; everyone else only their own

@@ -47,7 +47,8 @@ export const ytNewsSchema = new mongoose.Schema({
     },
     videoLinkId: {
         type: String,
-        required: true
+        required: function () { return !this.draft; },
+        default: ''
     },
     author: {
         type: Schema.Types.ObjectId,
@@ -72,6 +73,11 @@ export const ytNewsSchema = new mongoose.Schema({
     publishedAt: { type: Date },
     category: { type: Schema.Types.ObjectId, ref: 'Category' },
     seo: { type: seoSchema, default: () => ({}) },
+
+    isPinned: { type: Boolean, default: false },
+    pinnedAt: { type: Date },
+    pinnedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+
     need_approval: { type: Boolean, default: false },
     approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
     approved_at: { type: Date },
@@ -88,6 +94,9 @@ ytNewsSchema.index(
 );
 ytNewsSchema.index({ isDeleted: 1, draft: 1, isPublished: 1, publishedAt: -1 });
 ytNewsSchema.index({ isDeleted: 1, need_approval: 1, createdAt: -1 })
+// indexes
+ytNewsSchema.index({ isDeleted: 1, isPinned: -1, pinnedAt: -1, createdAt: -1 });
+ytNewsSchema.index({ isDeleted: 1, draft: 1, isPublished: 1, isPinned: -1, publishedAt: -1 });
 const YtNews = mongoose.model('YtNews', ytNewsSchema);
 
 export default YtNews;

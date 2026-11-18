@@ -6,6 +6,7 @@ import User from "../model/user.model.js";
 import UpdateStack from "../model/updatedstack.model.js";
 import tryCatch from "../utils/asyncFunction.js";
 import ErrorHandler from "../utils/errorHandler.js";
+import { readMediaInput } from '../utils/mediaRef.js';
 import { sendNewsNotification } from "./pushnotification.controller.js";
 import { deleteImage, uploadImage } from "../utils/uploadImage.js";
 import { notifyUsers } from "../service/notification.service.js";
@@ -88,6 +89,7 @@ export const createScheduleNews = tryCatch(async (req, res) => {
     const aiGeneratedTags = parseJson(b.aiGeneratedTags, 'aiGeneratedTags', []);
     const location = String(b.location ?? '').trim().toLowerCase();
     const bannerFile = req.files?.banner;
+    const imageIn = await readMediaInput(b, 'bannerMedia', 'banner');
 
     if (!title) throw new ErrorHandler(400, `You must provide a title to ${draft ? 'save' : 'schedule'} a news`);
     if (title.length > 300) throw new ErrorHandler(400, 'Title cannot exceed 300 characters');
@@ -96,18 +98,18 @@ export const createScheduleNews = tryCatch(async (req, res) => {
     const tagItems = parseTagInput(b.tags);
     const tags = (await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TAG_CREATE), userId: authorId, requireTag: !draft })).ids;
 
-    if (!draft) assertSchedulable({ description, content, tags, post_time, hasBanner: Boolean(bannerFile), isVideo, video: b.video });
+    if (!draft) assertSchedulable({ description, content, tags, post_time, hasBanner: Boolean(bannerFile || imageIn?.media), isVideo, video: b.video });
     const publishAt = draft ? undefined : toPublishAt(post_time);
 
-    let banner = '';
+    let banner = ''; let bannerMedia;
     if (bannerFile) {
         try { banner = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
         catch (error) { throw new ErrorHandler(502, `Failed to upload banner image: ${error.message}`); }
-    }
+    } else if (imageIn?.media) { banner = imageIn.media.url; bannerMedia = imageIn.media._id; }
 
     const news_id = `${await makeSlug(title)}-${getCurrentDate()}-${generateNanoId()}`;
     const news = new ScheduleNews({
-        news_id, title, description, content, banner, location, tags, aiGeneratedTags,
+        news_id, title, description, content, banner, ...(bannerMedia ? { bannerMedia } : {}), location, tags, aiGeneratedTags,
         category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district,
         post_time, publishAt, draft, sendNotification, author: authorId,
         imageRef: b.imageRef || '', isVideo, video: b.video || '', isPublished: false,
@@ -138,6 +140,7 @@ export const updateScheduledNews = tryCatch(async (req, res) => {
     const aiGeneratedTags = parseJson(b.aiGeneratedTags, 'aiGeneratedTags', []);
     const location = String(b.location ?? '').trim().toLowerCase();
     const bannerFile = req.files?.banner;
+    const imageIn = await readMediaInput(b, 'bannerMedia', 'banner', { keep: news.bannerMedia });
 
     if (!title) throw new ErrorHandler(400, `You must provide a title to ${draft ? 'save' : 'schedule'} a news`);
     if (title.length > 300) throw new ErrorHandler(400, 'Title cannot exceed 300 characters');
@@ -146,18 +149,24 @@ export const updateScheduledNews = tryCatch(async (req, res) => {
     const tagItems = parseTagInput(b.tags);
     const tags = (await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TAG_CREATE), userId: authorId, existing: news.tags, requireTag: !draft })).ids;
 
-    const hasBanner = Boolean(bannerFile || b.banner || news.banner);
+    const hasBanner = Boolean(bannerFile || imageIn?.media || (!imageIn?.clear && (b.banner || news.banner)));
     if (!draft) assertSchedulable({ description, content, tags, post_time, hasBanner, isVideo, video: b.video });
     const publishAt = draft ? undefined : toPublishAt(post_time);
 
     // new banner: upload first, delete the old one only after the save worked
     const oldBanner = news.banner;
+    const oldBannerMedia = news.bannerMedia;     // a library image's file is shared: never deleted from here
     let uploaded = null;
     if (bannerFile) {
         try { uploaded = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
         catch (error) { throw new ErrorHandler(502, `Failed to upload banner image: ${error.message}`); }
-        news.banner = uploaded;
+        news.banner = uploaded; news.bannerMedia = undefined;
+    } else if (imageIn?.media) {
+        news.banner = imageIn.media.url; news.bannerMedia = imageIn.media._id;
+    } else if (imageIn?.clear) {
+        news.banner = ''; news.bannerMedia = undefined;
     } else if (typeof b.banner === 'string' && b.banner && !b.banner.startsWith('data:image')) {
+        if (b.banner !== news.banner) news.bannerMedia = undefined;
         news.banner = b.banner;
     }
 
@@ -170,7 +179,7 @@ export const updateScheduledNews = tryCatch(async (req, res) => {
     });
     await news.save();
 
-    if (uploaded && oldBanner) deleteImage(oldBanner).catch((e) => console.error('[schedule] image delete failed:', e.message));
+    if (uploaded && oldBanner && !oldBannerMedia) deleteImage(oldBanner).catch((e) => console.error('[schedule] image delete failed:', e.message));
     res.status(200).json({ success: true, message: 'Scheduled News Updated Successfully' });
 });
 
@@ -280,7 +289,7 @@ const publishScheduled = async (scheduledId) => {
             news_id: `${await makeSlug(s.title)}-${getCurrentDate()}-${generateNanoId()}`,
             slug: await makeNewsSlug(s.title),
             ...(primaryRoute ? { primaryRoute } : {}),
-            title: s.title, banner: s.banner, description: s.description, content: s.content,
+            title: s.title, banner: s.banner, ...(s.bannerMedia ? { bannerMedia: s.bannerMedia } : {}), description: s.description, content: s.content,
             category: s.category, subCategory: s.subCategory, state: s.state, district: s.district,
             location: s.location, tags: s.tags, aiGeneratedTags: s.aiGeneratedTags,
             keywords: s.keywords, seo: s.seo || {}, ref_reporter: s.ref_reporter || '', is_literature: Boolean(s.is_literature),

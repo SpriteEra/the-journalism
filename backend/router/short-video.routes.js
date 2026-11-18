@@ -3,6 +3,7 @@ import { P } from '../config/permissions.js';
 import {
     uploadShortVideo, addYoutubeShortVideo,
     getShortVideosAdmin, getShortVideoAdmin, updateShortVideo, deleteShortVideo, runYoutubeSync, youtubeSyncStatus,
+    pinShortVideo,
 
 } from '../controller/short-video.controller.js';
 
@@ -26,6 +27,7 @@ const maxMb = () => parseInt(process.env.MAX_VIDEO_MB) || 300;
 export async function shortVideoAdminRouter(app) {
     app.get('/short-videos', { onRequest: [...list] }, getShortVideosAdmin);
     app.post('/short-videos/youtube', { onRequest: [...create] }, addYoutubeShortVideo);
+    app.patch('/short-videos/:slug/pin', { onRequest: [...create] }, pinShortVideo);
     app.post('/short-videos/sync', { onRequest: [...sync] }, runYoutubeSync);
     app.get('/short-videos/sync-status', { onRequest: [...sync] }, youtubeSyncStatus);
     app.get('/short-videos/:slug', { onRequest: [...manage] }, getShortVideoAdmin);

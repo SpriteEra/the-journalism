@@ -13,6 +13,8 @@ import { syncYoutube, getSyncStatus, parseYoutubeId, fetchYoutubeMeta, isShort }
 import { buildTaxonomyFilter, escapeRegex, findTaxonomyByName, resolveNewsTaxonomy } from '../utils/newsTaxonomy.js';
 import { resolveNewsTags } from '../utils/newsTags.js';
 import { notifyApprovers, notifyAuthor, logApproval, approvalCleared } from '../utils/approval.js';
+
+export const MAX_PINNED = 10;
 const KINDS = ['short', 'video'];
 export const MAX_SHORT_SECONDS = 180;
 const SOURCES = ['youtube_auto', 'youtube_manual', 'upload'];
@@ -114,7 +116,9 @@ export const uploadShortVideo = tryCatch(async (req, res) => {
 export const addYoutubeShortVideo = tryCatch(async (req, res) => {
     const b = req.body || {};
     const id = parseYoutubeId(b.url || b.videoLinkId);
-    if (!id) throw new ErrorHandler(400, 'Enter a valid YouTube link or video id');
+    if (!id)
+        throw new ErrorHandler(400, 'Enter a valid YouTube link or video id');
+
     if (await ShortVideo.exists({ videoLinkId: id }) || await YtNews.exists({ videoLinkId: id, isDeleted: false })) throw new ErrorHandler(409, 'This YouTube video is already added');
     const { tax, tg } = await readTaxonomy(req);
 
@@ -128,7 +132,7 @@ export const addYoutubeShortVideo = tryCatch(async (req, res) => {
     const publishNow = canPublishNow(req, draft);
     const title = b.title?.trim() || meta.title;
     const doc = new ShortVideo({
-        title, slug: await uniqueSlug(ShortVideo, await makeSlug(title)), description: b.description ?? meta.description,
+        title, slug: await uniqueSlug(ShortVideo, await makeSlug(title)), description: String(b.description || '').trim() || meta.description || '',
         kind, sourceType: 'youtube_manual', videoLinkId: id, thumbnail: meta.thumbnail, duration: meta.duration,
         channelId: meta.channelId, channelTitle: meta.channelTitle, keywords: meta.tags || [],
         category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district, tags: tg?.ids || [],
@@ -148,21 +152,24 @@ export const addYoutubeShortVideo = tryCatch(async (req, res) => {
 });
 
 // ═════════════════════ ADMIN: manage ═════════════════════
-/** GET /admin/short-videos?kind=&sourceType=&pending=true&search=&category=&subCategory=&state=&district=&tag=&page=&limit= */
+/** GET /admin/short-videos?kind=&sourceType=&pending=true&pinned=true&pinFirst=false&search=&category=&subCategory=&state=&district=&tag=&page=&limit= */
 export const getShortVideosAdmin = tryCatch(async (req, res) => {
     const { page, limit, skip } = paging(req, 100);
     const seeAll = req.can(P.VIDEO_MANAGE_ANY) || req.can(P.VIDEO_APPROVE);
     const q = { isDeleted: false };
+    if (req.query.pinned === 'true') q.isPinned = true;
     if (!seeAll) q.author = req.user._id;
     if (KINDS.includes(req.query.kind)) q.kind = req.query.kind;
     if (SOURCES.includes(req.query.sourceType)) q.sourceType = req.query.sourceType;
     if (req.query.pending === 'true') q.need_approval = true;
+
     const { filter, empty } = await buildTaxonomyFilter({
         category: qList(req.query, 'category'), subCategory: qList(req.query, 'subCategory'),
         state: qList(req.query, 'state'), district: qList(req.query, 'district'), tag: qList(req.query, 'tag'),
     });
-    if (empty) return res.status(200).json({ success: true, items: [], total: 0, page, limit });
+    if (empty) return res.status(200).json({ success: true, items: [], total: 0, page, limit, pinnedCount: 0 });
     Object.assign(q, filter);
+
     if (req.query.search) {
         const rx = new RegExp(escapeRegex(String(req.query.search).trim().slice(0, 100)), 'i');
         const tax = await findTaxonomyByName(rx);
@@ -170,10 +177,19 @@ export const getShortVideosAdmin = tryCatch(async (req, res) => {
         if (tax.tags.length) or.push({ tags: { $in: tax.tags } });
         q.$and = [...(q.$and || []), { $or: or }];
     }
-    const [items, total] = await Promise.all([
+
+    // pinFirst=true (default): pinned on top, newest pin first.
+    // pinFirst=false: normal list by date (pins stay where their date puts them).
+    // _id is a tie-breaker so pagination stays stable.
+    const pinFirst = req.query.pinFirst !== 'false';
+    const sort = pinFirst
+        ? { isPinned: -1, pinnedAt: -1, createdAt: -1, _id: -1 }
+        : { createdAt: -1, _id: -1 };
+
+    const [items, total, pinnedCount] = await Promise.all([
         ShortVideo
             .find(q)
-            .sort({ createdAt: -1 })
+            .sort(sort)
             .skip(skip)
             .limit(limit)
             .populate('author', 'username fullName profile')
@@ -182,10 +198,66 @@ export const getShortVideosAdmin = tryCatch(async (req, res) => {
             .populate({ path: 'category', select: 'name slug -_id' })
             .populate({ path: 'tags', select: 'title slug -_id' })
             .lean(),
-
         ShortVideo.countDocuments(q),
+        ShortVideo.countDocuments({ isDeleted: false, isPinned: true }),
     ]);
-    res.status(200).json({ success: true, items, total, page, limit });
+
+    res.status(200).json({ success: true, items, total, page, limit, pinnedCount });
+});
+
+// unpin the oldest pins until at most MAX_PINNED remain; returns the removed items
+const trimPins = async () => {
+    const pinned = await ShortVideo.find({ isDeleted: false, isPinned: true })
+        .sort({ pinnedAt: 1 }).select('_id title update_stack');
+    const remove = pinned.slice(0, Math.max(0, pinned.length - MAX_PINNED));
+    if (!remove.length) return [];
+    await ShortVideo.updateMany(
+        { _id: { $in: remove.map((x) => x._id) } },
+        { $set: { isPinned: false }, $unset: { pinnedAt: '', pinnedBy: '' } }
+    );
+    return remove;
+};
+
+export const pinShortVideo = tryCatch(async (req, res) => {
+    if (!req.can(P.VIDEO_PUBLISH)) throw new ErrorHandler(403, `Missing permission: ${P.VIDEO_PUBLISH}`);
+
+
+    const v = await ShortVideo.findOne({ slug: String(req.params.slug).toLowerCase(), isDeleted: false });
+    if (!v) throw new ErrorHandler(404, 'Video not found');
+
+    const pin = req.body?.pin === undefined ? !v.isPinned : toBool(req.body.pin);
+    const replace = toBool(req.body?.replace);
+    if (pin === v.isPinned) return res.status(200).json({ success: true, message: pin ? 'Already pinned' : 'Already unpinned', isPinned: pin });
+
+    if (pin) {
+        if (v.draft || !v.isPublished || v.need_approval) throw new ErrorHandler(400, 'Only published videos can be pinned');
+        if (!replace) {
+            const current = await ShortVideo.find({ isDeleted: false, isPinned: true })
+                .sort({ pinnedAt: 1 }).select('slug title -_id').lean();
+            if (current.length >= MAX_PINNED) {
+                return res.status(409).json({
+                    success: false,
+                    code: 'PIN_LIMIT',
+                    message: `${MAX_PINNED} videos are already pinned.`,
+                    willRemove: current.slice(0, current.length - MAX_PINNED + 1),
+                });
+            }
+        }
+    }
+
+    await ShortVideo.updateOne(
+        { _id: v._id },
+        pin
+            ? { $set: { isPinned: true, pinnedAt: new Date(), pinnedBy: req.user._id } }
+            : { $set: { isPinned: false }, $unset: { pinnedAt: '', pinnedBy: '' } }
+    );
+
+    const replaced = pin ? await trimPins() : [];
+    replaced.forEach((r) => pushStack(r.update_stack, req.user._id, 'Unpinned (replaced by a newer pin)'));
+    pushStack(v.update_stack, req.user._id, pin ? 'Pinned' : 'Unpinned');
+
+    res.status(200).json({ success: true, message: pin ? 'Pinned' : 'Unpinned', isPinned: pin, replaced: replaced.map((x) => x.title) });
+    // onNewsChanged();
 });
 
 /** may the caller touch this video? own / any, and auto-imported items (no author) need video.manage.any or video.shorts.manage */
@@ -236,7 +308,10 @@ export const updateShortVideo = tryCatch(async (req, res) => {
         v.draft = toBool(b.draft);
         Object.assign(v, approvalCleared);
         v.need_approval = false;
-        if (v.draft) v.isPublished = false;
+        if (v.draft) {
+            v.isPublished = false;
+            v.isPinned = false; v.pinnedAt = undefined; v.pinnedBy = undefined;
+        }
         else if (req.can(P.VIDEO_PUBLISH)) { v.isPublished = true; v.publishedAt = v.publishedAt || new Date(); }
         else { v.isPublished = false; v.need_approval = true; }
         changes.push(v.draft ? 'moved to draft' : v.isPublished ? 'published' : 'submitted for approval');
@@ -266,6 +341,7 @@ export const updateShortVideo = tryCatch(async (req, res) => {
 export const deleteShortVideo = tryCatch(async (req, res) => {
     const v = await findEditable(req);
     v.isDeleted = true;
+    v.isPinned = false; v.pinnedAt = undefined; v.pinnedBy = undefined;
     await v.save();
     pushStack(v.update_stack, req.user._id, 'Video deleted');
     res.status(200).json({ success: true, message: 'Video deleted' });

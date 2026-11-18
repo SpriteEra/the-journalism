@@ -74,6 +74,8 @@ const HomeSections = lazy(() => import("./pages/homesection/HomeSection"));   //
 const ShortVideos = lazy(() => import("./pages/shortVideos/ShortVideos"));
 const LiveNews = lazy(() => import("./pages/live/LiveNews"));
 const LiveNewsForm = lazy(() => import("./pages/live/LiveNewsForm"));
+const MediaLibrary = lazy(() => import("./pages/media/MediaLibrary"));
+const MediaEditor = lazy(() => import("./pages/media/MediaEditor"));
 
 const App = () => {
   const dispatch = useDispatch();
@@ -187,6 +189,12 @@ const App = () => {
             <Route path="breaking-news" element={<ProtectedRoute component={BreakingNews} permission="breaking.manage" />} />
 
             {/* media */}
+            <Route path="media" element={<ProtectedRoute component={MediaLibrary} permission={["media.view", "media.upload"]} />} />
+            <Route path="media/new" element={<ProtectedRoute component={MediaEditor} permission="media.upload" />} />
+            <Route path="media/:id/edit" element={<ProtectedRoute component={MediaEditor} permission={["media.update", "media.upload"]} />} />
+
+
+
 
             <Route path="short-videos" element={<ProtectedRoute component={ShortVideos} permission={VIDEO_PERMS} />} />
             <Route path="short-videos/new" element={<ProtectedRoute component={ShortVideoFormPage} permission={["video.create"]} />} />

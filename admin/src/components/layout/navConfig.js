@@ -27,6 +27,7 @@ export const NAV = [
     items: [
       { label: "Shorts & videos", to: "/dashboard/short-videos", icon: PlaySquare, perm: ["video.create", "video.manage.own", "video.manage.any", "video.shorts.manage", "video.approve"] },
       { label: "YouTube news", to: "/dashboard/videos", icon: Video, perm: ["yt.create", "yt.manage.own", "yt.manage.any", "yt.approve"] },
+      { label: "Media library", to: "/dashboard/media", icon: Images, perm: ["media.view", "media.upload"] },
       // { label: "Photo gallery", to: "/dashboard/photo-gallery", icon: Images, perm: ["gallery.create", "gallery.manage.own", "gallery.manage.any"] },
       // { label: "Events", to: "/dashboard/events", icon: CalendarCheck, perm: ["event.create", "event.manage.own", "event.manage.any"] },
       // { label: "Event categories", to: "/dashboard/admin-events", icon: CalendarCog, perm: ["event.category.manage"] },

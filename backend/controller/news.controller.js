@@ -1,6 +1,7 @@
 import News from "../model/news.models.js";
 import tryCatch from "../utils/asyncFunction.js";
 import ErrorHandler from "../utils/errorHandler.js";
+import { readMediaInput } from '../utils/mediaRef.js';
 import User from "../model/user.model.js";
 import { sendNewsNotification, } from "./pushnotification.controller.js";
 import { deleteImage, uploadImage } from "../utils/uploadImage.js";
@@ -182,59 +183,6 @@ export const getNewses = tryCatch(async (req, res) => {
     const news = toCards(rows);
     return res.status(200).json(body.iscount ? { news, total } : news);
 });
-// export const incrementCount = tryCatch(async (req, res, next) => {
-//     const { type, id } = req.params;
-//     const cfg = VIEW_TYPES[type];
-//     if (!cfg) return next(new ErrorHandler(400, "Invalid type"));
-
-//     // author / category / state are needed by the hourly analytics (trackRead)
-//     const doc = await cfg.Model.findOne(cfg.where(id)).select("_id author category state").lean();
-//     if (!doc) return next(new ErrorHandler(404, "Not found"));
-
-//     trackView(req, type, doc, id).catch(() => { });   // no await: the reader doesn't wait for counting
-//     return res.status(200).json({ success: true });
-// });
-
-// export const getRelatedNews = tryCatch(async (req, res, next) => {
-//     let { is_literature = false } = req.query;      // incrementVal removed
-//     const { news_id } = req.params;
-
-//     const news = await News.findOne({ news_id }).select('tags category subCategory').lean();
-
-//     if (!news) return next(new ErrorHandler(404, "News not found"));
-
-//     const or = [];
-//     if (news.tags?.length) or.push({ tags: { $in: news.tags } });
-//     if (news.category?.length) or.push({ category: { $in: news.category } });
-//     if (news.subCategory?.length) or.push({ subCategory: { $in: news.subCategory } });
-
-//     const query = { ...PUBLIC_Q, is_literature: toBool(is_literature), news_id: { $ne: news_id } };
-//     if (or.length) query.$or = or;
-
-//     let relatedNews = await News.find(query).limit(6).sort({ post_time: -1 })
-//         .select('news_id slug primaryRoute.slug title banner -_id post_time updatedAt').lean();
-
-//     if (relatedNews.length === 0) {
-//         relatedNews = await News.aggregate([
-//             { $match: { isPublished: true, isDeleted: false, draft: false, news_id: { $ne: news_id } } },
-//             { $sample: { size: 6 } },
-//             { $project: { _id: 0, news_id: 1, slug: 1, 'primaryRoute.slug': 1, title: 1, banner: 1, post_time: 1, updatedAt: 1 } },
-//         ]);
-//     }
-//     return res.status(200).json(relatedNews.map((n) => ({ ...n, path: newsPath(n) })));
-// });
-
-/** Latest news by date (post_time desc). GET /news/latest?page=&limit=&state=&district=&category=&subCategory=  (id or slug) */
-// export const getLatestNews = tryCatch(async (req, res) => {
-//     const page = clampInt(req.query.page, 1, 1, 100000);
-//     const limit = clampInt(req.query.limit, 12, 1, 50);
-//     const { filter, empty } = await buildTaxonomyFilter(req.query);
-//     if (empty) return res.status(200).json({ success: true, news: [], hasMore: false, page, limit });
-//     const rows = await News.find({ ...PUBLIC_Q, ...filter }).sort({ post_time: -1, _id: -1 }).skip((page - 1) * limit).limit(limit + 1)
-//         .select('news_id slug primaryRoute.slug title description banner location post_time tags -_id').populate({ path: 'tags', select: 'title slug -_id' }).lean();
-//     setPublicCache(res, 30);
-//     res.status(200).json({ success: true, news: rows.slice(0, limit), hasMore: rows.length > limit, page, limit });
-// });
 
 const FEATURED_SELECT = 'news_id slug primaryRoute.kind primaryRoute.ref primaryRoute.slug primaryRoute.name title description banner post_time featured isVideo author -_id ';
 
@@ -280,60 +228,6 @@ export const clearFeatured = tryCatch(async (req, res) => {
     onNewsChanged();
     return res.status(200).json({ success: true, cleared: r.modifiedCount });
 });
-
-// export const getSingleNews = tryCatch(async (req, res, next) => {
-//     // the param is the story's slug (new URLs) or its news_id (old URLs)
-//     const key = String(req.params.news_id || '').slice(0, 200);
-//     const news = await News.findOne({ $or: [{ slug: key }, { news_id: key }] })
-//         .select('news_id slug primaryRoute title description content tags banner location post_time contentUpdatedAt createdAt updatedAt imageRef isVideo isPublished isDeleted draft video ref_reporter seo relatedNews category subCategory state district author -_id')
-//         .populate(TAXONOMY_POPULATE)
-//         .populate('author', 'fullName about designation profile profileUrl username')
-//         .populate({ path: 'relatedNews', match: { draft: false, isPublished: true, isDeleted: false }, select: 'news_id slug primaryRoute.slug title banner -_id' })
-//         .lean();
-
-//     if (!news) return next(new ErrorHandler(404, "News not found"));
-//     if (news.draft || news.isDeleted || !news.isPublished) return res.status(400).json({ message: "News not available" });
-
-//     const convertToIST = (date) => new Date(new Date(date).getTime() + (5.5 * 60 * 60 * 1000));
-//     const { seo: seoData = {}, relatedNews: relatedDocs = [], ...newsRest } = news;
-//     const tagTitles = (news.tags || []).map((t) => t.title);      // populated tags -> plain titles for meta keywords / JSON-LD
-//     const article = {
-//         ...newsRest,
-//         news_post_time: convertToIST(news.post_time),
-//         news_update_time: convertToIST(news.contentUpdatedAt || news.createdAt),
-//         related: (relatedDocs || []).filter(Boolean).map((r) => ({ news_id: r.news_id, title: r.title, banner: r.banner, path: newsPath(r) })),     // internal links, with the canonical path
-//         post_time: news.post_time,
-//         updatedAt: news.updatedAt,
-//     };
-
-//     // breadcrumb + JSON-LD section use the first category, and the first sub-category that sits under it
-//     const primary = news.category?.[0];
-//     const primarySub = (news.subCategory || []).find((s) => String(s.parent) === String(primary?._id)) || news.subCategory?.[0];
-//     const section = primary?.name;
-//     const breadcrumbs = [{ name: 'Home', url: seoConfig.siteUrl() || '/' }];
-//     if (primary) breadcrumbs.push({ name: primary.name, url: buildUrl('category', { slug: primary.slug }) });
-//     if (primarySub) breadcrumbs.push({ name: primarySub.name, url: buildUrl('category', { slug: primarySub.slug }) });
-//     const news_id = news.news_id;
-//     const url = newsUrl(news);
-//     breadcrumbs.push({ name: seoData.breadcrumbTitle || news.title, url });
-
-//     const seo = {
-//         meta: resolveSeo({ seo: seoData, title: news.title, description: news.description, image: news.banner, url, ogType: 'article', publishedTime: news.post_time, modifiedTime: news.contentUpdatedAt || news.updatedAt, section, tags: tagTitles, author: news.ref_reporter || undefined }),
-//         jsonLd: assembleJsonLd(
-//             newsArticleLd({ seo: seoData, title: news.title, description: news.description, image: news.banner, url, published: news.post_time, modified: news.contentUpdatedAt || news.updatedAt, author: news.ref_reporter, section, keywords: tagTitles }),
-//             { seo: seoData, breadcrumbs },
-//         ),
-//         settings: seoData,
-//     };
-
-//     const latest_news = await News.find({ ...PUBLIC_Q, news_id: { $ne: news_id } })
-//         .sort({ post_time: -1 }).limit(1).select('news_id title post_time -_id');
-
-//     // canonicalPath: where this story lives. A link with a wrong / old section (?path=/wrong/news/<slug>) still opens the story;
-//     // needsRedirect tells the site to 301 to canonicalPath.
-//     const canonicalPath = newsPath(news);
-//     return res.status(200).json({ news: article, latest_news: latest_news[0], seo, canonicalPath, canonicalUrl: url, needsRedirect: needsRedirect(news, req.query.path) });
-// });
 
 export const fetchOnlyToday = tryCatch(async (req, res, next) => {
     // Get start & end of today in IST
@@ -393,93 +287,6 @@ export const findStateNews = tryCatch(async (req, res) => {
 /** GET /news/search-news?search=&page=&limit=  – title, location and the NAMES of tags / categories / states / districts */
 // ड़ / ढ़ / क़ ... can be stored as one character or as letter + nukta; accept both
 const NUKTA = { '\u0915\u093C': '\u0958', '\u0916\u093C': '\u0959', '\u0917\u093C': '\u095A', '\u091C\u093C': '\u095B', '\u0921\u093C': '\u095C', '\u0922\u093C': '\u095D', '\u092B\u093C': '\u095E', '\u092F\u093C': '\u095F' };
-const tolerantPattern = (s) => {
-    let out = escapeRegex(s.normalize('NFC'));            // NFC splits the one-character form into letter + nukta
-    for (const [split, joined] of Object.entries(NUKTA)) out = out.split(split).join(`(?:${split}|${joined})`);
-    return out;
-};
-
-// export const searchNews = tryCatch(async (req, res) => {
-//     const search = String(req.query.search || '').trim().slice(0, 150);
-//     const page = clampInt(req.query.page, 1, 1, 100000);
-//     const limit = clampInt(req.query.limit, 20, 1, 50);
-//     const TAG_LIMIT = 5;
-
-//     const query = { ...PUBLIC_Q };
-//     let tokenRx = [];
-//     let phraseRx = null;
-
-//     if (search) {
-//         const tokens = search.split(/\s+/).filter(Boolean).slice(0, 8);           // every word must appear, in any order
-//         tokenRx = tokens.map((t) => new RegExp(tolerantPattern(t), 'i'));
-//         phraseRx = new RegExp(tolerantPattern(search), 'i');
-
-//         const tax = await findTaxonomyByName(phraseRx);
-
-//         // each word may match title, location, news_id (English slug) or keywords
-//         const tokenClause = (rx) => ({ $or: [{ title: rx }, { location: rx }, { news_id: rx }, ...keywordClauses(rx)] });
-//         const or = [{ $and: tokenRx.map(tokenClause) }];
-
-//         if (tax.tags.length) or.push({ tags: { $in: tax.tags } });
-//         if (tax.category.length) or.push({ category: { $in: tax.category } });
-//         if (tax.subCategory.length) or.push({ subCategory: { $in: tax.subCategory } });
-//         if (tax.state.length) or.push({ state: { $in: tax.state } });
-//         if (tax.district.length) or.push({ district: { $in: tax.district } });
-//         query.$or = or;
-//     }
-
-//     // live blogs + topic tags: only on page 1 and only when searching, so paging of normal news stays correct
-//     const wantExtras = Boolean(search) && page === 1;
-
-//     const [rows, total, liveRows, tagRows] = await Promise.all([
-//         News.find(query).sort({ post_time: -1 }).skip((page - 1) * limit).limit(limit).select(CARD_FIELDS).lean(),
-//         News.countDocuments(query),
-//         wantExtras
-//             ? liveNewsModel.find({
-//                 isDeleted: false,
-//                 status: { $in: ['live', 'ended'] },
-//                 $and: tokenRx.map((rx) => ({ $or: [{ title: rx }, { slug: rx }, { tags: rx }] })),
-//             }).sort({ post_time: -1 }).limit(5).select('title slug image caption status post_time startTime').lean()
-//             : Promise.resolve([]),
-//         wantExtras && phraseRx
-//             ? tagModel.find({
-//                 isDeleted: false, isActive: true, mergedInto: null,
-//                 $or: [{ title: phraseRx }, { aliases: phraseRx }],
-//             }).sort({ isFeatured: -1, title: 1 }).limit(TAG_LIMIT).select('title slug image').lean()
-//             : Promise.resolve([]),
-//     ]);
-
-//     // tags: direct matches first, then fill up to 5 from the most used tags of the top matching stories
-//     let tags = tagRows;
-//     if (wantExtras && tags.length < TAG_LIMIT) {
-//         const top = await News.find(query).sort({ post_time: -1 }).limit(30).select('tags -_id').lean();
-
-//         const freq = new Map();
-//         for (const n of top) for (const id of n.tags || []) freq.set(String(id), (freq.get(String(id)) || 0) + 1);
-
-//         const have = new Set(tags.map((t) => String(t._id)));
-//         const ids = [...freq.entries()]
-//             .filter(([id]) => !have.has(id))
-//             .sort((a, b) => b[1] - a[1])                 // most used first
-//             .slice(0, TAG_LIMIT * 2)                     // spare ones, in case some are inactive / merged
-//             .map(([id]) => id);
-
-//         if (ids.length) {
-//             const extra = await tagModel.find({ _id: { $in: ids }, isDeleted: false, isActive: true, mergedInto: null })
-//                 .select('title slug image').lean();
-//             const order = new Map(ids.map((id, i) => [id, i]));
-//             extra.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
-//             tags = [...tags, ...extra];
-//         }
-//     }
-
-//     return res.status(200).json({
-//         news: toCards(rows),
-//         total,
-//         live: liveRows.map(toLiveCard),
-//         tags: tags.slice(0, TAG_LIMIT).map((t) => ({ id: String(t._id), title: t.title, slug: t.slug, image: t.image || '' })),
-//     });
-// });
 
 export const getNewsInfiniteScroll = tryCatch(async (req, res, next) => {
     const { news_id } = req.params;
@@ -536,47 +343,6 @@ export const getNewsXMLData = tryCatch(async (req, res, next) => {
         .exec();
 
     return res.status(200).json(news)
-
-    // // Define your base URL (replace with your actual base URL)
-    // const baseUrl = process.env.FRONTEND_URL;
-    // const convertToIST = (date) => {
-    //     return new Date(date).toLocaleString('en-IN', {
-    //         timeZone: 'Asia/Kolkata',
-    //         year: 'numeric',
-    //         month: '2-digit',
-    //         day: '2-digit',
-    //         hour: '2-digit',
-    //         minute: '2-digit',
-    //         second: '2-digit',
-    //         hour12: true,
-    //     }).replace(",", ""); // Formatting the output for desired structure
-    // };
-    // // Generate the sitemap XML
-    // const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-    // <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
-    //   ${news
-    //         .map(
-    //             (article) => `
-    //     <url>
-    //       <loc>${baseUrl}/news/${article.news_id}</loc>
-    //       <lastmod>${convertToIST(article.updatedAt)}</lastmod>
-    //       <news:news>
-    //         <news:publication>
-    //           <news:name>The Journalism</news:name>
-    //           <news:language>hi</news:language>
-    //         </news:publication>
-    //         <news:publication_date>${convertToIST(article.post_time)}</news:publication_date>
-    //         <news:title>${article.title}</news:title>
-    //       </news:news>
-    //     </url>
-    //   `
-    //         )
-    //         .join("")}
-    // </urlset>`;
-
-    // res.set('Content-Type', 'text/xml');
-
-    // res.send(sitemap);
 });
 
 
@@ -642,6 +408,7 @@ export const createNewsByReporter = tryCatch(async (req, res) => {
     const relatedIds = parseRelatedIds(b.relatedNews);
     const layout = ['standard', 'wide', 'immersive'].includes(b.layout) ? b.layout : undefined;
     const bannerFile = req.files?.banner;
+    const imageIn = await readMediaInput(b, 'bannerMedia', 'banner');     // media-library image chosen by reference
 
     if (!title) throw new ErrorHandler(400, `You must provide a title to ${draft ? 'save' : 'publish'} a news`);
     if (title.length > 300) throw new ErrorHandler(400, 'Title cannot exceed 300 characters');
@@ -656,7 +423,7 @@ export const createNewsByReporter = tryCatch(async (req, res) => {
     });
     if (!draft && !primaryRoute) throw new ErrorHandler(400, 'Choose a category, sub-category or state for the story URL');
     if (!draft && !primaryRoute) throw new ErrorHandler(400, 'Choose a category or a state for the story URL');
-    if (!draft) assertPublishable({ description, content, tags: tagItems, hasBanner: Boolean(bannerFile), isVideo, video: b.video });
+    if (!draft) assertPublishable({ description, content, tags: tagItems, hasBanner: Boolean(bannerFile || imageIn?.media), isVideo, video: b.video });
 
     const canPublish = req.can(P.NEWS_PUBLISH);
     const publishVal = !draft && canPublish;
@@ -669,17 +436,17 @@ export const createNewsByReporter = tryCatch(async (req, res) => {
         featured = await prepareFeature(req, featureReq, null);
     }
 
-    let banner = '';
+    let banner = ''; let bannerMedia;
     if (bannerFile) {
         try { banner = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
         catch (error) { throw new ErrorHandler(502, `Failed to upload banner image: ${error.message}`); }
-    }
+    } else if (imageIn?.media) { banner = imageIn.media.url; bannerMedia = imageIn.media._id; }
 
     // existing tags are looked up (id / slug / title / alias); unknown titles are created when the caller has tag.create
     const tg = await resolveNewsTags(tagItems.map((i) => i.id ?? i.text), { canCreate: req.can(P.TOPIC_CREATE), userId: authorId, requireTag: !draft });
     const news_id = `${await makeSlug(title)}-${getCurrentDate()}-${generateNanoId()}`;
     const news = new News({
-        title, description, content: content ?? [], tags: tg.ids, keywords: keywords ?? { hi: [], en: [] }, aiGeneratedTags: aiGeneratedTags ?? [], banner, location: location ?? '',
+        title, description, content: content ?? [], tags: tg.ids, keywords: keywords ?? { hi: [], en: [] }, aiGeneratedTags: aiGeneratedTags ?? [], banner, ...(bannerMedia ? { bannerMedia } : {}), location: location ?? '',
         category: tax.category, subCategory: tax.subCategory, state: tax.state, district: tax.district,
         draft, news_id, is_literature: toBool(b.is_literature), author: authorId, ref_reporter: b.ref_reporter || '',
         imageRef: b.imageRef || '', isVideo, video: b.video || '', isPublished: publishVal, need_approval: needApproval,
@@ -741,9 +508,9 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     const relatedIds = parseRelatedIds(b.relatedNews);
     const layoutIn = ['standard', 'wide', 'immersive'].includes(b.layout) ? b.layout : undefined;
     const bannerFile = req.files?.banner;
-
     const news = await News.findOne({ news_id: b.id });
     if (!news || news.isDeleted) return res.status(404).json({ success: false, message: 'News not Found' });
+    const imageIn = await readMediaInput(b, 'bannerMedia', 'banner', { keep: news.bannerMedia });
 
     // ── who may touch this record ──
     assertOwnOrAny(req, news.author, P.NEWS_UPDATE_OWN, P.NEWS_UPDATE_ANY, "You don't have permission to update this news");
@@ -782,7 +549,7 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     if (!isDraft) {
         assertPublishable({
             description: description ?? news.description, content: content ?? news.content, tags: tagItems ?? news.tags,
-            hasBanner: Boolean(bannerFile || b.banner || news.banner), isVideo: videoFlag, video: b.video !== undefined ? b.video : news.video,
+            hasBanner: Boolean(bannerFile || imageIn?.media || (!imageIn?.clear && (b.banner || news.banner))), isVideo: videoFlag, video: b.video !== undefined ? b.video : news.video,
         });
     }
 
@@ -845,20 +612,27 @@ export const updateNewsByReporter = tryCatch(async (req, res) => {
     if (bannerFile) {
         try { uploadedBanner = await uploadImage(bannerFile.data, bannerFile.name, 'news'); }
         catch (error) { throw new ErrorHandler(502, `Failed to upload banner image: ${error.message}`); }
-        updateData.banner = uploadedBanner; changes.push('Banner image updated');
-    } else if (b.banner !== undefined && b.banner !== news.banner) { updateData.banner = b.banner; changes.push('Banner image updated'); }
+        updateData.banner = uploadedBanner; updateData.bannerMedia = undefined; changes.push('Banner image updated');
+    } else if (imageIn?.media) {
+        if (news.banner !== imageIn.media.url || String(news.bannerMedia || '') !== String(imageIn.media._id)) {
+            updateData.banner = imageIn.media.url; updateData.bannerMedia = imageIn.media._id; changes.push('Banner image updated');
+        }
+    } else if (imageIn?.clear) {
+        if (news.banner || news.bannerMedia) { updateData.banner = ''; updateData.bannerMedia = undefined; changes.push('Banner image removed'); }
+    } else if (b.banner !== undefined && b.banner !== news.banner) { updateData.banner = b.banner; updateData.bannerMedia = undefined; changes.push('Banner image updated'); }
 
     if (Object.keys(updateData).length === 0) return res.status(200).json({ success: true, message: 'No changes detected', news });
 
     updateData.contentUpdatedAt = now;
     updateData.updatedBy = actorId;
     const oldBanner = news.banner;
+    const oldBannerMedia = news.bannerMedia;                                 // a library image's file is shared: never deleted from here
     const becameLive = updateData.isPublished === true && !news.post_time;    // first time this news goes live
     // full document validation (category rule etc.) -assign + save instead of findOneAndUpdate so hooks run
     news.set(updateData);
     await news.save();
     if (featureNow) await unfeatureOthers(news._id);
-    if (uploadedBanner && oldBanner) deleteImage(oldBanner).catch(() => { });   // old image goes only after the new save succeeded
+    if (uploadedBanner && oldBanner && !oldBannerMedia) deleteImage(oldBanner).catch(() => { });   // old image goes only after the new save succeeded
 
     await stackPush(news.update_stack, actorId, changes.join(', '));
     onNewsChanged();
@@ -961,7 +735,7 @@ export const getNewsByReporter = tryCatch(async (req, res) => {
             .populate('state', 'state displayName slug -_id').populate('district', 'district displayName slug -_id')
             .populate('tags', 'title slug -_id')
             .skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 })
-            .select('news_id title description draft banner createdAt activity isPublished update_stack need_approval approved_by approved_at rejected_reason rejected_by rejected_at post_time category subCategory state district tags keywords author -_id').lean(),
+            .select('news_id slug primaryRoute.slug title description draft banner createdAt activity isPublished update_stack need_approval approved_by approved_at rejected_reason rejected_by rejected_at post_time category subCategory state district tags keywords author -_id').lean(),
         News.countDocuments(query),
     ]);
     return res.status(200).json({ news, total, page, limit });
@@ -969,8 +743,16 @@ export const getNewsByReporter = tryCatch(async (req, res) => {
 
 /** GET /admin/news-authors -people who wrote news (for the "Created by" filter). Needs news.view.all. */
 export const getNewsAuthors = tryCatch(async (req, res) => {
+    const q = req.query;
+    // same slice the list page shows: published (default), drafts, or the approval queue
+    const match = {
+        isDeleted: false,
+        draft: q.draft === 'true',
+        need_approval: q.need_approval === 'true',
+    };
+
     const rows = await News.aggregate([
-        { $match: { isDeleted: false } },
+        { $match: match },
         { $group: { _id: '$author', total: { $sum: 1 } } },
         { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u' } },
         { $unwind: '$u' },
