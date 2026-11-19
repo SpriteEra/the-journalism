@@ -167,8 +167,8 @@ export async function getAuthorNews(username, { page = 1, limit = 12 } = {}) {
 }
 
 // ───────────────────────── videos & shorts ─────────────────────────
-export async function getShorts({ page = 1, limit = 12 } = {}) {
-  const r = await safe(apiGet("/shorts", { params: { kind: "short", page, limit }, revalidate: TTL.list() }), { videos: [], hasMore: false });
+export async function getShorts({ page = 1, limit = 12, pinned = false } = {}) {
+  const r = await safe(apiGet("/shorts", { params: { kind: "short", page, limit, ...(pinned && { pinned: true }) }, revalidate: TTL.list() }), { videos: [], hasMore: false });
   return { items: (r.videos || []).map(toShort).filter(Boolean), hasMore: Boolean(r.hasMore) };
 }
 
@@ -188,8 +188,8 @@ export async function getNextShorts(slug, { exclude = [], limit = 5 } = {}) {
   return { items: (r.videos || []).map(toShort).filter(Boolean), hasMore: Boolean(r.hasMore) };
 }
 
-export async function getVideos({ page = 1, limit = 12 } = {}) {
-  const r = await safe(apiGet("/yt/video-news", { params: { page, limit }, revalidate: TTL.list() }), { news: [], total: 0 });
+export async function getVideos({ page = 1, limit = 12, pinned = false } = {}) {
+  const r = await safe(apiGet("/yt/video-news", { params: { page, limit, ...(pinned && { pinned: true }) }, revalidate: TTL.list() }), { news: [], total: 0 });
   return { items: (r.news || []).map(toVideo).filter(Boolean), total: r.total ?? r.news?.length ?? 0 };
 }
 

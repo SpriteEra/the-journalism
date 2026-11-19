@@ -195,8 +195,8 @@ const Navbar = ({ items = [], topics = [] }) => {
                             src="/logo.png"
                             alt="The Journalism Logo"
                             width={300}
-                            height={40}
-                            className="h-7 sm:h-10 w-fit object-contain"
+                            height={48}
+                            className="h-7 sm:h-12 w-fit object-contain"
                         />
                     </Link>
 

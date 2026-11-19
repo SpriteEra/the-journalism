@@ -8,7 +8,7 @@ import Link from "next/link";
  */
 
 const SITE_NAME = "The Journalism";
-const LOGO = "/logo.png";
+const LOGO = "/logo-white.png";
 const COMPANY = "T & J Media";
 const SOCIALS = [
     {
@@ -75,13 +75,13 @@ export default function Footer() {
             <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-10">
                 {/* brand + socials */}
                 <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
-                    <Link href="/" className="flex items-center gap-3 sm:gap-4 bg-white p-2 rounded-md" aria-label={`${SITE_NAME} home`}>
+                    <Link href="/" className="flex items-center gap-3 sm:gap-4" aria-label={`${SITE_NAME} home`}>
                         <Image
                             src={LOGO}
                             alt=""
                             width={300}
-                            height={36}
-                            className="h-8 w-fit object-contain sm:h-10"
+                            height={48}
+                            className="h-8 w-fit object-contain sm:h-16"
                         />
                     </Link>
 

@@ -132,9 +132,9 @@ const page = async () => {
     const [featured, sections, live, videos, shorts] = await Promise.all([
         getFeatured(),
         getHomeSections(),
-        getLiveList({ limit: 8 }),
-        getVideos({ limit: 2 }),
-        getShorts({ limit: 14 }),
+        getLiveList({ limit: 5 }),
+        getVideos({ limit: 2, pinned: true }),
+        getShorts({ limit: 14, pinned: true }),
     ]);
 
     const hero = featured || null;

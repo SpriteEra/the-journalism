@@ -583,8 +583,11 @@ export const getVideoNews = tryCatch(async (req, res, next) => {
 
     iscount = iscount === 'true' || iscount === true;
 
+    // ?pinned=true (home page only): pinned videos first, latest pin on top. Without it (list pages) the order stays newest first.
+    const pinnedFirst = req.query.pinned === 'true' || req.query.pinned === true;
+    const sort = pinnedFirst ? { isPinned: -1, pinnedAt: -1, createdAt: -1, _id: -1 } : { createdAt: -1 };
     const ytnews = await YtNews.find(PUBLIC_Q)
-        .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit)
+        .sort(sort).skip((page - 1) * limit).limit(limit)
         .select('news_id title seo.metaTitle videoLinkId createdAt -_id').lean();
 
     let ytnewsCount = 0;
@@ -771,7 +774,10 @@ export const getShortVideos = tryCatch(async (req, res) => {
 
     if (empty) return res.status(200).json({ success: true, videos: [], hasMore: false, page, limit });
 
-    const rows = await ShortVideo.find({ ...q, ...filter }).sort({ publishedAt: -1, _id: -1 }).skip(skip).limit(limit + 1).select(LIST).populate(TAGS_POPULATE).lean();
+    // ?pinned=true (home page only): pinned shorts first, latest pin on top. Without it the order stays newest first.
+    const pinnedFirst = req.query.pinned === 'true' || req.query.pinned === true;
+    const sort = pinnedFirst ? { isPinned: -1, pinnedAt: -1, publishedAt: -1, _id: -1 } : { publishedAt: -1, _id: -1 };
+    const rows = await ShortVideo.find({ ...q, ...filter }).sort(sort).skip(skip).limit(limit + 1).select(LIST).populate(TAGS_POPULATE).lean();
 
     setPublicCache(res, 60);
 

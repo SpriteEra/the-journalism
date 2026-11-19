@@ -53,7 +53,7 @@ const VideoSection = ({
 
             <div className="lg:mt-2 text-right">
                 <Link href={'/videos'} className="text-sm lg:text-[15px] font-semibold text-primary hover:underline flex items-center justify-end gap-1">
-                    और पढ़ें <ChevronRight className="size-4" />
+                    और देखें  <ChevronRight className="size-4" />
                 </Link>
             </div>
         </section>
